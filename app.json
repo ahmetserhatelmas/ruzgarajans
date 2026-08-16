@@ -1,23 +1,38 @@
 {
   "expo": {
-    "name": "ajansapp",
+    "name": "Rüzgâr Ajans",
     "slug": "ajansapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "ajansapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ruzgarajans.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Tanıtım ve audition videoları çekmek için kamera erişimi gerekir.",
+        "NSMicrophoneUsageDescription": "Video kaydı için mikrofon erişimi gerekir.",
+        "NSPhotoLibraryUsageDescription": "Portföy fotoğrafları seçmek için galeri erişimi gerekir.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.ruzgarajans.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#121418",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -26,17 +41,41 @@
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Tanıtım ve audition videoları çekmek için kamera erişimi gerekir.",
+          "microphonePermission": "Video kaydı için mikrofon erişimi gerekir.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Portföy fotoğrafları seçmek için galeri erişimi gerekir."
+        }
+      ],
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#F3EFE7"
         }
-      ]
+      ],
+      "expo-audio",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fa749bd7-a0ea-4af1-aae5-51fa5a90dd05"
+      }
+    },
+    "owner": "4se"
   }
 }
