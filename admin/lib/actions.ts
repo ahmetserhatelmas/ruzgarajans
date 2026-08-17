@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { ActorStatus, ApplicationStatus } from "@/lib/types";
+import { notifyMatchingActors } from "@/lib/notify-cast";
+import type { ActorStatus, ApplicationStatus, CastListing, GenderPref } from "@/lib/types";
 
 export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -80,9 +81,17 @@ export async function upsertCastAction(formData: FormData) {
     role_description: String(formData.get("role_description") ?? "").trim(),
     age_min: numOrNull(formData.get("age_min")),
     age_max: numOrNull(formData.get("age_max")),
-    gender: String(formData.get("gender") ?? "any"),
+    gender: String(formData.get("gender") ?? "any") as GenderPref,
     height_min_cm: numOrNull(formData.get("height_min_cm")),
     height_max_cm: numOrNull(formData.get("height_max_cm")),
+    nationalities: formData
+      .getAll("nationalities")
+      .map((value) => String(value).trim().toUpperCase())
+      .filter(Boolean),
+    languages: formData
+      .getAll("languages")
+      .map((value) => String(value).trim().toLowerCase())
+      .filter(Boolean),
     shoot_location: emptyToNull(formData.get("shoot_location")),
     shoot_date: emptyToNull(formData.get("shoot_date")),
     deadline: emptyToNull(formData.get("deadline")),
@@ -101,8 +110,20 @@ export async function upsertCastAction(formData: FormData) {
   }
 
   if (id) {
+    const { data: previous } = await supabase
+      .from("cast_listings")
+      .select("is_published")
+      .eq("id", id)
+      .maybeSingle();
     const { error } = await supabase.from("cast_listings").update(payload).eq("id", id);
     if (error) throw error;
+    if (payload.is_published && !previous?.is_published) {
+      try {
+        await notifyMatchingActors({ id, ...payload });
+      } catch (err) {
+        console.error("cast notify failed", err);
+      }
+    }
     revalidatePath("/casts");
     revalidatePath(`/casts/${id}`);
     redirect(`/casts/${id}`);
@@ -114,6 +135,13 @@ export async function upsertCastAction(formData: FormData) {
     .select("id")
     .single();
   if (error) throw error;
+  if (payload.is_published) {
+    try {
+      await notifyMatchingActors({ id: data.id, ...payload });
+    } catch (err) {
+      console.error("cast notify failed", err);
+    }
+  }
   revalidatePath("/casts");
   redirect(`/casts/${data.id}`);
 }
@@ -125,6 +153,22 @@ export async function toggleCastPublishedAction(id: string, isPublished: boolean
     .update({ is_published: isPublished })
     .eq("id", id);
   if (error) throw error;
+  if (isPublished) {
+    const { data: cast } = await supabase
+      .from("cast_listings")
+      .select(
+        "id, project_name, role_name, is_published, gender, age_min, age_max, nationalities, languages"
+      )
+      .eq("id", id)
+      .maybeSingle();
+    if (cast) {
+      try {
+        await notifyMatchingActors(cast as CastListing);
+      } catch (err) {
+        console.error("cast notify failed", err);
+      }
+    }
+  }
   revalidatePath("/casts");
   revalidatePath(`/casts/${id}`);
 }

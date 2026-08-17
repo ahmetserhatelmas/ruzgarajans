@@ -19,6 +19,7 @@ export default {
     delete: 'Delete',
     select: 'Select',
     skip: 'Dismiss',
+    done: 'Done',
   },
   language: {
     title: 'Choose language',
@@ -53,6 +54,8 @@ export default {
     needsMediaBody:
       'Upload the required photos and videos to see cast listings. This stays separate from the registration form.',
     uploadMedia: 'Upload photos and videos',
+    progress: '{{done}}/2',
+    submitHint: 'You can submit the form after both sections are saved.',
     castLocked: 'Cast listings unlock after the form, required media, and admin approval.',
   },
   tabs: {
@@ -91,6 +94,8 @@ export default {
     ageRange: 'Age range',
     heightRange: 'Height range',
     gender: 'Gender',
+    nationality: 'Nationality',
+    languages: 'Spoken language',
     applied: 'Applied',
     status: 'Status',
   },
@@ -128,6 +133,12 @@ export default {
     subtitle: 'Complete this form to finish your profile. * required fields.',
     submit: 'Submit form',
     fillRequired: 'Please fill in all required fields.',
+    draftHint: 'Your progress is saved. You can leave and continue later.',
+    addLanguage: 'Add another language',
+    removeLanguage: 'Remove',
+    languageLevels: {
+      native: 'Native',
+    },
     sections: {
       personal: 'Personal information',
       physical: 'Physical attributes',
@@ -135,7 +146,7 @@ export default {
       dances: 'Dances',
       model: 'Model',
       performance: 'Performance & skills',
-      special: 'Special occasion',
+      special: 'Special occasion (if any)',
       questions: 'Additional questions',
       bank: 'Bank details',
       passport: 'Passport & permits',
@@ -144,9 +155,11 @@ export default {
     fields: {
       fullName: 'Name surname',
       nationalId: 'ID number',
-      birthDate: 'Birth date (YYYY-MM-DD)',
+      nationality: 'Nationality',
+      birthDate: 'Birth date',
       birthPlace: 'Birth place',
       phone: 'Phone number',
+      relativePhone: 'Emergency / relative phone',
       whatsapp: 'WhatsApp number',
       address: 'Address',
       registrationDate: 'Registration date',
@@ -172,7 +185,9 @@ export default {
       visaCountries: 'Which countries do you have a visa for?',
       hasWorkPermit: 'Do you have a work permit?',
       hasResidencePermit: 'Do you have a residence permit?',
-      languages: 'Languages you speak with levels (incl. sign language)',
+      languages: 'Languages you speak and their levels',
+      language: 'Language',
+      languageLevel: 'Level',
       actingEducation: 'Do you have acting education?',
       actingEducationDetail: 'From where? For how long?',
       drivingInfo: 'Do you drive?',
@@ -191,6 +206,13 @@ export default {
       additionalNotes: 'Anything else you want to add',
       kvkk:
         'I confirm I have no binding contract with another casting agency, and I allow Rüzgar Agency to use my personal data, photos and videos and to contact me by SMS, call, email, etc.',
+      kvkkRead: 'Read full text',
+      kvkkTitle: 'Consent and KVKK text',
+      kvkkFullAgency:
+        'By signing this form I confirm that I do not have a binding contract with another agency, and I agree to be contacted and directed by you via phone, SMS, email, etc.',
+      kvkkFullData:
+        'I confirm that I have read this notice and I give prior consent for my personal data to be collected, recorded, processed and stored by RÜZGAR OYUNCULUK LTD. ŞTİ. under Law No. 6698 on the Protection of Personal Data, within the principles of that law.',
+      kvkkAccept: 'I have read and I agree',
     },
     gender: {
       female: 'Female',
@@ -378,6 +400,11 @@ export default {
     avatar: 'Profile photo',
     cover: 'Cover photo',
     avatarRequired: 'Profile photo is required.',
+    cardPhotosTitle: 'Comp card photos',
+    cardPhotosHint:
+      'These four photos are used for the agency comp card in the admin panel. Upload sharp, well-lit, well-framed shots.',
+    cardPhotoBadge: 'Comp card',
+    otherPhotosTitle: 'Other photos',
     photos: {
       full_body: 'Full-length photo',
       chest: 'Chest-up close photo',

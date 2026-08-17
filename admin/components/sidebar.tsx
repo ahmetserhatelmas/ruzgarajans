@@ -33,7 +33,7 @@ export function Sidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
+    <aside className="flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar print:hidden">
       <div className="px-5 py-6">
         <p className="font-heading text-2xl tracking-tight">Rüzgâr Ajans</p>
         <p className="mt-1 text-xs text-muted-foreground">Admin paneli</p>

@@ -6,7 +6,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { Screen } from '@/components/ui/Screen';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { TextField } from '@/components/ui/TextField';
+import { LanguageSkillsField } from '@/components/ui/LanguageSkillsField';
 import { Button } from '@/components/ui/Button';
+import { parseLanguageSkills, serializeLanguageSkills } from '@/constants/languages';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   updateActorProfile,
@@ -29,7 +31,7 @@ export default function EditProfileScreen() {
   const [body, setBody] = useState(actorProfile?.body_size ?? '');
   const [education, setEducation] = useState(actorProfile?.education ?? '');
   const [experience, setExperience] = useState(actorProfile?.experience ?? '');
-  const [languages, setLanguages] = useState((actorProfile?.languages ?? []).join(', '));
+  const [languages, setLanguages] = useState(parseLanguageSkills(actorProfile?.languages));
   const [skills, setSkills] = useState((actorProfile?.skills ?? []).join(', '));
   const [city, setCity] = useState(actorProfile?.city ?? '');
   const [loading, setLoading] = useState(false);
@@ -40,6 +42,7 @@ export default function EditProfileScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.85,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
     if (result.canceled || !result.assets[0]) return;
     try {
@@ -74,10 +77,7 @@ export default function EditProfileScreen() {
         body_size: body,
         education,
         experience,
-        languages: languages
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
+        languages: serializeLanguageSkills(languages),
         skills: skills
           .split(',')
           .map((s) => s.trim())
@@ -155,7 +155,11 @@ export default function EditProfileScreen() {
         onChangeText={setExperience}
         multiline
       />
-      <TextField label={t('profile.languages')} value={languages} onChangeText={setLanguages} />
+      <LanguageSkillsField
+        label={t('profile.languages')}
+        value={languages}
+        onChange={setLanguages}
+      />
       <TextField label={t('profile.skills')} value={skills} onChangeText={setSkills} />
       <Button
         label={t('common.save')}

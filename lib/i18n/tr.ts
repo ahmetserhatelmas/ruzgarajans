@@ -19,6 +19,7 @@ export default {
     delete: 'Sil',
     select: 'Seç',
     skip: 'Yoksay',
+    done: 'Tamam',
   },
   language: {
     title: 'Dil seçin',
@@ -53,6 +54,8 @@ export default {
     needsMediaBody:
       'Cast ilanlarını görmek için zorunlu fotoğraf ve videoları yükle. Bu kısım kayıt formundan ayrı durur.',
     uploadMedia: 'Fotoğraf ve video yükle',
+    progress: '{{done}}/2',
+    submitHint: 'Her iki bölümü kaydedince formu gönderebilirsin.',
     castLocked: 'Cast ilanları form, fotoğraf/video ve admin onayından sonra açılır.',
   },
   tabs: {
@@ -91,6 +94,8 @@ export default {
     ageRange: 'Yaş aralığı',
     heightRange: 'Boy aralığı',
     gender: 'Cinsiyet',
+    nationality: 'Uyruk',
+    languages: 'Konuştuğu dil',
     applied: 'Başvuruldu',
     status: 'Durum',
   },
@@ -128,6 +133,12 @@ export default {
     subtitle: 'Profilini tamamlamak için formu doldur. * zorunlu alanlar.',
     submit: 'Formu gönder',
     fillRequired: 'Lütfen zorunlu alanları doldur.',
+    draftHint: 'Yazdıkların kaydedilir; ara verip sonra devam edebilirsin.',
+    addLanguage: 'Başka dil ekle',
+    removeLanguage: 'Sil',
+    languageLevels: {
+      native: 'Anadil',
+    },
     sections: {
       personal: 'Kişisel bilgiler',
       physical: 'Fiziki özellikler',
@@ -135,7 +146,7 @@ export default {
       dances: 'Dans',
       model: 'Model',
       performance: 'Performans & yetenekler',
-      special: 'Özel durum',
+      special: 'Özel durum (varsa)',
       questions: 'Ek sorular',
       bank: 'Banka bilgileri',
       passport: 'Pasaport & izin',
@@ -144,9 +155,11 @@ export default {
     fields: {
       fullName: 'Ad Soyad',
       nationalId: 'TC Kimlik No',
-      birthDate: 'Doğum tarihi (YYYY-AA-GG)',
+      nationality: 'Uyruk',
+      birthDate: 'Doğum tarihi',
       birthPlace: 'Doğum yeri',
       phone: 'Telefon numarası',
+      relativePhone: 'Yakın telefonu',
       whatsapp: 'WhatsApp numarası',
       address: 'Adres',
       registrationDate: 'Kayıt tarihi',
@@ -172,7 +185,9 @@ export default {
       visaCountries: 'Hangi ülkelere vizeniz var?',
       hasWorkPermit: 'Çalışma izniniz var mı?',
       hasResidencePermit: 'Oturma izniniz var mı?',
-      languages: 'Bildğiniz yabancı diller ve seviyeleri',
+      languages: 'Bildiğiniz yabancı diller ve seviyeleri',
+      language: 'Dil',
+      languageLevel: 'Seviye',
       actingEducation: 'Oyunculuk eğitiminiz var mı?',
       actingEducationDetail: 'Nereden? Ne süreyle?',
       drivingInfo: 'Araç kullanıyor musunuz?',
@@ -191,6 +206,13 @@ export default {
       additionalNotes: 'İlave etmek istedikleriniz',
       kvkk:
         'KVKK kapsamında kişisel verilerimin, fotoğraf ve videolarımın Rüzgâr Oyunculuk tarafından kullanılmasına ve başka bir ajansla bağlayıcı sözleşmem olmadığına onay veriyorum.',
+      kvkkRead: 'Tam metni oku',
+      kvkkTitle: 'Onay ve KVKK metni',
+      kvkkFullAgency:
+        'Bu formu imzalarken başka bir ajans ile bağlayıcı sözleşmemin bulunmadığını teyit eder ve tarafınızdan telefon, SMS, e-posta vb. ile tarafıma bilgi ve yönlendirme yapılmasını kabul ederim.',
+      kvkkFullData:
+        'İşbu bilgilendirme yazısını okuduğumu ve 6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında, kişisel verilerimin RÜZGAR OYUNCULUK LTD. ŞTİ. tarafından yasadaki esaslar çerçevesinde toplanmasına, kaydedilmesine, işlenmesine ve saklanmasına peşinen izin verdiğimi kabul ediyorum.',
+      kvkkAccept: 'Okudum, onaylıyorum',
     },
     gender: {
       female: 'Kadın',
@@ -378,6 +400,11 @@ export default {
     avatar: 'Profil fotoğrafı',
     cover: 'Kapak fotoğrafı',
     avatarRequired: 'Profil fotoğrafı zorunlu.',
+    cardPhotosTitle: 'Kartvizit fotoğrafları',
+    cardPhotosHint:
+      'Bu dört fotoğraf admin panelinde kartvizit için kullanılır. Net, iyi ışıklı ve düzgün kadrajlı fotoğraflar yükle.',
+    cardPhotoBadge: 'Kartvizit',
+    otherPhotosTitle: 'Diğer fotoğraflar',
     photos: {
       full_body: 'Boydan düz fotoğraf',
       chest: 'Göğüs plan yakın fotoğraf',

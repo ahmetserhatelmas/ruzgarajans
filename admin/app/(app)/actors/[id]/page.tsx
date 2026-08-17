@@ -10,6 +10,8 @@ import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
 import {
   ageFromBirth,
   boolLabel,
+  countryLabel,
+  formatLanguages,
   DANCES,
   EYES,
   formatDate,
@@ -23,8 +25,21 @@ import {
 } from "@/lib/labels";
 import { setActorStatusAction, startConversationAction } from "@/lib/actions";
 import { REQUIRED_PHOTO_KINDS } from "@/lib/types";
+import { displayImageUrl } from "@/lib/media";
 
 export const dynamic = "force-dynamic";
+
+function PhotoFigure({ src, caption }: { src: string; caption: string }) {
+  return (
+    <figure>
+      <a href={src} target="_blank" rel="noreferrer" className="block rounded-lg bg-muted">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={caption} className="h-auto w-full rounded-lg object-contain" />
+      </a>
+      <figcaption className="mt-1 text-xs text-muted-foreground">{caption}</figcaption>
+    </figure>
+  );
+}
 
 export default async function ActorDetailPage({
   params,
@@ -38,6 +53,13 @@ export default async function ActorDetailPage({
   const photoKinds = photos.map((p) => p.kind).filter(Boolean) as string[];
   const mediaOk = hasRequiredMedia(profile, actor, photoKinds);
   const age = ageFromBirth(actor?.birth_date);
+  const avatarSrc = displayImageUrl(profile.avatar_url);
+  const coverSrc = displayImageUrl(profile.cover_url, 1200);
+  const profileVideoKinds = new Set(["intro", "mimic", "showreel", "talent"]);
+  const extraVideos = videos.filter((v) => {
+    const kind = (v.kind ?? "").toLowerCase();
+    return v.status === "ready" && Boolean(v.playback_url) && !profileVideoKinds.has(kind);
+  });
 
   const field = (k: string, v?: React.ReactNode) => (
     <div className="grid grid-cols-3 gap-2 border-b border-border py-2 text-sm">
@@ -53,6 +75,12 @@ export default async function ActorDetailPage({
         description={profile.email ?? undefined}
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <a href={`/api/actors/${profile.id}/export`}>İndir</a>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/actors/${profile.id}/kartvizit`}>Kartvizit</Link>
+            </Button>
             <form action={startConversationAction.bind(null, profile.id)}>
               <Button type="submit" variant="outline">
                 Mesaj yaz
@@ -82,9 +110,9 @@ export default async function ActorDetailPage({
         </span>
       </div>
 
-      {profile.cover_url ? (
+      {coverSrc ? (
         <div className="relative h-40 overflow-hidden rounded-xl bg-muted">
-          <Image src={profile.cover_url} alt="" fill className="object-cover" unoptimized />
+          <Image src={coverSrc} alt="" fill className="object-cover" unoptimized />
         </div>
       ) : null}
 
@@ -98,8 +126,10 @@ export default async function ActorDetailPage({
               {field("Ad soyad", profile.full_name)}
               {field("E-posta", profile.email)}
               {field("Telefon", profile.phone)}
+              {field("Yakın telefonu", actor?.relative_phone)}
               {field("WhatsApp", actor?.whatsapp)}
               {field("TCKN", actor?.national_id)}
+              {field("Uyruk", countryLabel(actor?.nationality))}
               {field("Doğum", `${formatDate(actor?.birth_date)} (${age ?? "—"} yaş)`)}
               {field("Doğum yeri", actor?.birth_place)}
               {field("Cinsiyet", label(GENDER, actor?.gender))}
@@ -140,7 +170,7 @@ export default async function ActorDetailPage({
               {field("Meslek", actor?.profession)}
               {field("Oyunculuk eğitimi", actor?.acting_education)}
               {field("Deneyim", actor?.experience)}
-              {field("Diller", actor?.languages?.join(", "))}
+              {field("Diller", formatLanguages(actor?.languages))}
               {field("Aksan", actor?.accents)}
               {field("Enstrüman", actor?.instruments)}
               {field("Müsaitlik", actor?.availability)}
@@ -195,38 +225,21 @@ export default async function ActorDetailPage({
           <CardTitle>Fotoğraflar</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {profile.avatar_url ? (
-            <figure>
-              <Image
-                src={profile.avatar_url}
-                alt="Profil"
-                width={400}
-                height={400}
-                className="h-56 w-full rounded-lg object-cover"
-                unoptimized
-              />
-              <figcaption className="mt-1 text-xs text-muted-foreground">Profil</figcaption>
-            </figure>
+          {avatarSrc ? (
+            <PhotoFigure src={avatarSrc} caption="Profil" />
           ) : (
             <p className="text-sm text-destructive">Profil fotoğrafı eksik</p>
           )}
           {photos.map((p) => (
-            <figure key={p.id}>
-              <Image
-                src={p.public_url}
-                alt={p.kind ?? ""}
-                width={400}
-                height={400}
-                className="h-56 w-full rounded-lg object-cover"
-                unoptimized
-              />
-              <figcaption className="mt-1 text-xs text-muted-foreground">
-                {label(PHOTO_KIND, p.kind)}
-                {p.kind && REQUIRED_PHOTO_KINDS.includes(p.kind as (typeof REQUIRED_PHOTO_KINDS)[number])
+            <PhotoFigure
+              key={p.id}
+              src={displayImageUrl(p.public_url, 1600) ?? p.public_url}
+              caption={`${label(PHOTO_KIND, p.kind)}${
+                p.kind && REQUIRED_PHOTO_KINDS.includes(p.kind as (typeof REQUIRED_PHOTO_KINDS)[number])
                   ? " *"
-                  : ""}
-              </figcaption>
-            </figure>
+                  : ""
+              }`}
+            />
           ))}
         </CardContent>
       </Card>
@@ -251,16 +264,10 @@ export default async function ActorDetailPage({
               )}
             </div>
           ))}
-          {videos.map((v) => (
+          {extraVideos.map((v) => (
             <div key={v.id}>
-              <p className="mb-1 text-sm font-medium">
-                {label(VIDEO_KIND, v.kind)} · {v.status}
-              </p>
-              {v.playback_url ? (
-                <video src={v.playback_url} controls className="w-full rounded-lg bg-black" />
-              ) : (
-                <p className="text-sm text-muted-foreground">Hazır değil</p>
-              )}
+              <p className="mb-1 text-sm font-medium">{label(VIDEO_KIND, v.kind)}</p>
+              <video src={v.playback_url!} controls className="w-full rounded-lg bg-black" />
             </div>
           ))}
         </CardContent>

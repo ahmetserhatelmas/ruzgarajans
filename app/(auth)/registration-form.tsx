@@ -1,10 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Redirect, useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/ui/Screen';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { TextField } from '@/components/ui/TextField';
+import { DateField } from '@/components/ui/DateField';
 import { Button } from '@/components/ui/Button';
 import { ChipSelect } from '@/components/ui/ChipSelect';
 import { ValueSlider } from '@/components/ui/ValueSlider';
@@ -24,7 +26,17 @@ import {
   SPORTS,
 } from '@/constants/registrationForm';
 import { SelectField } from '@/components/ui/SelectField';
+import { countryOptions } from '@/constants/countries';
+import { parseLanguageSkills, serializeLanguageSkills } from '@/constants/languages';
+import { LanguageSkillsField } from '@/components/ui/LanguageSkillsField';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import {
+  clearRegistrationDraft,
+  loadRegistrationDraft,
+  persistRegistrationDraftRemote,
+  saveRegistrationDraft,
+  type RegistrationDraft,
+} from '@/lib/registrationDraft';
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -58,15 +70,18 @@ function serializeYesNoDetail(
 }
 
 export default function RegistrationFormScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user, profile, actorProfile, refreshProfile } = useAuth();
 
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
   const [nationalId, setNationalId] = useState(actorProfile?.national_id ?? '');
+  const [nationality, setNationality] = useState(actorProfile?.nationality ?? '');
   const [birthDate, setBirthDate] = useState(actorProfile?.birth_date ?? '');
   const [birthPlace, setBirthPlace] = useState(actorProfile?.birth_place ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
+  const [relativePhone, setRelativePhone] = useState(actorProfile?.relative_phone ?? '');
   const [whatsapp, setWhatsapp] = useState(actorProfile?.whatsapp ?? '');
   const [address, setAddress] = useState(actorProfile?.address ?? '');
   const [registrationDate] = useState(actorProfile?.registration_date ?? todayISO());
@@ -100,7 +115,7 @@ export default function RegistrationFormScreen() {
   const [special, setSpecial] = useState<string[]>(actorProfile?.special_conditions ?? []);
   const [additionalNotes, setAdditionalNotes] = useState(actorProfile?.additional_notes ?? '');
 
-  const [languages, setLanguages] = useState((actorProfile?.languages ?? []).join(', '));
+  const [languages, setLanguages] = useState(parseLanguageSkills(actorProfile?.languages));
   const initialActing = parseYesNoDetail(actorProfile?.acting_education);
   const [hasActingEducation, setHasActingEducation] = useState<boolean | null>(initialActing.yes);
   const [actingEducationDetail, setActingEducationDetail] = useState(initialActing.detail);
@@ -135,8 +150,128 @@ export default function RegistrationFormScreen() {
   );
 
   const [kvkk, setKvkk] = useState(Boolean(actorProfile?.kvkk_accepted));
+  const [kvkkOpen, setKvkkOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const submittedRef = useRef(false);
+
+  const draft = useMemo<RegistrationDraft>(
+    () => ({
+      fullName,
+      nationalId,
+      nationality,
+      birthDate,
+      birthPlace,
+      phone,
+      relativePhone,
+      whatsapp,
+      address,
+      registrationDate,
+      gender,
+      education,
+      profession,
+      instagram,
+      height,
+      weight,
+      hair,
+      eyes,
+      tshirt,
+      pants,
+      suit,
+      shoe,
+      sports,
+      dances,
+      dancesOther,
+      modelSkills,
+      modelOther,
+      performance,
+      performanceOther,
+      accents,
+      instruments,
+      special,
+      additionalNotes,
+      languages,
+      hasActingEducation,
+      actingEducationDetail,
+      hasDriving,
+      drivingDetail,
+      experience,
+      availability,
+      hasOtherAgency,
+      otherAgencyDetail,
+      referral,
+      specialInterests,
+      bankAccountName,
+      bankName,
+      iban,
+      hasPassport,
+      passportNo,
+      passportType,
+      visaCountries,
+      hasWorkPermit,
+      hasResidencePermit,
+      kvkk,
+    }),
+    [
+      fullName,
+      nationalId,
+      nationality,
+      birthDate,
+      birthPlace,
+      phone,
+      relativePhone,
+      whatsapp,
+      address,
+      registrationDate,
+      gender,
+      education,
+      profession,
+      instagram,
+      height,
+      weight,
+      hair,
+      eyes,
+      tshirt,
+      pants,
+      suit,
+      shoe,
+      sports,
+      dances,
+      dancesOther,
+      modelSkills,
+      modelOther,
+      performance,
+      performanceOther,
+      accents,
+      instruments,
+      special,
+      additionalNotes,
+      languages,
+      hasActingEducation,
+      actingEducationDetail,
+      hasDriving,
+      drivingDetail,
+      experience,
+      availability,
+      hasOtherAgency,
+      otherAgencyDetail,
+      referral,
+      specialInterests,
+      bankAccountName,
+      bankName,
+      iban,
+      hasPassport,
+      passportNo,
+      passportType,
+      visaCountries,
+      hasWorkPermit,
+      hasResidencePermit,
+      kvkk,
+    ]
+  );
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
 
   const sportOptions = useMemo(
     () => SPORTS.map((id) => ({ id, label: t(`regForm.sports.${id}`) })),
@@ -178,20 +313,121 @@ export default function RegistrationFormScreen() {
     () => PROFESSIONS.map((id) => ({ id, label: t(`regForm.profession.${id}`) })),
     [t]
   );
+  const nationalityOptions = useMemo(() => countryOptions(i18n.language), [i18n.language]);
 
   const pickOne = (setter: (v: string) => void) => (next: string[]) => {
     setter(next[0] ?? '');
   };
 
+  useEffect(() => {
+    if (!user) {
+      setHydrated(true);
+      return;
+    }
+    let cancelled = false;
+    void loadRegistrationDraft(user.id).then((saved) => {
+      if (cancelled) return;
+      if (saved) {
+        setFullName(saved.fullName);
+        setNationalId(saved.nationalId);
+        setNationality(saved.nationality ?? '');
+        setBirthDate(saved.birthDate);
+        setBirthPlace(saved.birthPlace);
+        setPhone(saved.phone);
+        setRelativePhone(saved.relativePhone);
+        setWhatsapp(saved.whatsapp);
+        setAddress(saved.address);
+        setGender(saved.gender);
+        setEducation(saved.education);
+        setProfession(saved.profession);
+        setInstagram(saved.instagram);
+        setHeight(saved.height);
+        setWeight(saved.weight);
+        setHair(saved.hair);
+        setEyes(saved.eyes);
+        setTshirt(saved.tshirt);
+        setPants(saved.pants);
+        setSuit(saved.suit);
+        setShoe(saved.shoe);
+        setSports(saved.sports);
+        setDances(saved.dances);
+        setDancesOther(saved.dancesOther);
+        setModelSkills(saved.modelSkills);
+        setModelOther(saved.modelOther);
+        setPerformance(saved.performance);
+        setPerformanceOther(saved.performanceOther);
+        setAccents(saved.accents);
+        setInstruments(saved.instruments);
+        setSpecial(saved.special);
+        setAdditionalNotes(saved.additionalNotes);
+        setLanguages(
+          Array.isArray(saved.languages)
+            ? saved.languages
+            : parseLanguageSkills(
+                typeof saved.languages === 'string'
+                  ? saved.languages.split(',')
+                  : []
+              )
+        );
+        setHasActingEducation(saved.hasActingEducation);
+        setActingEducationDetail(saved.actingEducationDetail);
+        setHasDriving(saved.hasDriving);
+        setDrivingDetail(saved.drivingDetail);
+        setExperience(saved.experience);
+        setAvailability(saved.availability);
+        setHasOtherAgency(saved.hasOtherAgency);
+        setOtherAgencyDetail(saved.otherAgencyDetail);
+        setReferral(saved.referral);
+        setSpecialInterests(saved.specialInterests);
+        setBankAccountName(saved.bankAccountName);
+        setBankName(saved.bankName);
+        setIban(saved.iban);
+        setHasPassport(saved.hasPassport);
+        setPassportNo(saved.passportNo);
+        setPassportType(saved.passportType);
+        setVisaCountries(saved.visaCountries);
+        setHasWorkPermit(saved.hasWorkPermit);
+        setHasResidencePermit(saved.hasResidencePermit);
+        setKvkk(saved.kvkk);
+      }
+      setHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || !hydrated) return;
+    const timer = setTimeout(() => {
+      void saveRegistrationDraft(user.id, draftRef.current);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [user, hydrated, draft]);
+
   useFocusEffect(
     useCallback(() => {
-      if (!user) return;
-      void refreshProfile();
-    }, [user, refreshProfile])
+      if (user) void refreshProfile();
+      return () => {
+        if (!user || !hydrated || submittedRef.current) return;
+        const current = draftRef.current;
+        void saveRegistrationDraft(user.id, current);
+        void persistRegistrationDraftRemote(user.id, current).catch(() => undefined);
+      };
+    }, [user, refreshProfile, hydrated])
   );
 
   if (!user) {
     return <Redirect href="/(auth)/login" />;
+  }
+
+  if (!hydrated) {
+    return (
+      <Screen contentStyle={{ paddingTop: Spacing.md }}>
+        <BackHeader fallbackHref="/(actor)" />
+        <Text style={styles.subtitle}>{t('common.loading')}</Text>
+      </Screen>
+    );
   }
 
   const validate = () => {
@@ -202,6 +438,7 @@ export default function RegistrationFormScreen() {
 
     need('fullName', fullName.trim().length > 1);
     need('nationalId', /^\d{11}$/.test(nationalId.trim()));
+    need('nationality', nationality.length === 2);
     need('birthDate', /^\d{4}-\d{2}-\d{2}$/.test(birthDate.trim()));
     need('birthPlace', birthPlace.trim().length > 0);
     need('phone', phone.trim().length >= 10);
@@ -234,14 +471,14 @@ export default function RegistrationFormScreen() {
       await updateProfileBasics(user.id, {
         full_name: fullName.trim(),
         phone: phone.trim(),
-        // Form gönderilince admin onayı beklenir
-        actor_status: 'pending',
       });
       await updateActorProfile(user.id, {
         national_id: nationalId.trim(),
+        nationality,
         birth_date: birthDate.trim(),
         birth_place: birthPlace.trim(),
         whatsapp: whatsapp.trim(),
+        relative_phone: relativePhone.trim() || null,
         address: address.trim(),
         registration_date: registrationDate,
         gender,
@@ -268,10 +505,7 @@ export default function RegistrationFormScreen() {
         instruments: instruments.trim() || null,
         special_conditions: special,
         additional_notes: additionalNotes.trim() || null,
-        languages: languages
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
+        languages: serializeLanguageSkills(languages),
         acting_education: serializeYesNoDetail(
           hasActingEducation,
           actingEducationDetail,
@@ -293,11 +527,13 @@ export default function RegistrationFormScreen() {
         has_work_permit: hasWorkPermit,
         has_residence_permit: hasResidencePermit,
         kvkk_accepted: true,
-        registration_completed_at: new Date().toISOString(),
+        form_saved_at: actorProfile?.form_saved_at ?? new Date().toISOString(),
         skills: [...sports, ...dances, ...modelSkills, ...performance].filter(
           (id) => id !== 'none'
         ),
       });
+      submittedRef.current = true;
+      await clearRegistrationDraft(user.id);
       await refreshProfile();
       Alert.alert(t('common.success'));
       router.replace('/');
@@ -379,6 +615,7 @@ export default function RegistrationFormScreen() {
       <BackHeader fallbackHref="/(actor)" />
       <Text style={styles.title}>{t('regForm.title')}</Text>
       <Text style={styles.subtitle}>{t('regForm.subtitle')}</Text>
+      <Text style={styles.subtitle}>{t('regForm.draftHint')}</Text>
 
       <Text style={styles.section}>{t('regForm.sections.personal')}</Text>
       <TextField
@@ -395,11 +632,18 @@ export default function RegistrationFormScreen() {
         maxLength={11}
         error={errors.nationalId}
       />
-      <TextField
+      <SelectField
+        label={reqLabel(t('regForm.fields.nationality'))}
+        value={nationality}
+        options={nationalityOptions}
+        onChange={setNationality}
+        searchable
+        error={errors.nationality}
+      />
+      <DateField
         label={reqLabel(t('regForm.fields.birthDate'))}
         value={birthDate}
-        onChangeText={setBirthDate}
-        placeholder="1995-03-21"
+        onChange={setBirthDate}
         error={errors.birthDate}
       />
       <TextField
@@ -414,6 +658,12 @@ export default function RegistrationFormScreen() {
         onChangeText={setPhone}
         keyboardType="phone-pad"
         error={errors.phone}
+      />
+      <TextField
+        label={t('regForm.fields.relativePhone')}
+        value={relativePhone}
+        onChangeText={setRelativePhone}
+        keyboardType="phone-pad"
       />
       <TextField
         label={reqLabel(t('regForm.fields.whatsapp'))}
@@ -628,11 +878,10 @@ export default function RegistrationFormScreen() {
       />
 
       <Text style={styles.section}>{t('regForm.sections.questions')}</Text>
-      <TextField
+      <LanguageSkillsField
         label={t('regForm.fields.languages')}
         value={languages}
-        onChangeText={setLanguages}
-        multiline
+        onChange={setLanguages}
       />
       <YesNoDetail
         question={t('regForm.fields.actingEducation')}
@@ -733,10 +982,51 @@ export default function RegistrationFormScreen() {
         <View style={[styles.checkbox, kvkk && styles.checkboxOn]} />
         <Text style={styles.consentText}>{t('regForm.fields.kvkk')}</Text>
       </Pressable>
+      <Pressable onPress={() => setKvkkOpen(true)} hitSlop={8}>
+        <Text style={styles.kvkkLink}>{t('regForm.fields.kvkkRead')}</Text>
+      </Pressable>
       {errors.kvkk ? <Text style={styles.error}>{errors.kvkk}</Text> : null}
 
+      <Modal
+        visible={kvkkOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setKvkkOpen(false)}
+      >
+        <View style={styles.kvkkRoot}>
+          <Pressable
+            style={styles.kvkkBackdrop}
+            onPress={() => setKvkkOpen(false)}
+            accessibilityRole="button"
+          />
+          <View style={[styles.kvkkSheet, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
+            <View style={styles.kvkkHead}>
+              <Text style={styles.kvkkTitle}>{t('regForm.fields.kvkkTitle')}</Text>
+              <Pressable onPress={() => setKvkkOpen(false)} hitSlop={12}>
+                <Text style={styles.kvkkClose}>{t('common.cancel')}</Text>
+              </Pressable>
+            </View>
+            <ScrollView
+              style={styles.kvkkScroll}
+              contentContainerStyle={{ paddingBottom: Spacing.md }}
+              showsVerticalScrollIndicator
+            >
+              <Text style={styles.kvkkBody}>{t('regForm.fields.kvkkFullAgency')}</Text>
+              <Text style={styles.kvkkBody}>{t('regForm.fields.kvkkFullData')}</Text>
+            </ScrollView>
+            <Button
+              label={t('regForm.fields.kvkkAccept')}
+              onPress={() => {
+                setKvkk(true);
+                setKvkkOpen(false);
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
+
       <Button
-        label={t('regForm.submit')}
+        label={t('common.save')}
         onPress={onSubmit}
         loading={loading}
         style={{ marginTop: Spacing.lg, marginBottom: Spacing.xxl }}
@@ -810,5 +1100,55 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text,
     lineHeight: 20,
+  },
+  kvkkLink: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 14,
+    color: Colors.goldDeep,
+    marginTop: Spacing.sm,
+  },
+  kvkkRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  kvkkBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  kvkkSheet: {
+    maxHeight: '78%',
+    backgroundColor: Colors.paper,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    gap: Spacing.md,
+  },
+  kvkkHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  kvkkTitle: {
+    flex: 1,
+    fontFamily: Fonts.display,
+    fontSize: 24,
+    color: Colors.ink,
+  },
+  kvkkClose: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: 15,
+    color: Colors.goldDeep,
+  },
+  kvkkScroll: {
+    flexGrow: 0,
+  },
+  kvkkBody: {
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    color: Colors.text,
+    lineHeight: 22,
+    marginBottom: Spacing.md,
   },
 });

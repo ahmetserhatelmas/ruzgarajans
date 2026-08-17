@@ -142,3 +142,33 @@ export function boolLabel(v?: boolean | null) {
   if (v == null) return "—";
   return v ? "Evet" : "Hayır";
 }
+
+export function formatLanguages(raw?: string[] | null) {
+  if (!raw?.length) return "—";
+  return raw
+    .map((item) => {
+      const sep = item.lastIndexOf(":");
+      if (sep <= 0) return item;
+      const code = item.slice(0, sep);
+      const level = item.slice(sep + 1);
+      let name = code;
+      try {
+        name = new Intl.DisplayNames(["tr"], { type: "language" }).of(code) ?? code;
+      } catch {
+        name = code === "sgn" ? "İşaret dili" : code;
+      }
+      if (code === "sgn") name = "İşaret dili";
+      const levelLabel = level === "native" ? "Anadil" : level;
+      return `${name} ${levelLabel}`.trim();
+    })
+    .join(", ");
+}
+
+export function countryLabel(code?: string | null) {
+  if (!code) return "—";
+  try {
+    return new Intl.DisplayNames(["tr"], { type: "region" }).of(code.toUpperCase()) ?? code;
+  } catch {
+    return code;
+  }
+}

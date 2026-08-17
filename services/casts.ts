@@ -104,6 +104,8 @@ export async function updateCast(
       | 'gender'
       | 'height_min_cm'
       | 'height_max_cm'
+      | 'nationalities'
+      | 'languages'
       | 'shoot_date'
       | 'shoot_location'
       | 'deadline'

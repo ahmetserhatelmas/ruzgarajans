@@ -19,6 +19,7 @@ export type Profile = {
   avatar_url: string | null;
   cover_url: string | null;
   actor_status: ActorStatus;
+  expo_push_token: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -48,8 +49,10 @@ export type ActorProfile = {
   talent_video_id: string | null;
   talent_video_playback_url: string | null;
   national_id: string | null;
+  nationality: string | null;
   birth_place: string | null;
   whatsapp: string | null;
+  relative_phone: string | null;
   address: string | null;
   registration_date: string | null;
   profession: string | null;
@@ -85,6 +88,8 @@ export type ActorProfile = {
   referral_source: string | null;
   special_interests: string | null;
   kvkk_accepted: boolean;
+  form_saved_at: string | null;
+  media_saved_at: string | null;
   registration_completed_at: string | null;
   updated_at: string;
 };
@@ -108,6 +113,8 @@ export type CastListing = {
   gender: GenderPref;
   height_min_cm: number | null;
   height_max_cm: number | null;
+  nationalities: string[];
+  languages: string[];
   shoot_date: string | null;
   shoot_location: string | null;
   deadline: string | null;

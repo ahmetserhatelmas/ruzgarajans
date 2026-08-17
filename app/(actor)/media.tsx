@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Image, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +7,6 @@ import { Screen } from '@/components/ui/Screen';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
-import { uploadProfileImage } from '@/services/actors';
 import {
   ALL_PHOTO_KINDS,
   fetchGalleryPhotos,
@@ -16,20 +15,57 @@ import {
   type GalleryPhoto,
   type GalleryPhotoKind,
 } from '@/services/gallery';
+import { updateActorProfile } from '@/services/actors';
+import { hasRequiredGalleryMedia } from '@/lib/access';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+
+const CARD_PHOTO_KINDS: GalleryPhotoKind[] = [
+  'full_body',
+  'profile_left',
+  'profile_right',
+  'chest',
+];
+const CARD_PHOTO_SET = new Set<GalleryPhotoKind>(CARD_PHOTO_KINDS);
+const OTHER_PHOTO_KINDS = ALL_PHOTO_KINDS.filter((kind) => !CARD_PHOTO_SET.has(kind));
+const CARD_PHOTO_BORDER = '#2563EB';
 
 function reqLabel(label: string) {
   return `${label} *`;
 }
 
+function PhotoPreview({ uri }: { uri: string }) {
+  const [ratio, setRatio] = useState(3 / 4);
+
+  useEffect(() => {
+    let cancelled = false;
+    Image.getSize(
+      uri,
+      (width, height) => {
+        if (!cancelled && width > 0 && height > 0) setRatio(width / height);
+      },
+      () => undefined
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [uri]);
+
+  return (
+    <Image
+      source={{ uri }}
+      style={[styles.thumb, { aspectRatio: ratio }]}
+      resizeMode="contain"
+    />
+  );
+}
+
 export default function MediaScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { user, profile, actorProfile, refreshProfile } = useAuth();
+  const { user, actorProfile, refreshProfile } = useAuth();
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
-  const [photoBusy, setPhotoBusy] = useState<GalleryPhotoKind | 'avatar' | 'cover' | null>(
-    null
-  );
+  const [photoBusy, setPhotoBusy] = useState<GalleryPhotoKind | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const photoMap = useMemo(() => photosByKind(photos), [photos]);
 
@@ -49,6 +85,7 @@ export default function MediaScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.85,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
       });
       if (result.canceled || !result.assets[0]) return;
       setPhotoBusy(kind);
@@ -70,26 +107,24 @@ export default function MediaScreen() {
     }
   };
 
-  const pickProfilePhoto = async (role: 'avatar' | 'cover') => {
+  const onSave = async () => {
     if (!user) return;
+    if (!hasRequiredGalleryMedia(actorProfile, photos)) {
+      Alert.alert(t('common.error'), t('regForm.fillRequired'));
+      return;
+    }
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.85,
-      });
-      if (result.canceled || !result.assets[0]) return;
-      setPhotoBusy(role);
-      await uploadProfileImage({
-        userId: user.id,
-        localUri: result.assets[0].uri,
-        mimeType: result.assets[0].mimeType,
-        role,
+      setSaving(true);
+      await updateActorProfile(user.id, {
+        media_saved_at: actorProfile?.media_saved_at ?? new Date().toISOString(),
       });
       await refreshProfile();
+      Alert.alert(t('common.success'));
+      router.replace('/');
     } catch (e: any) {
       Alert.alert(t('common.error'), e?.message ?? t('common.error'));
     } finally {
-      setPhotoBusy(null);
+      setSaving(false);
     }
   };
 
@@ -99,43 +134,33 @@ export default function MediaScreen() {
       <Text style={styles.title}>{reqLabel(t('media.section'))}</Text>
       <Text style={styles.hint}>{t('media.sectionHint')}</Text>
 
-      <View style={styles.card}>
-        <View style={styles.head}>
-          <Text style={styles.cardTitle}>{reqLabel(t('media.avatar'))}</Text>
-          <Text style={profile?.avatar_url ? styles.ok : styles.miss}>
-            {profile?.avatar_url ? t('media.uploaded') : t('media.missing')}
-          </Text>
-        </View>
-        {profile?.avatar_url ? (
-          <Image source={{ uri: profile.avatar_url }} style={styles.thumb} />
-        ) : null}
-        <Button
-          label={profile?.avatar_url ? t('media.changePhoto') : t('media.uploadPhoto')}
-          variant="secondary"
-          loading={photoBusy === 'avatar'}
-          onPress={() => void pickProfilePhoto('avatar')}
-        />
-      </View>
+      <Text style={styles.subhead}>{t('media.cardPhotosTitle')}</Text>
+      <Text style={styles.hint}>{t('media.cardPhotosHint')}</Text>
+      {CARD_PHOTO_KINDS.map((kind) => {
+        const photo = photoMap[kind];
+        return (
+          <View key={kind} style={[styles.card, styles.cardPhoto]}>
+            <View style={styles.head}>
+              <Text style={styles.cardTitle}>
+                {reqLabel(`${t(`media.photos.${kind}`)} (${t('media.cardPhotoBadge')})`)}
+              </Text>
+              <Text style={photo ? styles.ok : styles.miss}>
+                {photo ? t('media.uploaded') : t('media.missing')}
+              </Text>
+            </View>
+            {photo ? <PhotoPreview uri={photo.public_url} /> : null}
+            <Button
+              label={photo ? t('media.changePhoto') : t('media.uploadPhoto')}
+              variant="secondary"
+              loading={photoBusy === kind}
+              onPress={() => void pickPhoto(kind)}
+            />
+          </View>
+        );
+      })}
 
-      <View style={styles.card}>
-        <View style={styles.head}>
-          <Text style={styles.cardTitle}>{t('media.cover')}</Text>
-          <Text style={profile?.cover_url ? styles.ok : styles.miss}>
-            {profile?.cover_url ? t('media.uploaded') : t('media.missing')}
-          </Text>
-        </View>
-        {profile?.cover_url ? (
-          <Image source={{ uri: profile.cover_url }} style={styles.thumb} />
-        ) : null}
-        <Button
-          label={profile?.cover_url ? t('media.changePhoto') : t('media.uploadPhoto')}
-          variant="secondary"
-          loading={photoBusy === 'cover'}
-          onPress={() => void pickProfilePhoto('cover')}
-        />
-      </View>
-
-      {ALL_PHOTO_KINDS.map((kind) => {
+      <Text style={styles.subhead}>{t('media.otherPhotosTitle')}</Text>
+      {OTHER_PHOTO_KINDS.map((kind) => {
         const required = !['model_pose', 'hands'].includes(kind);
         const photo = photoMap[kind];
         return (
@@ -148,7 +173,7 @@ export default function MediaScreen() {
                 {photo ? t('media.uploaded') : t('media.missing')}
               </Text>
             </View>
-            {photo ? <Image source={{ uri: photo.public_url }} style={styles.thumb} /> : null}
+            {photo ? <PhotoPreview uri={photo.public_url} /> : null}
             <Button
               label={photo ? t('media.changePhoto') : t('media.uploadPhoto')}
               variant="secondary"
@@ -195,6 +220,13 @@ export default function MediaScreen() {
           />
         </View>
       ))}
+
+      <Button
+        label={t('common.save')}
+        onPress={() => void onSave()}
+        loading={saving}
+        style={{ marginTop: Spacing.sm, marginBottom: Spacing.xl }}
+      />
     </Screen>
   );
 }
@@ -211,6 +243,12 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginBottom: Spacing.sm,
   },
+  subhead: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: 16,
+    color: Colors.text,
+    marginTop: Spacing.sm,
+  },
   card: {
     gap: Spacing.sm,
     padding: Spacing.md,
@@ -218,6 +256,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: Radius.md,
     backgroundColor: Colors.white,
+  },
+  cardPhoto: {
+    borderWidth: 2,
+    borderColor: CARD_PHOTO_BORDER,
+    backgroundColor: '#F8FBFF',
   },
   head: {
     flexDirection: 'row',
@@ -235,7 +278,6 @@ const styles = StyleSheet.create({
   miss: { fontFamily: Fonts.bodyBold, fontSize: 12, color: Colors.danger },
   thumb: {
     width: '100%',
-    height: 160,
     borderRadius: Radius.sm,
     backgroundColor: Colors.paperMuted,
   },

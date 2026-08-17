@@ -18,6 +18,7 @@ import {
   initialWindowMetrics,
 } from 'react-native-safe-area-context';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { NotificationObserver } from '@/components/NotificationObserver';
 import { initI18n } from '@/lib/i18n';
 import { Colors } from '@/constants/theme';
 
@@ -60,6 +61,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <AuthProvider>
+        <NotificationObserver />
         <StatusBar style="dark" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.paper } }}>
           <Stack.Screen name="index" />

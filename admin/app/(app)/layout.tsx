@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-screen">
       <Sidebar email={profile?.email ?? user?.email} pendingCount={count ?? 0} />
-      <main className="min-w-0 flex-1 p-8">{children}</main>
+      <main className="min-w-0 flex-1 p-8 print:p-0">{children}</main>
     </div>
   );
 }

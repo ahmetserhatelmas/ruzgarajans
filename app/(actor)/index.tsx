@@ -6,6 +6,7 @@ import { Screen } from '@/components/ui/Screen';
 import { LinearGradient } from '@/components/ui/Atmosphere';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
 import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard';
+import { RegistrationSteps } from '@/components/ui/RegistrationSteps';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
 import { fetchPublishedCasts } from '@/services/casts';
@@ -59,8 +60,14 @@ export default function HomeScreen() {
         {t('home.hello')}, {profile?.full_name?.split(' ')[0] || '—'}
       </Text>
 
-      <AccessGateCard compact />
-      <MediaAccessCard compact />
+      {actorProfile?.registration_completed_at ? (
+        <>
+          <AccessGateCard compact />
+          <MediaAccessCard compact />
+        </>
+      ) : (
+        <RegistrationSteps />
+      )}
 
       <Pressable
         style={({ pressed }) => [styles.introCard, pressed && { opacity: 0.93 }]}

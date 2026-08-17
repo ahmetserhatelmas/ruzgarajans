@@ -4,6 +4,37 @@ import {
   type GalleryPhoto,
 } from '@/services/gallery';
 
+export function isFormSectionSaved(actor: ActorProfile | null | undefined) {
+  return Boolean(actor?.form_saved_at || actor?.registration_completed_at);
+}
+
+export function hasRequiredGalleryMedia(
+  actorProfile: ActorProfile | null | undefined,
+  photos: GalleryPhoto[] = []
+) {
+  return (
+    missingRequiredPhotos(photos).length === 0 &&
+    Boolean(actorProfile?.intro_video_playback_url) &&
+    Boolean(actorProfile?.mimic_video_playback_url)
+  );
+}
+
+export function isMediaSectionSaved(
+  _profile: Profile | null | undefined,
+  actor: ActorProfile | null | undefined,
+  photos: GalleryPhoto[] = []
+) {
+  return Boolean(actor?.media_saved_at) && hasRequiredGalleryMedia(actor, photos);
+}
+
+export function registrationStepCount(
+  profile: Profile | null | undefined,
+  actor: ActorProfile | null | undefined,
+  photos: GalleryPhoto[] = []
+) {
+  return (isFormSectionSaved(actor) ? 1 : 0) + (isMediaSectionSaved(profile, actor, photos) ? 1 : 0);
+}
+
 export function hasRequiredMedia(
   profile: Profile | null | undefined,
   actorProfile: ActorProfile | null | undefined,

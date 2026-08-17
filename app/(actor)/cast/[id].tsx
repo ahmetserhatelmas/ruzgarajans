@@ -11,11 +11,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
 import { applyToCast, fetchCastById, fetchMyApplications } from '@/services/casts';
 import type { Application, CastListing } from '@/types/database';
+import { countryLabel } from '@/constants/countries';
+import { languageLabel } from '@/constants/languages';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function CastDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, profile, actorProfile, galleryPhotos } = useAuth();
   const router = useRouter();
   const castOk = canAccessCasts(profile, actorProfile, galleryPhotos);
@@ -89,6 +91,22 @@ export default function CastDetailScreen() {
         <Meta
           label={t('cast.heightRange')}
           value={`${cast.height_min_cm ?? '—'}–${cast.height_max_cm ?? '—'} cm`}
+        />
+        <Meta
+          label={t('cast.nationality')}
+          value={
+            cast.nationalities?.length
+              ? cast.nationalities.map((code) => countryLabel(code, i18n.language)).join(', ')
+              : '—'
+          }
+        />
+        <Meta
+          label={t('cast.languages')}
+          value={
+            cast.languages?.length
+              ? cast.languages.map((code) => languageLabel(code, i18n.language)).join(', ')
+              : '—'
+          }
         />
         <Meta label={t('cast.shootDate')} value={cast.shoot_date ?? '—'} />
         <Meta label={t('cast.location')} value={cast.shoot_location ?? '—'} />

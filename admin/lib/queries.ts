@@ -218,5 +218,19 @@ export function matchesCast(row: ActorRow, cast: CastListing) {
   const h = row.actor?.height_cm;
   if (cast.height_min_cm != null && (h == null || h < cast.height_min_cm)) return false;
   if (cast.height_max_cm != null && (h == null || h > cast.height_max_cm)) return false;
+  if (cast.nationalities?.length) {
+    const nationality = row.actor?.nationality?.toUpperCase();
+    const allowed = new Set(cast.nationalities.map((code) => code.toUpperCase()));
+    if (!nationality || !allowed.has(nationality)) return false;
+  }
+  if (cast.languages?.length) {
+    const spoken = new Set(
+      (row.actor?.languages ?? []).map((item) => {
+        const sep = item.lastIndexOf(":");
+        return (sep > 0 ? item.slice(0, sep) : item).trim().toLowerCase();
+      })
+    );
+    if (!cast.languages.every((code) => spoken.has(code.toLowerCase()))) return false;
+  }
   return true;
 }

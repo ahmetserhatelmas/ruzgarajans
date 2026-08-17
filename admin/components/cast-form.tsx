@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { MultiSearchSelect } from "@/components/multi-search-select";
+import { countryOptions, languageOptions } from "@/lib/geo";
 import type { CastListing } from "@/lib/types";
 
 export function CastForm({ cast }: { cast?: CastListing }) {
@@ -56,6 +58,27 @@ export function CastForm({ cast }: { cast?: CastListing }) {
           <Input name="budget_amount" type="number" defaultValue={cast?.budget_amount ?? ""} />
         </Field>
       </div>
+      <Field label="Uyruk">
+        <MultiSearchSelect
+          name="nationalities"
+          options={countryOptions()}
+          defaultValue={cast?.nationalities ?? []}
+          placeholder="Ülke ara — boşsa fark etmez"
+        />
+      </Field>
+      <Field label="Konuştuğu dil">
+        <MultiSearchSelect
+          name="languages"
+          options={languageOptions()}
+          defaultValue={cast?.languages ?? []}
+          placeholder="Dil ara — boşsa fark etmez"
+        />
+      </Field>
+      <p className="text-sm text-muted-foreground">
+        Cinsiyet, yaş, uyruk veya dil doldurulursa yalnızca uyan onaylı oyunculara
+        “Size uygun bir rol var” bildirimi gider. Hepsi boşsa bildirim gitmez; ilan
+        yine herkese görünür.
+      </p>
       <Field label="Diyalog / senaryo">
         <Textarea name="dialogue_script" rows={4} defaultValue={cast?.dialogue_script ?? ""} />
       </Field>

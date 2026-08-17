@@ -5,6 +5,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ type Props = {
   onChange: (id: string) => void;
   placeholder?: string;
   error?: string;
+  searchable?: boolean;
 };
 
 export function SelectField({
@@ -29,17 +31,33 @@ export function SelectField({
   onChange,
   placeholder,
   error,
+  searchable,
 }: Props) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const canSearch = searchable ?? options.length > 20;
 
-  const close = () => setOpen(false);
+  const close = () => {
+    setQuery('');
+    setOpen(false);
+  };
 
   const selectedLabel = useMemo(() => {
     const hit = options.find((o) => o.id === value);
     return hit?.label ?? '';
   }, [options, value]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase('tr-TR');
+    if (!q) return options;
+    return options.filter(
+      (o) =>
+        o.label.toLocaleLowerCase('tr-TR').includes(q) ||
+        o.id.toLocaleLowerCase('tr-TR').includes(q)
+    );
+  }, [options, query]);
 
   return (
     <View style={styles.wrap}>
@@ -58,15 +76,31 @@ export function SelectField({
       <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
         <View style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={close} accessibilityRole="button" />
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
+          <View
+            style={[
+              styles.sheet,
+              canSearch && styles.sheetTall,
+              { paddingBottom: Math.max(insets.bottom, Spacing.md) },
+            ]}
+          >
             <View style={styles.sheetHead}>
               <Text style={styles.sheetTitle}>{label || t('common.select')}</Text>
               <Pressable onPress={close} hitSlop={12}>
                 <Text style={styles.done}>{t('common.skip')}</Text>
               </Pressable>
             </View>
+            {canSearch ? (
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder={t('common.search')}
+                placeholderTextColor={Colors.textMuted}
+                autoCorrect={false}
+                style={styles.search}
+              />
+            ) : null}
             <FlatList
-              data={options}
+              data={filtered}
               keyExtractor={(item) => item.id}
               showsVerticalScrollIndicator={false}
               style={styles.list}
@@ -144,6 +178,20 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: Radius.lg,
     borderTopRightRadius: Radius.lg,
     paddingTop: Spacing.md,
+  },
+  sheetTall: { maxHeight: '78%' },
+  search: {
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    fontFamily: Fonts.body,
+    fontSize: 16,
+    color: Colors.text,
   },
   sheetHead: {
     flexDirection: 'row',

@@ -76,7 +76,7 @@ export default async function CastDetailPage({
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="mb-3 text-sm text-muted-foreground">
-            Onaylı + form + medya + yaş/cinsiyet/boy kriterleri.
+            Onaylı + form + medya + yaş/cinsiyet/boy/uyruk/dil kriterleri.
           </p>
           {matches.slice(0, 40).map((row) => (
             <Link
