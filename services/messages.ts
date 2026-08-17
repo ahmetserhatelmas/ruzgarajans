@@ -34,6 +34,19 @@ export async function sendMessage(input: {
   senderId: string;
   body: string;
 }): Promise<Message> {
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role, actor_status')
+    .eq('id', input.senderId)
+    .maybeSingle();
+  if (profileError) throw profileError;
+  const allowed =
+    profile?.role === 'admin' ||
+    (profile?.role === 'actor' && profile.actor_status === 'approved');
+  if (!allowed) {
+    throw new Error('Only approved actors can send messages');
+  }
+
   const { data, error } = await supabase
     .from('messages')
     .insert({

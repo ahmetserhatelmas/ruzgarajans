@@ -34,6 +34,8 @@ export function SelectField({
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
 
+  const close = () => setOpen(false);
+
   const selectedLabel = useMemo(() => {
     const hit = options.find((o) => o.id === value);
     return hit?.label ?? '';
@@ -53,14 +55,14 @@ export function SelectField({
       </Pressable>
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
         <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
+          <Pressable style={styles.backdrop} onPress={close} accessibilityRole="button" />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
             <View style={styles.sheetHead}>
               <Text style={styles.sheetTitle}>{label || t('common.select')}</Text>
-              <Pressable onPress={() => setOpen(false)} hitSlop={12}>
-                <Text style={styles.done}>{t('common.continue')}</Text>
+              <Pressable onPress={close} hitSlop={12}>
+                <Text style={styles.done}>{t('common.skip')}</Text>
               </Pressable>
             </View>
             <FlatList
@@ -69,13 +71,14 @@ export function SelectField({
               showsVerticalScrollIndicator={false}
               style={styles.list}
               contentContainerStyle={{ paddingBottom: Spacing.lg }}
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => {
                 const active = item.id === value;
                 return (
                   <Pressable
                     onPress={() => {
                       onChange(item.id);
-                      setOpen(false);
+                      close();
                     }}
                     style={[styles.row, active && styles.rowActive]}
                   >
@@ -127,13 +130,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.danger,
   },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
   modalRoot: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   sheet: {
     maxHeight: '55%',

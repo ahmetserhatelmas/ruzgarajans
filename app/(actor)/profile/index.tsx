@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +14,12 @@ export default function ProfileScreen() {
   const { profile, actorProfile, user, refreshProfile } = useAuth();
   const router = useRouter();
   const hasIntro = !!actorProfile?.intro_video_playback_url;
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const showAvatar = Boolean(profile?.avatar_url) && !avatarFailed;
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [profile?.avatar_url]);
 
   return (
     <Screen scroll>
@@ -22,8 +29,12 @@ export default function ProfileScreen() {
         ) : null}
       </View>
       <View style={styles.avatarWrap}>
-        {profile?.avatar_url ? (
-          <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+        {showAvatar ? (
+          <Image
+            source={{ uri: profile!.avatar_url! }}
+            style={styles.avatar}
+            onError={() => setAvatarFailed(true)}
+          />
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
             <Text style={styles.initials}>
@@ -134,6 +145,8 @@ const styles = StyleSheet.create({
     borderRadius: 44,
     borderWidth: 3,
     borderColor: Colors.paper,
+    backgroundColor: Colors.paperMuted,
+    overflow: 'hidden',
   },
   avatarPlaceholder: {
     backgroundColor: Colors.gold,

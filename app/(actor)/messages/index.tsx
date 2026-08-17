@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
+import { canSendAgencyMessages } from '@/lib/access';
 import {
   fetchMessages,
   getOrCreateConversation,
@@ -24,19 +25,24 @@ import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function MessagesScreen() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const canMessage = canSendAgencyMessages(profile);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
 
   const load = useCallback(async () => {
-    if (!user) return;
+    if (!user || !canMessage) {
+      setConversationId(null);
+      setMessages([]);
+      return;
+    }
     const conv = await getOrCreateConversation(user.id);
     setConversationId(conv.id);
     const msgs = await fetchMessages(conv.id);
     setMessages(msgs);
-  }, [user]);
+  }, [user, canMessage]);
 
   useFocusEffect(
     useCallback(() => {
@@ -68,7 +74,7 @@ export default function MessagesScreen() {
   }, [conversationId]);
 
   const onSend = async () => {
-    if (!user || !conversationId || !body.trim()) return;
+    if (!user || !conversationId || !body.trim() || !canMessage) return;
     try {
       setSending(true);
       const msg = await sendMessage({
@@ -87,39 +93,46 @@ export default function MessagesScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <Text style={styles.title}>{t('messages.title')}</Text>
       <Text style={styles.hint}>{t('messages.agencyOnly')}</Text>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={12}
-      >
-        <FlatList
-          data={messages}
-          keyExtractor={(m) => m.id}
-          contentContainerStyle={styles.list}
-          ListEmptyComponent={<Text style={styles.empty}>{t('messages.empty')}</Text>}
-          renderItem={({ item }) => {
-            const mine = item.sender_id === user?.id;
-            return (
-              <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
-                <Text style={[styles.bubbleText, mine && { color: Colors.textOnDark }]}>
-                  {item.body}
-                </Text>
-              </View>
-            );
-          }}
-        />
-        <View style={styles.composer}>
-          <TextInput
-            style={styles.input}
-            placeholder={t('messages.placeholder')}
-            placeholderTextColor={Colors.textMuted}
-            value={body}
-            onChangeText={setBody}
-            editable={!sending}
-          />
-          <Button label={t('messages.send')} onPress={onSend} loading={sending} style={styles.send} />
+      {!canMessage ? (
+        <View style={styles.locked}>
+          <Text style={styles.lockedTitle}>{t('messages.lockedTitle')}</Text>
+          <Text style={styles.lockedBody}>{t('messages.lockedBody')}</Text>
         </View>
-      </KeyboardAvoidingView>
+      ) : (
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={12}
+        >
+          <FlatList
+            data={messages}
+            keyExtractor={(m) => m.id}
+            contentContainerStyle={styles.list}
+            ListEmptyComponent={<Text style={styles.empty}>{t('messages.empty')}</Text>}
+            renderItem={({ item }) => {
+              const mine = item.sender_id === user?.id;
+              return (
+                <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
+                  <Text style={[styles.bubbleText, mine && { color: Colors.textOnDark }]}>
+                    {item.body}
+                  </Text>
+                </View>
+              );
+            }}
+          />
+          <View style={styles.composer}>
+            <TextInput
+              style={styles.input}
+              placeholder={t('messages.placeholder')}
+              placeholderTextColor={Colors.textMuted}
+              value={body}
+              onChangeText={setBody}
+              editable={!sending}
+            />
+            <Button label={t('messages.send')} onPress={onSend} loading={sending} style={styles.send} />
+          </View>
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }
@@ -137,6 +150,27 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.sm,
+  },
+  locked: {
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.white,
+    gap: Spacing.sm,
+  },
+  lockedTitle: {
+    fontFamily: Fonts.display,
+    fontSize: 24,
+    color: Colors.ink,
+  },
+  lockedBody: {
+    fontFamily: Fonts.body,
+    fontSize: 14,
+    lineHeight: 20,
+    color: Colors.textMuted,
   },
   list: { padding: Spacing.lg, gap: Spacing.sm, flexGrow: 1 },
   empty: { fontFamily: Fonts.body, color: Colors.textMuted },

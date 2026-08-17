@@ -45,11 +45,29 @@ export async function createImagesDirectUpload(
   });
 
   if (error) {
-    throw new Error(error.message || 'Cloudflare Images upload URL alınamadı');
+    let detail = error.message || 'Cloudflare Images upload URL alınamadı';
+    try {
+      const ctx = (error as { context?: Response }).context;
+      if (ctx) {
+        const payload = await ctx.json();
+        if (payload?.error) {
+          detail =
+            typeof payload.error === 'string'
+              ? payload.error
+              : JSON.stringify(payload.error);
+        }
+      }
+    } catch {
+      // keep generic message
+    }
+    throw new Error(detail);
   }
 
   if (!data?.uploadURL || !data?.id) {
-    throw new Error('Geçersiz Cloudflare Images yanıtı');
+    throw new Error(
+      (data as { error?: string } | null)?.error ||
+        'Geçersiz Cloudflare Images yanıtı'
+    );
   }
 
   return {
@@ -91,7 +109,7 @@ export function getCfImagesAccountHash(): string | null {
  */
 export function cfImageUrl(
   imageId: string,
-  variant: string = 'public',
+  variant: string = 'w=800,h=800,fit=cover',
   accountHash?: string | null
 ): string {
   const hash = accountHash || cachedImagesHash;

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { uploadImageViaCloudflare } from '@/lib/cloudflare';
+import { uploadImageToStorage } from '@/lib/storageUpload';
 import type { ActorProfile, ActorStatus, Profile } from '@/types/database';
 
 export async function updateActorProfile(
@@ -20,27 +20,37 @@ export async function updateProfileBasics(
   if (error) throw error;
 }
 
+async function uploadProfileImageFile(input: {
+  userId: string;
+  localUri: string;
+  mimeType?: string | null;
+  role: 'avatar' | 'cover';
+}): Promise<string> {
+  // CF Images varyant/secret kurulumu olmadan güvenilir yol: Supabase Storage
+  const bucket = input.role === 'avatar' ? 'avatars' : 'covers';
+  const uploaded = await uploadImageToStorage({
+    userId: input.userId,
+    localUri: input.localUri,
+    mimeType: input.mimeType,
+    bucket,
+    fileKey: `${input.role}-${Date.now()}`,
+  });
+  return uploaded.url;
+}
+
 export async function uploadProfileImage(input: {
   userId: string;
   localUri: string;
   mimeType?: string | null;
   role: 'avatar' | 'cover';
 }): Promise<string> {
-  const uploaded = await uploadImageViaCloudflare({
-    localUri: input.localUri,
-    mimeType: input.mimeType,
-    meta: {
-      role: input.role,
-      userId: input.userId,
-    },
-    variant: input.role === 'avatar' ? 'public' : 'public',
-  });
+  const url = await uploadProfileImageFile(input);
 
   await updateProfileBasics(input.userId, {
-    [input.role === 'avatar' ? 'avatar_url' : 'cover_url']: uploaded.url,
+    [input.role === 'avatar' ? 'avatar_url' : 'cover_url']: url,
   });
 
-  return uploaded.url;
+  return url;
 }
 
 export async function fetchActorsAdmin(status?: ActorStatus): Promise<Profile[]> {

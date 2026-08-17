@@ -34,6 +34,29 @@ function reqLabel(label: string) {
   return `${label} *`;
 }
 
+const NO_MARKERS = /^(hayır|hayir|no|yok)$/i;
+
+function parseYesNoDetail(raw: string | null | undefined): {
+  yes: boolean | null;
+  detail: string;
+} {
+  if (!raw?.trim()) return { yes: null, detail: '' };
+  const v = raw.trim();
+  if (NO_MARKERS.test(v)) return { yes: false, detail: '' };
+  return { yes: true, detail: v };
+}
+
+function serializeYesNoDetail(
+  yes: boolean | null,
+  detail: string,
+  noLabel: string
+): string | null {
+  if (yes === null) return null;
+  if (!yes) return noLabel;
+  const trimmed = detail.trim();
+  return trimmed || null;
+}
+
 export default function RegistrationFormScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -78,11 +101,17 @@ export default function RegistrationFormScreen() {
   const [additionalNotes, setAdditionalNotes] = useState(actorProfile?.additional_notes ?? '');
 
   const [languages, setLanguages] = useState((actorProfile?.languages ?? []).join(', '));
-  const [actingEducation, setActingEducation] = useState(actorProfile?.acting_education ?? '');
-  const [drivingInfo, setDrivingInfo] = useState(actorProfile?.driving_info ?? '');
+  const initialActing = parseYesNoDetail(actorProfile?.acting_education);
+  const [hasActingEducation, setHasActingEducation] = useState<boolean | null>(initialActing.yes);
+  const [actingEducationDetail, setActingEducationDetail] = useState(initialActing.detail);
+  const initialDriving = parseYesNoDetail(actorProfile?.driving_info);
+  const [hasDriving, setHasDriving] = useState<boolean | null>(initialDriving.yes);
+  const [drivingDetail, setDrivingDetail] = useState(initialDriving.detail);
   const [experience, setExperience] = useState(actorProfile?.experience ?? '');
   const [availability, setAvailability] = useState(actorProfile?.availability ?? '');
-  const [otherAgency, setOtherAgency] = useState(actorProfile?.other_agency ?? '');
+  const initialAgency = parseYesNoDetail(actorProfile?.other_agency);
+  const [hasOtherAgency, setHasOtherAgency] = useState<boolean | null>(initialAgency.yes);
+  const [otherAgencyDetail, setOtherAgencyDetail] = useState(initialAgency.detail);
   const [referral, setReferral] = useState(actorProfile?.referral_source ?? '');
   const [specialInterests, setSpecialInterests] = useState(
     actorProfile?.special_interests ?? ''
@@ -243,11 +272,15 @@ export default function RegistrationFormScreen() {
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean),
-        acting_education: actingEducation.trim() || null,
-        driving_info: drivingInfo.trim() || null,
+        acting_education: serializeYesNoDetail(
+          hasActingEducation,
+          actingEducationDetail,
+          t('regForm.no')
+        ),
+        driving_info: serializeYesNoDetail(hasDriving, drivingDetail, t('regForm.no')),
         experience: experience.trim() || null,
         availability: availability.trim() || null,
-        other_agency: otherAgency.trim() || null,
+        other_agency: serializeYesNoDetail(hasOtherAgency, otherAgencyDetail, t('regForm.no')),
         referral_source: referral.trim() || null,
         special_interests: specialInterests.trim() || null,
         bank_account_name: bankAccountName.trim() || null,
@@ -302,6 +335,42 @@ export default function RegistrationFormScreen() {
           );
         })}
       </View>
+    </View>
+  );
+
+  const YesNoDetail = ({
+    question,
+    detailLabel,
+    value,
+    detail,
+    onChangeYes,
+    onChangeDetail,
+  }: {
+    question: string;
+    detailLabel: string;
+    value: boolean | null;
+    detail: string;
+    onChangeYes: (v: boolean) => void;
+    onChangeDetail: (v: string) => void;
+  }) => (
+    <View style={{ gap: Spacing.sm }}>
+      <BoolRow
+        label={question}
+        value={value}
+        onChange={(v) => {
+          onChangeYes(v);
+          if (!v) onChangeDetail('');
+        }}
+      />
+      {value === true ? (
+        <TextField
+          label={detailLabel}
+          value={detail}
+          onChangeText={onChangeDetail}
+          multiline
+          style={{ minHeight: 80 }}
+        />
+      ) : null}
     </View>
   );
 
@@ -565,17 +634,21 @@ export default function RegistrationFormScreen() {
         onChangeText={setLanguages}
         multiline
       />
-      <TextField
-        label={t('regForm.fields.actingEducation')}
-        value={actingEducation}
-        onChangeText={setActingEducation}
-        multiline
+      <YesNoDetail
+        question={t('regForm.fields.actingEducation')}
+        detailLabel={t('regForm.fields.actingEducationDetail')}
+        value={hasActingEducation}
+        detail={actingEducationDetail}
+        onChangeYes={setHasActingEducation}
+        onChangeDetail={setActingEducationDetail}
       />
-      <TextField
-        label={t('regForm.fields.drivingInfo')}
-        value={drivingInfo}
-        onChangeText={setDrivingInfo}
-        multiline
+      <YesNoDetail
+        question={t('regForm.fields.drivingInfo')}
+        detailLabel={t('regForm.fields.drivingInfoDetail')}
+        value={hasDriving}
+        detail={drivingDetail}
+        onChangeYes={setHasDriving}
+        onChangeDetail={setDrivingDetail}
       />
       <TextField
         label={t('regForm.fields.experience')}
@@ -589,11 +662,13 @@ export default function RegistrationFormScreen() {
         onChangeText={setAvailability}
         multiline
       />
-      <TextField
-        label={t('regForm.fields.otherAgency')}
-        value={otherAgency}
-        onChangeText={setOtherAgency}
-        multiline
+      <YesNoDetail
+        question={t('regForm.fields.otherAgency')}
+        detailLabel={t('regForm.fields.otherAgencyDetail')}
+        value={hasOtherAgency}
+        detail={otherAgencyDetail}
+        onChangeYes={setHasOtherAgency}
+        onChangeDetail={setOtherAgencyDetail}
       />
       <TextField
         label={t('regForm.fields.referral')}

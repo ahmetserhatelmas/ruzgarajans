@@ -31,6 +31,11 @@ export function canAccessCasts(
   );
 }
 
+/** Ajans mesajları: yalnızca admin onaylı oyuncular */
+export function canSendAgencyMessages(profile: Profile | null | undefined): boolean {
+  return profile?.role === 'actor' && profile.actor_status === 'approved';
+}
+
 export type ActorAccessState =
   | 'ready'
   | 'needs_form'

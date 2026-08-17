@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { uploadImageViaCloudflare } from '@/lib/cloudflare';
+import { uploadImageToStorage } from '@/lib/storageUpload';
 
 export const REQUIRED_PHOTO_KINDS = [
   'full_body',
@@ -35,22 +35,34 @@ export async function fetchGalleryPhotos(userId: string): Promise<GalleryPhoto[]
   return (data ?? []) as GalleryPhoto[];
 }
 
+async function uploadGalleryImageFile(input: {
+  userId: string;
+  kind: GalleryPhotoKind;
+  localUri: string;
+  mimeType?: string | null;
+}): Promise<{ url: string; storagePath: string; cfImageId: string | null }> {
+  const uploaded = await uploadImageToStorage({
+    userId: input.userId,
+    localUri: input.localUri,
+    mimeType: input.mimeType,
+    bucket: 'gallery',
+    fileKey: `${input.kind}-${Date.now()}`,
+  });
+  return {
+    url: uploaded.url,
+    storagePath: uploaded.path,
+    cfImageId: null,
+  };
+}
+
 export async function upsertGalleryPhoto(input: {
   userId: string;
   kind: GalleryPhotoKind;
   localUri: string;
   mimeType?: string | null;
 }): Promise<GalleryPhoto> {
-  const uploaded = await uploadImageViaCloudflare({
-    localUri: input.localUri,
-    mimeType: input.mimeType,
-    meta: {
-      kind: input.kind,
-      userId: input.userId,
-    },
-  });
+  const uploaded = await uploadGalleryImageFile(input);
 
-  const storagePath = `cf:${uploaded.id}`;
   const { data: existing } = await supabase
     .from('gallery_photos')
     .select('id')
@@ -62,9 +74,9 @@ export async function upsertGalleryPhoto(input: {
     const { data, error } = await supabase
       .from('gallery_photos')
       .update({
-        storage_path: storagePath,
+        storage_path: uploaded.storagePath,
         public_url: uploaded.url,
-        cf_image_id: uploaded.id,
+        cf_image_id: uploaded.cfImageId,
       })
       .eq('id', existing.id)
       .select('*')
@@ -78,9 +90,9 @@ export async function upsertGalleryPhoto(input: {
     .from('gallery_photos')
     .insert({
       user_id: input.userId,
-      storage_path: storagePath,
+      storage_path: uploaded.storagePath,
       public_url: uploaded.url,
-      cf_image_id: uploaded.id,
+      cf_image_id: uploaded.cfImageId,
       kind: input.kind,
       sort_order: sortOrder >= 0 ? sortOrder : 0,
     })
