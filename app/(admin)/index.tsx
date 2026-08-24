@@ -6,14 +6,15 @@ import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { setAppLanguage } from '@/lib/i18n';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { canAdmin, type AdminPerm } from '@/lib/adminAccess';
 
-const LINKS = [
+const LINKS: { href: string; key: AdminPerm }[] = [
   { href: '/(admin)/actors', key: 'actors' },
   { href: '/(admin)/casts', key: 'casts' },
   { href: '/(admin)/applications', key: 'applications' },
   { href: '/(admin)/messages', key: 'messages' },
   { href: '/(admin)/announcements', key: 'announcements' },
-] as const;
+];
 
 export default function AdminHome() {
   const { t, i18n } = useTranslation();
@@ -46,7 +47,7 @@ export default function AdminHome() {
       </View>
 
       <View style={styles.grid}>
-        {LINKS.map((l) => (
+        {LINKS.filter((l) => canAdmin(profile, l.key)).map((l) => (
           <Pressable
             key={l.key}
             style={styles.card}
@@ -57,11 +58,13 @@ export default function AdminHome() {
         ))}
       </View>
 
-      <Button
-        label={t('admin.newCast')}
-        onPress={() => router.push('/(admin)/casts/new')}
-        style={{ marginTop: Spacing.lg }}
-      />
+      {canAdmin(profile, 'casts') ? (
+        <Button
+          label={t('admin.newCast')}
+          onPress={() => router.push('/(admin)/casts/new')}
+          style={{ marginTop: Spacing.lg }}
+        />
+      ) : null}
       <Button
         label={t('common.logout')}
         variant="ghost"
@@ -128,8 +131,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   chipActive: {
-    backgroundColor: Colors.ink,
-    borderColor: Colors.ink,
+    backgroundColor: Colors.brand,
+    borderColor: Colors.brand,
   },
   chipText: {
     fontFamily: Fonts.bodyMedium,

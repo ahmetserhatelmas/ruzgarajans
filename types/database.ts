@@ -1,4 +1,4 @@
-export type UserRole = 'actor' | 'admin';
+export type UserRole = 'actor' | 'admin' | 'cast_director';
 export type ActorStatus = 'pending' | 'approved' | 'rejected';
 export type ApplicationStatus =
   | 'submitted'
@@ -28,8 +28,23 @@ export type Profile = {
   cover_url: string | null;
   actor_status: ActorStatus;
   expo_push_token: string | null;
+  is_super_admin?: boolean;
+  admin_permissions?: string[];
   created_at: string;
   updated_at: string;
+};
+
+export type ActorShare = {
+  id: string;
+  actor_id: string;
+  token: string;
+  created_by: string;
+  recipient_id: string | null;
+  note: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  pin_hash?: string | null;
 };
 
 export type ActorProfile = {
@@ -57,6 +72,7 @@ export type ActorProfile = {
   talent_video_id: string | null;
   talent_video_playback_url: string | null;
   national_id: string | null;
+  is_turkish_citizen: boolean | null;
   nationality: string | null;
   birth_place: string | null;
   whatsapp: string | null;
@@ -78,6 +94,8 @@ export type ActorProfile = {
   has_work_permit: boolean | null;
   has_residence_permit: boolean | null;
   employment_status: string[] | null;
+  insurance_status: string | null;
+  insurance_other: string | null;
   sports: string[] | null;
   dances: string[] | null;
   model_skills: string[] | null;
@@ -118,6 +136,8 @@ export type CastListing = {
   shoot_date: string | null;
   shoot_location: string | null;
   deadline: string | null;
+  option_date: string | null;
+  payment_due_date: string | null;
   budget_amount: number | null;
   budget_currency: string;
   allow_budget_counter: boolean;

@@ -9,6 +9,7 @@ import { fetchActorRows, fetchCastDetail, matchesCast } from "@/lib/queries";
 import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
 import { ageFromBirth, GENDER, label } from "@/lib/labels";
 import { toggleCastPublishedAction } from "@/lib/actions";
+import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,7 @@ export default async function CastDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  await requireAdminPerm("casts");
   const [{ cast, applications, videos }, actors] = await Promise.all([
     fetchCastDetail(id),
     fetchActorRows(),

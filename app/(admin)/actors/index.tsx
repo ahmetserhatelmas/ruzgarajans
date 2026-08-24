@@ -8,6 +8,7 @@ import { fetchActorsAdmin, setActorStatus } from '@/services/actors';
 import { supabase } from '@/lib/supabase';
 import type { ActorStatus, Profile } from '@/types/database';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { AdminPermGate } from '@/components/ui/AdminPermGate';
 
 const FILTERS: ActorStatus[] = ['approved', 'pending', 'rejected'];
 
@@ -58,6 +59,7 @@ export default function AdminActorsScreen() {
   const pendingBadge = formatBadgeCount(pendingCount);
 
   return (
+    <AdminPermGate perm="actors">
     <SafeAreaView style={styles.safe} edges={['top']}>
       <Text style={styles.title}>{t('admin.actors')}</Text>
       <View style={styles.filters}>
@@ -108,6 +110,7 @@ export default function AdminActorsScreen() {
         )}
       />
     </SafeAreaView>
+    </AdminPermGate>
   );
 }
 
@@ -136,7 +139,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     backgroundColor: Colors.white,
   },
-  chipActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
+  chipActive: { backgroundColor: Colors.brand, borderColor: Colors.brand },
   chipText: { fontFamily: Fonts.bodyMedium, color: Colors.text },
   chipTextActive: { color: Colors.textOnDark },
   badge: {

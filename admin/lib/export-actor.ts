@@ -6,10 +6,17 @@ import {
   countryLabel,
   formatLanguages,
   DANCES,
+  EDUCATION,
   EYES,
   formatDate,
   GENDER,
   HAIR,
+  INSURANCE,
+  MODEL,
+  PASSPORT_TYPE,
+  PERFORMANCE,
+  PROFESSION,
+  SPECIAL,
   label,
   listLabel,
   PHOTO_KIND,
@@ -194,6 +201,7 @@ export async function buildActorExportZip(input: ExportInput): Promise<Buffer> {
     row("Telefon", text(profile.phone)),
     row("Yakın telefonu", text(actor?.relative_phone)),
     row("WhatsApp", text(actor?.whatsapp)),
+    row("TC vatandaşı", boolLabel(actor?.is_turkish_citizen)),
     row("TCKN", text(actor?.national_id)),
     row("Uyruk", `${countryLabel(actor?.nationality)}${actor?.nationality ? ` (${actor.nationality})` : ""}`),
     row("Doğum", `${formatDate(actor?.birth_date)} (${age ?? "—"} yaş)`),
@@ -218,8 +226,8 @@ export async function buildActorExportZip(input: ExportInput): Promise<Buffer> {
   ].join("");
 
   const kariyer = [
-    row("Eğitim", text(actor?.education)),
-    row("Meslek", text(actor?.profession)),
+    row("Eğitim", label(EDUCATION, actor?.education)),
+    row("Meslek", label(PROFESSION, actor?.profession)),
     row("Oyunculuk eğitimi", text(actor?.acting_education)),
     row("Deneyim", text(actor?.experience)),
     row("Diller", formatLanguages(actor?.languages)),
@@ -234,9 +242,9 @@ export async function buildActorExportZip(input: ExportInput): Promise<Buffer> {
     row("Spor", listLabel(SPORTS, actor?.sports)),
     row("Dans", listLabel(DANCES, actor?.dances)),
     row("Dans diğer", text(actor?.dances_other)),
-    row("Model", actor?.model_skills?.join(", ") || "—"),
-    row("Performans", actor?.performance_skills?.join(", ") || "—"),
-    row("Özel durum", actor?.special_conditions?.join(", ") || "—"),
+    row("Model", listLabel(MODEL, actor?.model_skills)),
+    row("Performans", listLabel(PERFORMANCE, actor?.performance_skills)),
+    row("Özel durum", listLabel(SPECIAL, actor?.special_conditions)),
     row("Ehliyet", text(actor?.driving_info)),
     row("İlgi", text(actor?.special_interests)),
     row("Not", text(actor?.additional_notes)),
@@ -246,9 +254,11 @@ export async function buildActorExportZip(input: ExportInput): Promise<Buffer> {
     row("Hesap adı", text(actor?.bank_account_name)),
     row("Banka", text(actor?.bank_name)),
     row("IBAN", text(actor?.iban)),
+    row("Sigorta (günlük)", label(INSURANCE, actor?.insurance_status)),
+    row("Sigorta notu", text(actor?.insurance_other)),
     row("Pasaport", boolLabel(actor?.has_passport)),
     row("Pasaport no", text(actor?.passport_no)),
-    row("Pasaport tipi", text(actor?.passport_type)),
+    row("Pasaport tipi", label(PASSPORT_TYPE, actor?.passport_type)),
     row("Vize", text(actor?.visa_countries)),
     row("Çalışma izni", boolLabel(actor?.has_work_permit)),
     row("İkamet", boolLabel(actor?.has_residence_permit)),
@@ -289,15 +299,15 @@ export async function buildActorExportZip(input: ExportInput): Promise<Buffer> {
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <title>${escapeHtml(name)} — Rüzgâr Ajans</title>
+  <title>${escapeHtml(name)} — Rüzgâr Oyunculuk</title>
   <style>
-    body { font-family: Georgia, serif; background: #f4efe6; color: #1a1a1a; margin: 0; padding: 32px; }
-    h1 { font-size: 32px; margin: 0 0 4px; }
-    .meta { color: #666; margin-bottom: 28px; }
-    h2 { font-size: 20px; border-bottom: 1px solid #d8d0c4; padding-bottom: 6px; }
+    body { font-family: Georgia, serif; background: #ffffff; color: #16181d; margin: 0; padding: 32px; }
+    h1 { font-size: 32px; margin: 0 0 4px; color: #6b2c91; }
+    .meta { color: #5c616a; margin-bottom: 28px; }
+    h2 { font-size: 20px; border-bottom: 1px solid #e4dcec; padding-bottom: 6px; color: #6b2c91; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #ece6dc; vertical-align: top; }
-    th { width: 220px; color: #666; font-weight: 600; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #f4eef8; vertical-align: top; }
+    th { width: 220px; color: #5c616a; font-weight: 600; }
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
     figure { margin: 0; }
     img, video, iframe { width: 100%; height: auto; background: #fff; border-radius: 10px; }

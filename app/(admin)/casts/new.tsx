@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { createCast } from '@/services/casts';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
+import { DialogueFields } from '@/components/cast/DialogueFields';
+import { stringifyDialogueScript, parseDialogueScript } from '@/lib/dialogueScript';
+import { sanitizeIsoDateInput } from '@/lib/isoDate';
 
 export default function NewCastScreen() {
   const { t } = useTranslation();
@@ -24,6 +27,8 @@ export default function NewCastScreen() {
   const [location, setLocation] = useState('');
   const [shootDate, setShootDate] = useState('');
   const [deadline, setDeadline] = useState('');
+  const [optionDate, setOptionDate] = useState('');
+  const [paymentDue, setPaymentDue] = useState('');
   const [budget, setBudget] = useState('');
   const [allowCounter, setAllowCounter] = useState(true);
   const [dialogueScript, setDialogueScript] = useState('');
@@ -46,10 +51,12 @@ export default function NewCastScreen() {
         shoot_location: location,
         shoot_date: shootDate || null,
         deadline: deadline || null,
+        option_date: optionDate || null,
+        payment_due_date: paymentDue || null,
         budget_amount: budget ? Number(budget) : null,
         allow_budget_counter: allowCounter,
-        dialogue_mode: dialogueScript.trim() ? 'script_tts' : 'none',
-        dialogue_script: dialogueScript.trim() || null,
+        dialogue_mode: parseDialogueScript(dialogueScript).lines.length ? 'script_tts' : 'none',
+        dialogue_script: stringifyDialogueScript(parseDialogueScript(dialogueScript)) || null,
         is_published: publish,
         gender: 'any',
         budget_currency: 'TRY',
@@ -79,19 +86,16 @@ export default function NewCastScreen() {
       <TextField label="Boy min" value={heightMin} onChangeText={setHeightMin} keyboardType="numeric" />
       <TextField label="Boy max" value={heightMax} onChangeText={setHeightMax} keyboardType="numeric" />
       <TextField label={t('cast.location')} value={location} onChangeText={setLocation} />
-      <TextField label={`${t('cast.shootDate')} (YYYY-MM-DD)`} value={shootDate} onChangeText={setShootDate} />
-      <TextField label={`${t('cast.deadline')} (YYYY-MM-DD)`} value={deadline} onChangeText={setDeadline} />
+      <TextField label={`${t('cast.shootDate')} (YYYY-MM-DD)`} value={shootDate} onChangeText={(v) => setShootDate(sanitizeIsoDateInput(v))} />
+      <TextField label={`${t('cast.deadline')} (YYYY-MM-DD)`} value={deadline} onChangeText={(v) => setDeadline(sanitizeIsoDateInput(v))} />
+      <TextField label={`${t('cast.optionDate')} (YYYY-MM-DD)`} value={optionDate} onChangeText={(v) => setOptionDate(sanitizeIsoDateInput(v))} />
+      <TextField label={`${t('cast.paymentDue')} (YYYY-MM-DD)`} value={paymentDue} onChangeText={(v) => setPaymentDue(sanitizeIsoDateInput(v))} />
       <TextField label={t('cast.budget')} value={budget} onChangeText={setBudget} keyboardType="numeric" />
       <View style={styles.switchRow}>
         <Text style={styles.switchLabel}>{t('cast.counterBudget')}</Text>
         <Switch value={allowCounter} onValueChange={setAllowCounter} />
       </View>
-      <TextField
-        label={`${t('video.dialogueScript')} (satır satır)`}
-        value={dialogueScript}
-        onChangeText={setDialogueScript}
-        multiline
-      />
+      <DialogueFields value={dialogueScript} onChange={setDialogueScript} />
       <View style={styles.switchRow}>
         <Text style={styles.switchLabel}>{t('admin.publish')}</Text>
         <Switch value={publish} onValueChange={setPublish} />

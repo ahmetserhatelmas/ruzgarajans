@@ -72,7 +72,9 @@ export async function fetchActorDetail(id: string) {
         .order("sort_order"),
       supabase
         .from("applications")
-        .select("*, cast_listings(project_name, role_name)")
+        .select(
+          "*, cast_listings(id, project_name, role_name, shoot_date, option_date, budget_amount, budget_currency)"
+        )
         .eq("actor_id", id)
         .order("created_at", { ascending: false }),
       supabase
@@ -87,7 +89,16 @@ export async function fetchActorDetail(id: string) {
     actor: actor as ActorProfile | null,
     photos: (photos ?? []) as GalleryPhoto[],
     applications: (apps ?? []) as (Application & {
-      cast_listings: { project_name: string; role_name: string } | null;
+      cast_listings: Pick<
+        CastListing,
+        | "id"
+        | "project_name"
+        | "role_name"
+        | "shoot_date"
+        | "option_date"
+        | "budget_amount"
+        | "budget_currency"
+      > | null;
     })[],
     videos: (videos ?? []) as Video[],
   };
@@ -130,7 +141,7 @@ export async function fetchApplications() {
   const { data, error } = await supabase
     .from("applications")
     .select(
-      "*, profiles:actor_id(id, full_name, email, avatar_url, actor_status), cast_listings(id, project_name, role_name, deadline, budget_amount, budget_currency)"
+      "*, profiles:actor_id(id, full_name, email, avatar_url, actor_status), cast_listings(id, project_name, role_name, deadline, option_date, payment_due_date, budget_amount, budget_currency)"
     )
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -148,7 +159,7 @@ export async function fetchApplicationDetail(id: string) {
   const { data: app } = await supabase
     .from("applications")
     .select(
-      "*, cast_listings(id, project_name, role_name, role_description, deadline, budget_amount, budget_currency)"
+      "*, cast_listings(id, project_name, role_name, role_description, deadline, option_date, payment_due_date, budget_amount, budget_currency)"
     )
     .eq("id", id)
     .maybeSingle();

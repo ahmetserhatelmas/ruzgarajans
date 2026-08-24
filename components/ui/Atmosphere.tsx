@@ -26,7 +26,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: '#E8D9B0',
+    backgroundColor: '#E8D4F5',
     opacity: 0.55,
   },
   blobBottom: {
@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: '#D9C4B0',
+    backgroundColor: '#D4C0E8',
     opacity: 0.4,
   },
   grain: {

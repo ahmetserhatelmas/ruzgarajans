@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from '@/components/ui/Atmosphere';
 import { Screen } from '@/components/ui/Screen';
 import { setAppLanguage } from '@/lib/i18n';
+import { BrandMark } from '@/components/ui/BrandMark';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function LanguageScreen() {
@@ -18,7 +19,7 @@ export default function LanguageScreen() {
     <Screen>
       <LinearGradient />
       <View style={styles.hero}>
-        <Text style={styles.brand}>Rüzgâr Ajans</Text>
+        <BrandMark />
         {/* Always bilingual — don't depend on current locale */}
         <Text style={styles.title}>Dil seçin</Text>
         <Text style={styles.titleEn}>Choose language</Text>
@@ -59,13 +60,9 @@ export default function LanguageScreen() {
 
 const styles = StyleSheet.create({
   hero: {
-    marginTop: Spacing.xxl,
+    marginTop: Spacing.xl,
     gap: Spacing.sm,
-  },
-  brand: {
-    fontFamily: Fonts.displayBold,
-    fontSize: 42,
-    color: Colors.ink,
+    alignItems: 'center',
   },
   title: {
     fontFamily: Fonts.bodyBold,
@@ -90,7 +87,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   choice: {
-    backgroundColor: Colors.ink,
+    backgroundColor: Colors.brand,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
     flexDirection: 'row',
@@ -106,13 +103,13 @@ const styles = StyleSheet.create({
   choiceSub: {
     fontFamily: Fonts.body,
     fontSize: 13,
-    color: Colors.gold,
+    color: Colors.textOnDark,
     marginTop: 4,
   },
   choiceHint: {
     fontFamily: Fonts.displayBold,
     fontSize: 28,
-    color: Colors.gold,
+    color: Colors.textOnDark,
   },
   footer: {
     marginTop: 'auto',

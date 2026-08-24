@@ -7,12 +7,12 @@ import { Colors, Fonts } from '@/constants/theme';
 
 export default function ActorLayout() {
   const { t } = useTranslation();
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
 
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paper }}>
-        <ActivityIndicator color={Colors.ink} />
+        <ActivityIndicator color={Colors.brand} />
       </View>
     );
   }
@@ -21,11 +21,19 @@ export default function ActorLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
+  if (profile?.role === 'cast_director') {
+    return <Redirect href="/(director)" />;
+  }
+
+  if (profile?.role === 'admin') {
+    return <Redirect href="/(admin)" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: Colors.ink,
+        tabBarActiveTintColor: Colors.brand,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarStyle: {
           backgroundColor: Colors.paper,

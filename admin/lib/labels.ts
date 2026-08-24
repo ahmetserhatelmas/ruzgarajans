@@ -107,6 +107,92 @@ export const DANCES: Record<string, string> = {
   none: "Yok",
 };
 
+export const PASSPORT_TYPE: Record<string, string> = {
+  ordinary: "Umuma mahsus (bordo)",
+  special: "Hususi (yeşil)",
+  service: "Hizmet (gri)",
+  diplomatic: "Diplomatik (siyah)",
+  foreign: "Yabancı ülke pasaportu",
+};
+
+export const EDUCATION: Record<string, string> = {
+  primary: "İlkokul",
+  middle: "Ortaokul",
+  high_school: "Lise",
+  associate: "Ön lisans",
+  bachelor: "Lisans",
+  master: "Yüksek lisans",
+  doctorate: "Doktora",
+  other: "Diğer",
+};
+
+export const PROFESSION: Record<string, string> = {
+  actor: "Oyuncu",
+  model: "Model",
+  student: "Öğrenci",
+  teacher: "Öğretmen",
+  engineer: "Mühendis",
+  doctor: "Doktor",
+  nurse: "Hemşire",
+  lawyer: "Avukat",
+  architect: "Mimar",
+  designer: "Tasarımcı",
+  musician: "Müzisyen",
+  dancer: "Dansçı",
+  athlete: "Sporcu",
+  freelancer: "Serbest meslek",
+  private_sector: "Özel sektör",
+  public_sector: "Kamu",
+  homemaker: "Ev hanımı / ev erkeği",
+  unemployed: "Çalışmıyor",
+  retired: "Emekli",
+  other: "Diğer",
+};
+
+export const MODEL: Record<string, string> = {
+  hand: "El modeli",
+  foot: "Ayak modeli",
+  photo: "Fotomodel",
+  fashion: "Manken",
+  other: "Diğer",
+};
+
+export const PERFORMANCE: Record<string, string> = {
+  presenter: "Sunuculuk / spikerlik",
+  dubbing: "Dublaj",
+  pantomime: "Pandomim",
+  imitation: "Taklit",
+  improv: "Doğaçlama tiyatro",
+  fire: "Ateşbaz",
+  stilts: "Tahtabacak",
+  pole: "Direk dansı",
+  circus: "Sirk sanatçısı",
+  juggler: "Jonklör",
+  clown: "Palyaço",
+};
+
+export const SPECIAL: Record<string, string> = {
+  twin: "İkiz",
+  triplet: "Üçüz",
+  quadruplet: "Dördüz",
+  prosthetic_leg: "Protez bacak",
+  down_syndrome: "Down sendromu",
+  physical_condition: "Fiziksel özel durum",
+  large_scar: "Büyük yara izi",
+  dwarfism: "Cüce",
+  albino: "Albino",
+  vitiligo: "Vitiligo",
+};
+
+export const INSURANCE: Record<string, string> = {
+  eligible: "Yapılabilir",
+  eligible_sgk: "Yapılabilir — SGK'lı olarak çalışıyor",
+  eligible_retired: "Yapılabilir — Emekli",
+  unemployment: "İşsizlik maaşı alıyor",
+  student_grant: "Geri ödemesiz öğrenci kredisi alıyor",
+  ineligible_other: "Yapılamaz — diğer",
+};
+
 export function label(map: Record<string, string>, key?: string | null) {
   if (!key) return "—";
   return map[key] ?? key;

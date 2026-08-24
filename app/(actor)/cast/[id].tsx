@@ -111,6 +111,8 @@ export default function CastDetailScreen() {
         <Meta label={t('cast.shootDate')} value={cast.shoot_date ?? '—'} />
         <Meta label={t('cast.location')} value={cast.shoot_location ?? '—'} />
         <Meta label={t('cast.deadline')} value={cast.deadline ?? '—'} />
+        <Meta label={t('cast.optionDate')} value={cast.option_date ?? '—'} />
+        <Meta label={t('cast.paymentDue')} value={cast.payment_due_date ?? '—'} />
         <Meta
           label={t('cast.budget')}
           value={

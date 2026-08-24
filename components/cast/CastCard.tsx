@@ -26,6 +26,16 @@ export function CastCard({ item, onPress }: Props) {
             {t('cast.deadline')}: {item.deadline}
           </Text>
         ) : null}
+        {item.option_date ? (
+          <Text style={styles.meta}>
+            {t('cast.optionDate')}: {item.option_date}
+          </Text>
+        ) : null}
+        {item.payment_due_date ? (
+          <Text style={styles.meta}>
+            {t('cast.paymentDue')}: {item.payment_due_date}
+          </Text>
+        ) : null}
         {item.budget_amount != null ? (
           <Text style={styles.meta}>
             {item.budget_amount.toLocaleString()} {item.budget_currency}
@@ -63,7 +73,8 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
     marginTop: Spacing.xs,
   },
   meta: {

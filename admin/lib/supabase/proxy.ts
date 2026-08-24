@@ -31,6 +31,11 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isLogin = path === "/login";
+  const isPublicShare = path.startsWith("/p/");
+
+  if (isPublicShare) {
+    return supabaseResponse;
+  }
 
   if (!user && !isLogin) {
     const url = request.nextUrl.clone();

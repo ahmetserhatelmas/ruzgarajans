@@ -43,9 +43,9 @@ export function ValueSlider({
           step={step}
           value={display}
           onValueChange={(v) => onChange(Math.round(v))}
-          minimumTrackTintColor={Colors.ink}
+          minimumTrackTintColor={Colors.brand}
           maximumTrackTintColor={Colors.border}
-          thumbTintColor={Colors.ink}
+          thumbTintColor={Colors.brand}
         />
         <View style={styles.rangeRow}>
           <Text style={styles.rangeText}>

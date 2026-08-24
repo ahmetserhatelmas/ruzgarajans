@@ -224,8 +224,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   rowActive: {
-    backgroundColor: Colors.ink,
-    borderColor: Colors.ink,
+    backgroundColor: Colors.brand,
+    borderColor: Colors.brand,
   },
   rowText: {
     fontFamily: Fonts.bodyMedium,

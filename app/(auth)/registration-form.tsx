@@ -19,7 +19,9 @@ import {
   EYE_COLORS,
   GENDERS,
   HAIR_COLORS,
+  INSURANCE_STATUSES,
   MODEL_SKILLS,
+  PASSPORT_TYPES,
   PERFORMANCE_SKILLS,
   PROFESSIONS,
   SPECIAL_CONDITIONS,
@@ -28,7 +30,9 @@ import {
 import { SelectField } from '@/components/ui/SelectField';
 import { countryOptions } from '@/constants/countries';
 import { parseLanguageSkills, serializeLanguageSkills } from '@/constants/languages';
+import { parseDrivingLicenses, serializeDrivingLicenses } from '@/constants/licenses';
 import { LanguageSkillsField } from '@/components/ui/LanguageSkillsField';
+import { LicenseField } from '@/components/ui/LicenseField';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import {
   clearRegistrationDraft,
@@ -76,6 +80,10 @@ export default function RegistrationFormScreen() {
   const { user, profile, actorProfile, refreshProfile } = useAuth();
 
   const [fullName, setFullName] = useState(profile?.full_name ?? '');
+  const [isTurkishCitizen, setIsTurkishCitizen] = useState<boolean | null>(
+    actorProfile?.is_turkish_citizen ??
+      (/^\d{11}$/.test(actorProfile?.national_id ?? '') ? true : null)
+  );
   const [nationalId, setNationalId] = useState(actorProfile?.national_id ?? '');
   const [nationality, setNationality] = useState(actorProfile?.nationality ?? '');
   const [birthDate, setBirthDate] = useState(actorProfile?.birth_date ?? '');
@@ -119,9 +127,9 @@ export default function RegistrationFormScreen() {
   const initialActing = parseYesNoDetail(actorProfile?.acting_education);
   const [hasActingEducation, setHasActingEducation] = useState<boolean | null>(initialActing.yes);
   const [actingEducationDetail, setActingEducationDetail] = useState(initialActing.detail);
-  const initialDriving = parseYesNoDetail(actorProfile?.driving_info);
+  const initialDriving = parseDrivingLicenses(actorProfile?.driving_info);
   const [hasDriving, setHasDriving] = useState<boolean | null>(initialDriving.yes);
-  const [drivingDetail, setDrivingDetail] = useState(initialDriving.detail);
+  const [drivingLicenses, setDrivingLicenses] = useState<string[]>(initialDriving.licenses);
   const [experience, setExperience] = useState(actorProfile?.experience ?? '');
   const [availability, setAvailability] = useState(actorProfile?.availability ?? '');
   const initialAgency = parseYesNoDetail(actorProfile?.other_agency);
@@ -148,6 +156,8 @@ export default function RegistrationFormScreen() {
   const [hasResidencePermit, setHasResidencePermit] = useState<boolean | null>(
     actorProfile?.has_residence_permit ?? null
   );
+  const [insuranceStatus, setInsuranceStatus] = useState(actorProfile?.insurance_status ?? '');
+  const [insuranceOther, setInsuranceOther] = useState(actorProfile?.insurance_other ?? '');
 
   const [kvkk, setKvkk] = useState(Boolean(actorProfile?.kvkk_accepted));
   const [kvkkOpen, setKvkkOpen] = useState(false);
@@ -159,6 +169,7 @@ export default function RegistrationFormScreen() {
   const draft = useMemo<RegistrationDraft>(
     () => ({
       fullName,
+      isTurkishCitizen,
       nationalId,
       nationality,
       birthDate,
@@ -195,7 +206,7 @@ export default function RegistrationFormScreen() {
       hasActingEducation,
       actingEducationDetail,
       hasDriving,
-      drivingDetail,
+      drivingLicenses,
       experience,
       availability,
       hasOtherAgency,
@@ -211,10 +222,13 @@ export default function RegistrationFormScreen() {
       visaCountries,
       hasWorkPermit,
       hasResidencePermit,
+      insuranceStatus,
+      insuranceOther,
       kvkk,
     }),
     [
       fullName,
+      isTurkishCitizen,
       nationalId,
       nationality,
       birthDate,
@@ -251,7 +265,7 @@ export default function RegistrationFormScreen() {
       hasActingEducation,
       actingEducationDetail,
       hasDriving,
-      drivingDetail,
+      drivingLicenses,
       experience,
       availability,
       hasOtherAgency,
@@ -267,6 +281,8 @@ export default function RegistrationFormScreen() {
       visaCountries,
       hasWorkPermit,
       hasResidencePermit,
+      insuranceStatus,
+      insuranceOther,
       kvkk,
     ]
   );
@@ -293,6 +309,10 @@ export default function RegistrationFormScreen() {
     () => SPECIAL_CONDITIONS.map((id) => ({ id, label: t(`regForm.special.${id}`) })),
     [t]
   );
+  const insuranceOptions = useMemo(
+    () => INSURANCE_STATUSES.map((id) => ({ id, label: t(`regForm.insurance.${id}`) })),
+    [t]
+  );
   const hairOptions = useMemo(
     () => HAIR_COLORS.map((id) => ({ id, label: t(`regForm.hair.${id}`) })),
     [t]
@@ -307,6 +327,10 @@ export default function RegistrationFormScreen() {
   );
   const educationOptions = useMemo(
     () => EDUCATION_LEVELS.map((id) => ({ id, label: t(`regForm.education.${id}`) })),
+    [t]
+  );
+  const passportTypeOptions = useMemo(
+    () => PASSPORT_TYPES.map((id) => ({ id, label: t(`regForm.passportTypes.${id}`) })),
     [t]
   );
   const professionOptions = useMemo(
@@ -329,6 +353,10 @@ export default function RegistrationFormScreen() {
       if (cancelled) return;
       if (saved) {
         setFullName(saved.fullName);
+        setIsTurkishCitizen(
+          saved.isTurkishCitizen ??
+            (/^\d{11}$/.test(saved.nationalId ?? '') ? true : null)
+        );
         setNationalId(saved.nationalId);
         setNationality(saved.nationality ?? '');
         setBirthDate(saved.birthDate);
@@ -372,7 +400,11 @@ export default function RegistrationFormScreen() {
         setHasActingEducation(saved.hasActingEducation);
         setActingEducationDetail(saved.actingEducationDetail);
         setHasDriving(saved.hasDriving);
-        setDrivingDetail(saved.drivingDetail);
+        setDrivingLicenses(
+          Array.isArray(saved.drivingLicenses)
+            ? saved.drivingLicenses
+            : parseDrivingLicenses(saved.drivingDetail).licenses
+        );
         setExperience(saved.experience);
         setAvailability(saved.availability);
         setHasOtherAgency(saved.hasOtherAgency);
@@ -388,6 +420,8 @@ export default function RegistrationFormScreen() {
         setVisaCountries(saved.visaCountries);
         setHasWorkPermit(saved.hasWorkPermit);
         setHasResidencePermit(saved.hasResidencePermit);
+        setInsuranceStatus(saved.insuranceStatus ?? '');
+        setInsuranceOther(saved.insuranceOther ?? '');
         setKvkk(saved.kvkk);
       }
       setHydrated(true);
@@ -437,7 +471,10 @@ export default function RegistrationFormScreen() {
     };
 
     need('fullName', fullName.trim().length > 1);
-    need('nationalId', /^\d{11}$/.test(nationalId.trim()));
+    need('isTurkishCitizen', isTurkishCitizen !== null);
+    if (isTurkishCitizen === true) {
+      need('nationalId', /^\d{11}$/.test(nationalId.trim()));
+    }
     need('nationality', nationality.length === 2);
     need('birthDate', /^\d{4}-\d{2}-\d{2}$/.test(birthDate.trim()));
     need('birthPlace', birthPlace.trim().length > 0);
@@ -455,6 +492,15 @@ export default function RegistrationFormScreen() {
     need('shoe', shoe.length > 0);
     if (sports.length === 0) next.sports = t('regForm.sportsRequired');
     if (dances.length === 0) next.dances = t('regForm.dancesRequired');
+    if (hasDriving === true && drivingLicenses.length === 0) {
+      next.driving = t('regForm.drivingRequired');
+    }
+    if (!INSURANCE_STATUSES.includes(insuranceStatus as (typeof INSURANCE_STATUSES)[number])) {
+      next.insurance = t('regForm.insuranceRequired');
+    }
+    if (insuranceStatus === 'ineligible_other' && !insuranceOther.trim()) {
+      next.insuranceOther = t('regForm.insuranceOtherRequired');
+    }
     need('kvkk', kvkk);
 
     setErrors(next);
@@ -473,7 +519,8 @@ export default function RegistrationFormScreen() {
         phone: phone.trim(),
       });
       await updateActorProfile(user.id, {
-        national_id: nationalId.trim(),
+        is_turkish_citizen: isTurkishCitizen,
+        national_id: isTurkishCitizen === true ? nationalId.trim() : null,
         nationality,
         birth_date: birthDate.trim(),
         birth_place: birthPlace.trim(),
@@ -511,7 +558,7 @@ export default function RegistrationFormScreen() {
           actingEducationDetail,
           t('regForm.no')
         ),
-        driving_info: serializeYesNoDetail(hasDriving, drivingDetail, t('regForm.no')),
+        driving_info: serializeDrivingLicenses(hasDriving, drivingLicenses, t('regForm.no')),
         experience: experience.trim() || null,
         availability: availability.trim() || null,
         other_agency: serializeYesNoDetail(hasOtherAgency, otherAgencyDetail, t('regForm.no')),
@@ -521,11 +568,14 @@ export default function RegistrationFormScreen() {
         bank_name: bankName.trim() || null,
         iban: iban.trim() || null,
         has_passport: hasPassport,
-        passport_no: passportNo.trim() || null,
-        passport_type: passportType.trim() || null,
+        passport_no: hasPassport === true ? passportNo.trim() || null : null,
+        passport_type: hasPassport === true ? passportType.trim() || null : null,
         visa_countries: visaCountries.trim() || null,
         has_work_permit: hasWorkPermit,
         has_residence_permit: hasResidencePermit,
+        insurance_status: insuranceStatus || null,
+        insurance_other:
+          insuranceStatus === 'ineligible_other' ? insuranceOther.trim() || null : null,
         kvkk_accepted: true,
         form_saved_at: actorProfile?.form_saved_at ?? new Date().toISOString(),
         skills: [...sports, ...dances, ...modelSkills, ...performance].filter(
@@ -548,10 +598,12 @@ export default function RegistrationFormScreen() {
     label,
     value,
     onChange,
+    error,
   }: {
     label: string;
     value: boolean | null;
     onChange: (v: boolean) => void;
+    error?: string;
   }) => (
     <View style={styles.fieldBlock}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -571,6 +623,7 @@ export default function RegistrationFormScreen() {
           );
         })}
       </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
 
@@ -624,14 +677,25 @@ export default function RegistrationFormScreen() {
         onChangeText={setFullName}
         error={errors.fullName}
       />
-      <TextField
-        label={reqLabel(t('regForm.fields.nationalId'))}
-        value={nationalId}
-        onChangeText={setNationalId}
-        keyboardType="number-pad"
-        maxLength={11}
-        error={errors.nationalId}
+      <BoolRow
+        label={reqLabel(t('regForm.fields.turkishCitizen'))}
+        value={isTurkishCitizen}
+        onChange={(v) => {
+          setIsTurkishCitizen(v);
+          if (!v) setNationalId('');
+        }}
+        error={errors.isTurkishCitizen}
       />
+      {isTurkishCitizen === true ? (
+        <TextField
+          label={reqLabel(t('regForm.fields.nationalId'))}
+          value={nationalId}
+          onChangeText={setNationalId}
+          keyboardType="number-pad"
+          maxLength={11}
+          error={errors.nationalId}
+        />
+      ) : null}
       <SelectField
         label={reqLabel(t('regForm.fields.nationality'))}
         value={nationality}
@@ -877,6 +941,29 @@ export default function RegistrationFormScreen() {
         style={{ minHeight: 90 }}
       />
 
+      <Text style={styles.section}>{reqLabel(t('regForm.sections.insurance'))}</Text>
+      <Text style={styles.subtitle}>{t('regForm.insuranceHint')}</Text>
+      <ChipSelect
+        options={insuranceOptions}
+        selected={insuranceStatus ? [insuranceStatus] : []}
+        onChange={(next) => {
+          const value = next[0] ?? '';
+          setInsuranceStatus(value);
+          if (value !== 'ineligible_other') setInsuranceOther('');
+        }}
+        multiple={false}
+        error={errors.insurance}
+      />
+      {insuranceStatus === 'ineligible_other' ? (
+        <TextField
+          label={reqLabel(t('regForm.fields.insuranceOther'))}
+          value={insuranceOther}
+          onChangeText={setInsuranceOther}
+          multiline
+          error={errors.insuranceOther}
+        />
+      ) : null}
+
       <Text style={styles.section}>{t('regForm.sections.questions')}</Text>
       <LanguageSkillsField
         label={t('regForm.fields.languages')}
@@ -891,14 +978,23 @@ export default function RegistrationFormScreen() {
         onChangeYes={setHasActingEducation}
         onChangeDetail={setActingEducationDetail}
       />
-      <YesNoDetail
-        question={t('regForm.fields.drivingInfo')}
-        detailLabel={t('regForm.fields.drivingInfoDetail')}
-        value={hasDriving}
-        detail={drivingDetail}
-        onChangeYes={setHasDriving}
-        onChangeDetail={setDrivingDetail}
-      />
+      <View style={{ gap: Spacing.sm }}>
+        <BoolRow
+          label={t('regForm.fields.drivingInfo')}
+          value={hasDriving}
+          onChange={(v) => {
+            setHasDriving(v);
+            if (!v) setDrivingLicenses([]);
+          }}
+        />
+        {hasDriving === true ? (
+          <LicenseField
+            selected={drivingLicenses}
+            onChange={setDrivingLicenses}
+            error={errors.driving}
+          />
+        ) : null}
+      </View>
       <TextField
         label={t('regForm.fields.experience')}
         value={experience}
@@ -946,17 +1042,32 @@ export default function RegistrationFormScreen() {
       <TextField label={t('regForm.fields.iban')} value={iban} onChangeText={setIban} autoCapitalize="characters" />
 
       <Text style={styles.section}>{t('regForm.sections.passport')}</Text>
-      <BoolRow label={t('regForm.fields.hasPassport')} value={hasPassport} onChange={setHasPassport} />
-      <TextField
-        label={t('regForm.fields.passportNo')}
-        value={passportNo}
-        onChangeText={setPassportNo}
+      <BoolRow
+        label={t('regForm.fields.hasPassport')}
+        value={hasPassport}
+        onChange={(v) => {
+          setHasPassport(v);
+          if (!v) {
+            setPassportNo('');
+            setPassportType('');
+          }
+        }}
       />
-      <TextField
-        label={t('regForm.fields.passportType')}
-        value={passportType}
-        onChangeText={setPassportType}
-      />
+      {hasPassport === true ? (
+        <>
+          <TextField
+            label={t('regForm.fields.passportNo')}
+            value={passportNo}
+            onChangeText={setPassportNo}
+          />
+          <SelectField
+            label={t('regForm.fields.passportType')}
+            value={passportType}
+            options={passportTypeOptions}
+            onChange={setPassportType}
+          />
+        </>
+      ) : null}
       <TextField
         label={t('regForm.fields.visaCountries')}
         value={visaCountries}
@@ -1070,7 +1181,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
   },
-  choiceActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
+  choiceActive: { backgroundColor: Colors.brand, borderColor: Colors.brand },
   choiceText: { fontFamily: Fonts.bodyMedium, fontSize: 14, color: Colors.text },
   choiceTextActive: { color: Colors.textOnDark },
   error: { fontFamily: Fonts.body, fontSize: 12, color: Colors.danger },
@@ -1084,7 +1195,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     backgroundColor: Colors.white,
   },
-  consentActive: { borderColor: Colors.ink },
+  consentActive: { borderColor: Colors.brand },
   checkbox: {
     width: 22,
     height: 22,
@@ -1093,7 +1204,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     marginTop: 2,
   },
-  checkboxOn: { backgroundColor: Colors.ink, borderColor: Colors.ink },
+  checkboxOn: { backgroundColor: Colors.brand, borderColor: Colors.brand },
   consentText: {
     flex: 1,
     fontFamily: Fonts.body,

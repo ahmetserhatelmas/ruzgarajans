@@ -8,6 +8,7 @@ import { fetchApplicationDetail } from "@/lib/queries";
 import { APP_STATUS, formatDate, formatMoney, GENDER, HAIR, EYES, label } from "@/lib/labels";
 import { deleteApplicationAction, setApplicationStatusAction } from "@/lib/actions";
 import type { ApplicationStatus } from "@/lib/types";
+import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function ApplicationDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  await requireAdminPerm("applications");
   const { app, actor, videos } = await fetchApplicationDetail(id);
   if (!app || !actor) notFound();
 
@@ -35,6 +37,8 @@ export default async function ApplicationDetailPage({
     role_name: string;
     role_description: string;
     deadline: string | null;
+    option_date: string | null;
+    payment_due_date: string | null;
     budget_amount: number | null;
     budget_currency: string;
   } | null;
@@ -100,6 +104,8 @@ export default async function ApplicationDetailPage({
           <CardContent className="space-y-2 text-sm">
             <p>{listing?.role_description}</p>
             <p>Son tarih: {formatDate(listing?.deadline)}</p>
+            <p>Opsiyon tarihi: {formatDate(listing?.option_date)}</p>
+            <p>Ödeme vadesi: {formatDate(listing?.payment_due_date)}</p>
             <p>Bütçe: {formatMoney(listing?.budget_amount, listing?.budget_currency)}</p>
             <p>
               Oyuncu bütçesi:{" "}

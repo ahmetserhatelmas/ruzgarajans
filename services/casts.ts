@@ -109,6 +109,8 @@ export async function updateCast(
       | 'shoot_date'
       | 'shoot_location'
       | 'deadline'
+      | 'option_date'
+      | 'payment_due_date'
       | 'budget_amount'
       | 'budget_currency'
       | 'allow_budget_counter'

@@ -13,19 +13,31 @@ import {
   countryLabel,
   formatLanguages,
   DANCES,
+  EDUCATION,
   EYES,
   formatDate,
+  formatMoney,
   GENDER,
   HAIR,
+  INSURANCE,
+  MODEL,
+  PASSPORT_TYPE,
+  PERFORMANCE,
+  PROFESSION,
+  SPECIAL,
   label,
   listLabel,
   PHOTO_KIND,
   SPORTS,
   VIDEO_KIND,
 } from "@/lib/labels";
+import { AcceptedProjectsTable } from "@/components/accepted-projects-table";
+import { ShareActorPanel } from "@/components/share-actor-panel";
+import { fetchActorShares, fetchDirectors, sharePublicUrl } from "@/lib/share";
 import { setActorStatusAction, startConversationAction } from "@/lib/actions";
 import { REQUIRED_PHOTO_KINDS } from "@/lib/types";
 import { displayImageUrl } from "@/lib/media";
+import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -43,12 +55,26 @@ function PhotoFigure({ src, caption }: { src: string; caption: string }) {
 
 export default async function ActorDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ share?: string }>;
 }) {
   const { id } = await params;
-  const { profile, actor, photos, applications, videos } = await fetchActorDetail(id);
+  const { share } = await searchParams;
+  await requireAdminPerm("actors");
+  const [{ profile, actor, photos, applications, videos }, shares, directors] = await Promise.all([
+    fetchActorDetail(id),
+    fetchActorShares(id),
+    fetchDirectors(),
+  ]);
   if (!profile) notFound();
+  const shareUrls: Record<string, string> = {};
+  await Promise.all(
+    shares.map(async (s) => {
+      shareUrls[s.id] = await sharePublicUrl(s.token);
+    })
+  );
 
   const photoKinds = photos.map((p) => p.kind).filter(Boolean) as string[];
   const mediaOk = hasRequiredMedia(profile, actor, photoKinds);
@@ -110,6 +136,14 @@ export default async function ActorDetailPage({
         </span>
       </div>
 
+      <ShareActorPanel
+        actorId={profile.id}
+        shares={shares}
+        directors={directors}
+        urls={shareUrls}
+        pinError={share === "pin"}
+      />
+
       {coverSrc ? (
         <div className="relative h-40 overflow-hidden rounded-xl bg-muted">
           <Image src={coverSrc} alt="" fill className="object-cover" unoptimized />
@@ -128,6 +162,7 @@ export default async function ActorDetailPage({
               {field("Telefon", profile.phone)}
               {field("Yakın telefonu", actor?.relative_phone)}
               {field("WhatsApp", actor?.whatsapp)}
+              {field("TC vatandaşı", boolLabel(actor?.is_turkish_citizen))}
               {field("TCKN", actor?.national_id)}
               {field("Uyruk", countryLabel(actor?.nationality))}
               {field("Doğum", `${formatDate(actor?.birth_date)} (${age ?? "—"} yaş)`)}
@@ -166,8 +201,8 @@ export default async function ActorDetailPage({
           </CardHeader>
           <CardContent>
             <dl>
-              {field("Eğitim", actor?.education)}
-              {field("Meslek", actor?.profession)}
+              {field("Eğitim", label(EDUCATION, actor?.education))}
+              {field("Meslek", label(PROFESSION, actor?.profession))}
               {field("Oyunculuk eğitimi", actor?.acting_education)}
               {field("Deneyim", actor?.experience)}
               {field("Diller", formatLanguages(actor?.languages))}
@@ -189,9 +224,9 @@ export default async function ActorDetailPage({
               {field("Spor", listLabel(SPORTS, actor?.sports))}
               {field("Dans", listLabel(DANCES, actor?.dances))}
               {field("Dans diğer", actor?.dances_other)}
-              {field("Model", actor?.model_skills?.join(", "))}
-              {field("Performans", actor?.performance_skills?.join(", "))}
-              {field("Özel durum", actor?.special_conditions?.join(", "))}
+              {field("Model", listLabel(MODEL, actor?.model_skills))}
+              {field("Performans", listLabel(PERFORMANCE, actor?.performance_skills))}
+              {field("Özel durum", listLabel(SPECIAL, actor?.special_conditions))}
               {field("Ehliyet", actor?.driving_info)}
               {field("İlgi", actor?.special_interests)}
               {field("Not", actor?.additional_notes)}
@@ -208,9 +243,11 @@ export default async function ActorDetailPage({
               {field("Hesap adı", actor?.bank_account_name)}
               {field("Banka", actor?.bank_name)}
               {field("IBAN", actor?.iban)}
+              {field("Sigorta (günlük)", label(INSURANCE, actor?.insurance_status))}
+              {field("Sigorta notu", actor?.insurance_other)}
               {field("Pasaport", boolLabel(actor?.has_passport))}
               {field("Pasaport no", actor?.passport_no)}
-              {field("Pasaport tipi", actor?.passport_type)}
+              {field("Pasaport tipi", label(PASSPORT_TYPE, actor?.passport_type))}
               {field("Vize", actor?.visa_countries)}
               {field("Çalışma izni", boolLabel(actor?.has_work_permit))}
               {field("İkamet", boolLabel(actor?.has_residence_permit))}
@@ -296,6 +333,27 @@ export default async function ActorDetailPage({
           )}
         </CardContent>
       </Card>
+
+      <AcceptedProjectsTable
+        actorName={profile.full_name || "oyuncu"}
+        rows={applications
+          .filter((a) => a.status === "accepted")
+          .map((a) => {
+            const listing = a.cast_listings;
+            const listed = listing?.budget_amount ?? null;
+            const currency = listing?.budget_currency ?? "TRY";
+            const agreed = a.accept_budget ? listed : (a.counter_budget ?? listed);
+            const rawDate = listing?.shoot_date || listing?.option_date || "";
+            return {
+              id: a.id,
+              yapim: listing?.project_name ?? "",
+              proje: listing?.role_name ?? "",
+              tarih: rawDate ? formatDate(rawDate) : "",
+              ucret: listed == null ? "" : formatMoney(listed, currency),
+              odeme: agreed == null ? "" : formatMoney(agreed, currency),
+            };
+          })}
+      />
     </div>
   );
 }

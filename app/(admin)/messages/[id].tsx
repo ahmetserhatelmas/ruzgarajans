@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     marginBottom: Spacing.sm,
   },
-  mine: { alignSelf: 'flex-end', backgroundColor: Colors.ink },
+  mine: { alignSelf: 'flex-end', backgroundColor: Colors.brand },
   theirs: {
     alignSelf: 'flex-start',
     backgroundColor: Colors.white,

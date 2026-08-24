@@ -10,6 +10,7 @@ import { VideoPlayerModal } from '@/components/video/VideoPlayerModal';
 import { fetchActorDetail } from '@/services/actors';
 import { supabase } from '@/lib/supabase';
 import type { ActorProfile, ApplicationStatus, Profile, Video } from '@/types/database';
+import { optionLabel } from '@/lib/optionLabel';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 type AppDetail = {
@@ -26,6 +27,8 @@ type AppDetail = {
     role_name: string;
     role_description: string;
     deadline: string | null;
+    option_date: string | null;
+    payment_due_date: string | null;
     budget_amount: number | null;
     budget_currency: string;
   } | null;
@@ -47,7 +50,7 @@ export default function AdminApplicationDetailScreen() {
     const { data, error } = await supabase
       .from('applications')
       .select(
-        'id, actor_id, cast_id, status, accept_budget, counter_budget, note, created_at, cast_listings(project_name, role_name, role_description, deadline, budget_amount, budget_currency)'
+        'id, actor_id, cast_id, status, accept_budget, counter_budget, note, created_at, cast_listings(project_name, role_name, role_description, deadline, option_date, payment_due_date, budget_amount, budget_currency)'
       )
       .eq('id', id)
       .maybeSingle();
@@ -174,8 +177,8 @@ export default function AdminApplicationDetailScreen() {
       <Text style={styles.section}>{t('profile.physical')}</Text>
       <Text style={styles.line}>
         {t('profile.height')}: {actor?.height_cm ?? '—'} · {t('profile.weight')}:{' '}
-        {actor?.weight_kg ?? '—'} · {t('profile.hair')}: {actor?.hair_color ?? '—'} ·{' '}
-        {t('profile.eyes')}: {actor?.eye_color ?? '—'}
+        {actor?.weight_kg ?? '—'} · {t('profile.hair')}: {optionLabel(t, 'hair', actor?.hair_color)} ·{' '}
+        {t('profile.eyes')}: {optionLabel(t, 'eyes', actor?.eye_color)}
       </Text>
       <Text style={styles.section}>{t('profile.bio')}</Text>
       <Text style={styles.line}>{actor?.bio || '—'}</Text>
@@ -192,6 +195,12 @@ export default function AdminApplicationDetailScreen() {
       <Text style={styles.line}>{app.cast_listings?.role_description || '—'}</Text>
       <Text style={styles.meta}>
         {t('cast.deadline')}: {app.cast_listings?.deadline ?? '—'}
+      </Text>
+      <Text style={styles.meta}>
+        {t('cast.optionDate')}: {app.cast_listings?.option_date ?? '—'}
+      </Text>
+      <Text style={styles.meta}>
+        {t('cast.paymentDue')}: {app.cast_listings?.payment_due_date ?? '—'}
       </Text>
       <Text style={styles.meta}>
         {t('cast.budget')}:{' '}

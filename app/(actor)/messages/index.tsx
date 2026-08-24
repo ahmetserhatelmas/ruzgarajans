@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   },
   mine: {
     alignSelf: 'flex-end',
-    backgroundColor: Colors.ink,
+    backgroundColor: Colors.brand,
   },
   theirs: {
     alignSelf: 'flex-start',

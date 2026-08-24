@@ -11,6 +11,9 @@ import { fetchVideosForCast } from '@/services/videos';
 import { supabase } from '@/lib/supabase';
 import type { Application, CastListing, Video } from '@/types/database';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { DialogueFields } from '@/components/cast/DialogueFields';
+import { parseDialogueScript, stringifyDialogueScript } from '@/lib/dialogueScript';
+import { sanitizeIsoDateInput } from '@/lib/isoDate';
 
 export default function AdminCastDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,6 +33,8 @@ export default function AdminCastDetailScreen() {
   const [location, setLocation] = useState('');
   const [shootDate, setShootDate] = useState('');
   const [deadline, setDeadline] = useState('');
+  const [optionDate, setOptionDate] = useState('');
+  const [paymentDue, setPaymentDue] = useState('');
   const [budget, setBudget] = useState('');
   const [allowCounter, setAllowCounter] = useState(true);
   const [dialogueScript, setDialogueScript] = useState('');
@@ -51,6 +56,8 @@ export default function AdminCastDetailScreen() {
         setLocation(c.shoot_location ?? '');
         setShootDate(c.shoot_date ?? '');
         setDeadline(c.deadline ?? '');
+        setOptionDate(c.option_date ?? '');
+        setPaymentDue(c.payment_due_date ?? '');
         setBudget(c.budget_amount != null ? String(c.budget_amount) : '');
         setAllowCounter(c.allow_budget_counter);
         setDialogueScript(c.dialogue_script ?? '');
@@ -84,10 +91,12 @@ export default function AdminCastDetailScreen() {
         shoot_location: location.trim() || null,
         shoot_date: shootDate || null,
         deadline: deadline || null,
+        option_date: optionDate || null,
+        payment_due_date: paymentDue || null,
         budget_amount: budget ? Number(budget) : null,
         allow_budget_counter: allowCounter,
-        dialogue_mode: dialogueScript.trim() ? 'script_tts' : 'none',
-        dialogue_script: dialogueScript.trim() || null,
+        dialogue_mode: parseDialogueScript(dialogueScript).lines.length ? 'script_tts' : 'none',
+        dialogue_script: stringifyDialogueScript(parseDialogueScript(dialogueScript)) || null,
         is_published: publish,
       });
       setCast(updated);
@@ -129,12 +138,22 @@ export default function AdminCastDetailScreen() {
       <TextField
         label={`${t('cast.shootDate')} (YYYY-MM-DD)`}
         value={shootDate}
-        onChangeText={setShootDate}
+        onChangeText={(v) => setShootDate(sanitizeIsoDateInput(v))}
       />
       <TextField
         label={`${t('cast.deadline')} (YYYY-MM-DD)`}
         value={deadline}
-        onChangeText={setDeadline}
+        onChangeText={(v) => setDeadline(sanitizeIsoDateInput(v))}
+      />
+      <TextField
+        label={`${t('cast.optionDate')} (YYYY-MM-DD)`}
+        value={optionDate}
+        onChangeText={(v) => setOptionDate(sanitizeIsoDateInput(v))}
+      />
+      <TextField
+        label={`${t('cast.paymentDue')} (YYYY-MM-DD)`}
+        value={paymentDue}
+        onChangeText={(v) => setPaymentDue(sanitizeIsoDateInput(v))}
       />
       <TextField
         label={t('cast.budget')}
@@ -146,12 +165,7 @@ export default function AdminCastDetailScreen() {
         <Text style={styles.switchLabel}>{t('cast.counterBudget')}</Text>
         <Switch value={allowCounter} onValueChange={setAllowCounter} />
       </View>
-      <TextField
-        label={`${t('video.dialogueScript')} (satır satır)`}
-        value={dialogueScript}
-        onChangeText={setDialogueScript}
-        multiline
-      />
+      <DialogueFields value={dialogueScript} onChange={setDialogueScript} />
       <View style={styles.switchRow}>
         <Text style={styles.switchLabel}>{t('admin.publish')}</Text>
         <Switch value={publish} onValueChange={setPublish} />

@@ -2,10 +2,12 @@ import { Suspense } from "react";
 import { PageHeader } from "@/components/page-header";
 import { fetchActorRows } from "@/lib/queries";
 import { ActorsBrowser } from "./actors-browser";
+import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 export default async function ActorsPage() {
+  await requireAdminPerm("actors");
   const rows = await fetchActorRows();
   return (
     <div>

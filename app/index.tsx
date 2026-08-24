@@ -21,7 +21,7 @@ export default function Index() {
   if (loading || !langChecked) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paper }}>
-        <ActivityIndicator color={Colors.ink} />
+        <ActivityIndicator color={Colors.brand} />
       </View>
     );
   }
@@ -40,6 +40,10 @@ export default function Index() {
 
   if (profile?.role === 'admin') {
     return <Redirect href="/(admin)" />;
+  }
+
+  if (profile?.role === 'cast_director') {
+    return <Redirect href="/(director)" />;
   }
 
   if (profile?.actor_status === 'rejected') {

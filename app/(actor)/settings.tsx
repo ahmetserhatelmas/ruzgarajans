@@ -100,8 +100,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   chipActive: {
-    backgroundColor: Colors.ink,
-    borderColor: Colors.ink,
+    backgroundColor: Colors.brand,
+    borderColor: Colors.brand,
   },
   chipText: {
     fontFamily: Fonts.bodyMedium,

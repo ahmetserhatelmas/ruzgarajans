@@ -49,38 +49,38 @@
 }
 
 :root {
-  --background: #f3efe7;
+  --background: #ffffff;
   --foreground: #16181d;
   --card: #ffffff;
   --card-foreground: #16181d;
   --popover: #ffffff;
   --popover-foreground: #16181d;
-  --primary: #121418;
-  --primary-foreground: #f6f1e8;
-  --secondary: #e7e1d6;
-  --secondary-foreground: #121418;
-  --muted: #e7e1d6;
+  --primary: #6b2c91;
+  --primary-foreground: #ffffff;
+  --secondary: #f4eef8;
+  --secondary-foreground: #4e2175;
+  --muted: #f4eef8;
   --muted-foreground: #5c616a;
-  --accent: #c4a35a;
-  --accent-foreground: #121418;
+  --accent: #ede4f5;
+  --accent-foreground: #4e2175;
   --destructive: #a33a3a;
-  --border: #d8d1c4;
-  --input: #d8d1c4;
-  --ring: #9a7b32;
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --border: #e4dcec;
+  --input: #e4dcec;
+  --ring: #6b2c91;
+  --chart-1: #6b2c91;
+  --chart-2: #8b4cb8;
+  --chart-3: #4e2175;
+  --chart-4: #c4a3d8;
+  --chart-5: #ede4f5;
   --radius: 0.625rem;
-  --sidebar: #faf7f1;
+  --sidebar: #ffffff;
   --sidebar-foreground: #16181d;
-  --sidebar-primary: #121418;
-  --sidebar-primary-foreground: #f6f1e8;
-  --sidebar-accent: #e7e1d6;
-  --sidebar-accent-foreground: #121418;
-  --sidebar-border: #d8d1c4;
-  --sidebar-ring: #9a7b32;
+  --sidebar-primary: #6b2c91;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f4eef8;
+  --sidebar-accent-foreground: #4e2175;
+  --sidebar-border: #e4dcec;
+  --sidebar-ring: #6b2c91;
 }
 
 .dark {
@@ -131,7 +131,7 @@
 
 .kartvizit-frame {
   overflow: auto;
-  background: #d8d1c4;
+  background: #f4eef8;
   padding: 16px;
   border-radius: 12px;
 }
@@ -150,13 +150,17 @@
 }
 
 .kartvizit-header {
-  position: relative;
+  display: grid;
+  grid-template-columns: 34% 1fr 1fr;
+  gap: 5mm;
+  align-items: start;
   min-height: 22mm;
   margin-bottom: 5mm;
 }
 
 .kartvizit-name {
-  margin: 2mm 44mm 0 0;
+  grid-column: 2;
+  margin: 2mm 0 0;
   text-align: center;
   font-size: 22pt;
   font-weight: 800;
@@ -166,9 +170,8 @@
 }
 
 .kartvizit-logo {
-  position: absolute;
-  top: 0;
-  right: 0;
+  grid-column: 3;
+  justify-self: end;
   width: 42mm;
   text-align: center;
 }

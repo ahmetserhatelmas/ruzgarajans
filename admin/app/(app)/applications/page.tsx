@@ -13,6 +13,7 @@ import {
 import { fetchApplications, fetchCasts } from "@/lib/queries";
 import { APP_STATUS, formatDate, formatMoney } from "@/lib/labels";
 import type { ApplicationStatus } from "@/lib/types";
+import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function ApplicationsPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; cast?: string }>;
 }) {
+  await requireAdminPerm("applications");
   const { q = "", status = "all", cast = "all" } = await searchParams;
   const [apps, casts] = await Promise.all([fetchApplications(), fetchCasts()]);
   const filtered = apps.filter((a) => {

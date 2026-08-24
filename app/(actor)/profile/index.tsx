@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { IntroVideoCard } from '@/components/video/IntroVideoCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { clearIntroVideo } from '@/services/videos';
+import { anyOptionList, optionLabel } from '@/lib/optionLabel';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function ProfileScreen() {
@@ -76,10 +77,15 @@ export default function ProfileScreen() {
       <Section title={t('profile.physical')}>
         <Row label={t('profile.height')} value={actorProfile?.height_cm?.toString()} />
         <Row label={t('profile.weight')} value={actorProfile?.weight_kg?.toString()} />
-        <Row label={t('profile.hair')} value={actorProfile?.hair_color} />
-        <Row label={t('profile.eyes')} value={actorProfile?.eye_color} />
+        <Row label={t('profile.hair')} value={optionLabel(t, 'hair', actorProfile?.hair_color)} />
+        <Row label={t('profile.eyes')} value={optionLabel(t, 'eyes', actorProfile?.eye_color)} />
         <Row label={t('profile.shoe')} value={actorProfile?.shoe_size} />
         <Row label={t('profile.body')} value={actorProfile?.body_size} />
+        <Row label={t('profile.education')} value={optionLabel(t, 'education', actorProfile?.education)} />
+        <Row
+          label={t('regForm.fields.profession')}
+          value={optionLabel(t, 'profession', actorProfile?.profession)}
+        />
       </Section>
 
       <Section title={t('profile.bio')}>
@@ -91,7 +97,7 @@ export default function ProfileScreen() {
       </Section>
 
       <Section title={t('profile.skills')}>
-        <Text style={styles.block}>{(actorProfile?.skills ?? []).join(', ') || '—'}</Text>
+        <Text style={styles.block}>{anyOptionList(t, actorProfile?.skills)}</Text>
       </Section>
 
       <Section title={t('profile.introVideo')}>
@@ -156,7 +162,7 @@ const styles = StyleSheet.create({
   initials: {
     fontFamily: Fonts.displayBold,
     fontSize: 36,
-    color: Colors.ink,
+    color: Colors.textOnDark,
   },
   name: {
     fontFamily: Fonts.displayBold,

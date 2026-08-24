@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   introCard: {
-    backgroundColor: Colors.ink,
+    backgroundColor: Colors.brand,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
     marginBottom: Spacing.xl,
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   introTitle: {
     fontFamily: Fonts.displayBold,
     fontSize: 34,
-    color: Colors.gold,
+    color: Colors.textOnDark,
   },
   introHint: {
     marginTop: Spacing.sm,

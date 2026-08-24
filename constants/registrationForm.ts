@@ -77,12 +77,13 @@ export const SPECIAL_CONDITIONS = [
   'vitiligo',
 ] as const;
 
-export const EMPLOYMENT_STATUS = [
-  'working',
-  'retired',
-  'student',
-  'unemployed',
-  'freelancer',
+export const INSURANCE_STATUSES = [
+  'eligible',
+  'eligible_sgk',
+  'eligible_retired',
+  'unemployment',
+  'student_grant',
+  'ineligible_other',
 ] as const;
 
 export const GENDERS = ['female', 'male'] as const;
@@ -148,6 +149,14 @@ export const SUIT_SIZES = [
 
 export const SHOE_SIZES = Array.from({ length: 16 }, (_, i) => String(35 + i)); // 35–50
 
+export const PASSPORT_TYPES = [
+  'ordinary',
+  'special',
+  'service',
+  'diplomatic',
+  'foreign',
+] as const;
+
 export const EDUCATION_LEVELS = [
   'primary',
   'middle',
@@ -191,3 +200,5 @@ export type HairColorId = (typeof HAIR_COLORS)[number];
 export type EyeColorId = (typeof EYE_COLORS)[number];
 export type EducationLevelId = (typeof EDUCATION_LEVELS)[number];
 export type ProfessionId = (typeof PROFESSIONS)[number];
+export type PassportTypeId = (typeof PASSPORT_TYPES)[number];
+export type InsuranceStatusId = (typeof INSURANCE_STATUSES)[number];

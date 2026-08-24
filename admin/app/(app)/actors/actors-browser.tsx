@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/table";
 import { ActorStatusBadge } from "@/components/status-badge";
 import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
-import { ageFromBirth, DANCES, EYES, GENDER, HAIR, label, SPORTS } from "@/lib/labels";
+import { downloadXlsx } from "@/lib/export-table-xlsx";
+import { ACTOR_STATUS, ageFromBirth, DANCES, EYES, GENDER, HAIR, label, SPORTS } from "@/lib/labels";
 import { setActorStatusAction } from "@/lib/actions";
 import type { ActorRow, ActorStatus } from "@/lib/types";
 
@@ -75,6 +76,27 @@ export function ActorsBrowser({ rows }: { rows: ActorRow[] }) {
       return true;
     });
   }, [rows, q, status, gender, form, media, hair, eyes, sport, dance, ageMin, ageMax, heightMin, heightMax]);
+
+  const exportExcel = () => {
+    const headers = ["Ad", "E-posta", "Durum", "Yaş", "Cinsiyet", "Boy", "Saç", "Göz", "Form", "Medya"];
+    const data = filtered.map((row) => {
+      const mediaOk = hasRequiredMedia(row.profile, row.actor, row.photoKinds);
+      return [
+        row.profile.full_name || "",
+        row.profile.email || "",
+        ACTOR_STATUS[row.profile.actor_status] ?? row.profile.actor_status,
+        ageFromBirth(row.actor?.birth_date)?.toString() ?? "",
+        label(GENDER, row.actor?.gender),
+        row.actor?.height_cm != null ? String(row.actor.height_cm) : "",
+        label(HAIR, row.actor?.hair_color),
+        label(EYES, row.actor?.eye_color),
+        hasCompletedForm(row.actor) ? "Tamam" : "Eksik",
+        mediaOk ? "Tamam" : "Eksik",
+      ];
+    });
+    const today = new Date().toISOString().slice(0, 10);
+    void downloadXlsx(`oyuncular-${today}.xlsx`, headers, data, "Oyuncular");
+  };
 
   return (
     <div className="space-y-4">
@@ -161,7 +183,12 @@ export function ActorsBrowser({ rows }: { rows: ActorRow[] }) {
         </Field>
       </div>
 
-      <p className="text-sm text-muted-foreground">{filtered.length} oyuncu</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">{filtered.length} oyuncu</p>
+        <Button type="button" variant="outline" disabled={filtered.length === 0} onClick={exportExcel}>
+          Excel indir
+        </Button>
+      </div>
 
       <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
         <Table>

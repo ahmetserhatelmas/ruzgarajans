@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   CameraView,
   useCameraPermissions,
@@ -14,7 +14,16 @@ import { useTranslation } from 'react-i18next';
 import * as Speech from 'expo-speech';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { Button } from '@/components/ui/Button';
-import { Colors, Fonts, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import {
+  estimateActorHoldMs,
+  lineAfterSec,
+  parseDialogueScript,
+  wordIndexAt,
+  wordsOf,
+  type DialogueScript,
+  type DialogueVoice,
+} from '@/lib/dialogueScript';
 import type { DialogueMode } from '@/types/database';
 
 type Props = {
@@ -36,6 +45,73 @@ type Props = {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function pickVoice(language: string, gender: DialogueVoice) {
+  try {
+    const voices = await Speech.getAvailableVoicesAsync();
+    const langPrefix = language.slice(0, 2).toLowerCase();
+    const sameLang = voices.filter((voice) =>
+      voice.language?.toLowerCase().startsWith(langPrefix)
+    );
+    const pool = sameLang;
+    const female =
+      /(female|woman|girl|yelda|ayda|emel|zira|filiz|yildiz|yıldız|kadın|kadin)/i;
+    const male = /(male|man|boy|tolga|ahmet|emre|baris|barış|erkek)/i;
+    const premium = /(enhanced|premium|neural|natural|compact|siri)/i;
+    const ranked = pool
+      .map((voice) => {
+        const hay = `${voice.name} ${voice.identifier} ${voice.language}`.toLowerCase();
+        let score = 0;
+        if (voice.language?.toLowerCase() === language.toLowerCase()) score += 20;
+        if (voice.quality === 'Enhanced') score += 14;
+        if (premium.test(hay)) score += 8;
+        const isFemale = female.test(hay);
+        const isMale = male.test(hay);
+        if (gender === 'female' && isFemale) score += 20;
+        if (gender === 'male' && isMale) score += 20;
+        if (gender === 'female' && isMale) score -= 16;
+        if (gender === 'male' && isFemale) score -= 8;
+        return { voice, score, matched: gender === 'female' ? isFemale : isMale };
+      })
+      .sort((a, b) => b.score - a.score);
+    const best = ranked[0];
+    return { id: best?.voice.identifier, matched: Boolean(best?.matched) };
+  } catch {
+    return { id: undefined, matched: false };
+  }
+}
+
+function DialogueWords({
+  text,
+  label,
+  highlightIndex,
+}: {
+  text: string;
+  label: string | null;
+  highlightIndex: number;
+}) {
+  const words = wordsOf(text);
+  return (
+    <View style={styles.dialogueCard} pointerEvents="none">
+      {label ? <Text style={styles.dialogueWho}>{label}</Text> : null}
+      <Text style={styles.dialogueLine}>
+        {words.map((word, index) => (
+          <Text
+            key={`${word}-${index}`}
+            style={
+              highlightIndex < 0 || index === highlightIndex
+                ? styles.dialogueWordOn
+                : styles.dialogueWord
+            }
+          >
+            {word}
+            {index < words.length - 1 ? ' ' : ''}
+          </Text>
+        ))}
+      </Text>
+    </View>
+  );
 }
 
 function VideoPreview({ uri }: { uri: string }) {
@@ -77,6 +153,11 @@ export function VideoRecorder({
   const playerRef = useRef<AudioPlayer | null>(null);
   const cancelledRef = useRef(false);
   const isSimulator = !Device.isDevice;
+  const [showDialogue, setShowDialogue] = useState(true);
+  const [previewing, setPreviewing] = useState(false);
+  const [cueLabel, setCueLabel] = useState<string | null>(null);
+  const [cueText, setCueText] = useState('');
+  const [highlightIndex, setHighlightIndex] = useState(-1);
 
   const stopDialogueAssist = () => {
     Speech.stop();
@@ -98,30 +179,162 @@ export function VideoRecorder({
 
   const speakLines = async (lines: string[]) => {
     const lang = i18n.language?.startsWith('en') ? 'en-US' : 'tr-TR';
+    const voice = await pickVoice(lang, 'female');
     for (const line of lines) {
       if (cancelledRef.current) return;
-      await new Promise<void>((resolve) => {
-        Speech.speak(line, {
-          language: lang,
-          onDone: () => resolve(),
-          onStopped: () => resolve(),
-          onError: () => resolve(),
-        });
+      await speakText(line, {
+        language: lang,
+        voice: voice.id,
+        rate: 0.65,
+        pitch: 1,
       });
+    }
+  };
+
+  const speakText = (
+    text: string,
+    opts: { language: string; voice?: string; rate: number; pitch: number }
+  ) =>
+    new Promise<void>((resolve) => {
+      const words = wordsOf(text);
+      let usedBoundary = false;
+      let word = 0;
+      const perWord = Math.max(280, Math.round(500 / opts.rate));
+      const tick = setInterval(() => {
+        if (usedBoundary || cancelledRef.current) return;
+        word = Math.min(words.length - 1, word + 1);
+        setHighlightIndex(word);
+      }, perWord);
+
+      const finish = () => {
+        clearInterval(tick);
+        resolve();
+      };
+
+      Speech.speak(text, {
+        language: opts.language,
+        voice: opts.voice,
+        rate: opts.rate,
+        pitch: opts.pitch,
+        ...(Platform.OS === 'ios' ? { useApplicationAudioSession: false } : {}),
+        onStart: () => setHighlightIndex(0),
+        onBoundary: (ev: { charIndex?: number } | undefined) => {
+          usedBoundary = true;
+          const index = typeof ev?.charIndex === 'number' ? ev.charIndex : 0;
+          setHighlightIndex(wordIndexAt(text, index));
+        },
+        onDone: finish,
+        onStopped: finish,
+        onError: finish,
+      });
+    });
+
+  const playRemoteAudio = (uri: string, text: string) =>
+    new Promise<void>((resolve) => {
+      try {
+        playerRef.current?.pause();
+        playerRef.current?.release();
+      } catch {
+        // ignore
+      }
+      const player = createAudioPlayer({ uri });
+      playerRef.current = player;
+      const words = wordsOf(text);
+      highlightWhileFallback(words.length, 1);
+      player.play();
+      const started = Date.now();
+      const tick = setInterval(() => {
+        const duration = Number(player.duration ?? 0);
+        const current = Number(player.currentTime ?? 0);
+        if (duration > 0) {
+          const index = Math.min(words.length - 1, Math.floor((current / duration) * words.length));
+          setHighlightIndex(index);
+        }
+        const finished =
+          (duration > 0 && current >= duration - 0.08) ||
+          (duration <= 0 && Date.now() - started > Math.max(4000, words.length * 420));
+        if (cancelledRef.current || finished) {
+          clearInterval(tick);
+          resolve();
+        }
+      }, 80);
+    });
+
+  const highlightWhileFallback = (wordCount: number, rate: number) => {
+    let word = 0;
+    const step = Math.max(220, Math.round(450 / Math.max(0.25, rate)));
+    const tick = setInterval(() => {
+      if (cancelledRef.current) {
+        clearInterval(tick);
+        return;
+      }
+      word = Math.min(wordCount - 1, word + 1);
+      setHighlightIndex(word);
+      if (word >= wordCount - 1) clearInterval(tick);
+    }, step);
+  };
+
+  const playParsedScript = async (script: DialogueScript) => {
+    const lang = i18n.language?.startsWith('en') ? 'en-US' : 'tr-TR';
+    const voice = await pickVoice(lang, script.voice);
+    const rate = script.rate;
+    const pitch = 1;
+
+    await sleep(400);
+
+    for (let i = 0; i < script.lines.length; i += 1) {
+      const line = script.lines[i];
+      if (cancelledRef.current) return;
+      setCueLabel(
+        line.speaker === 'actor' ? t('video.actorCue') : t('video.aiCue')
+      );
+      setCueText(line.text);
+      setHighlightIndex(line.speaker === 'ai' ? 0 : -1);
+
+      if (line.speaker === 'ai') {
+        if (line.audioUrl) {
+          await playRemoteAudio(line.audioUrl, line.text);
+        } else {
+          await speakText(line.text, { language: lang, voice: voice.id, rate, pitch });
+        }
+      } else {
+        await sleep(estimateActorHoldMs(line.text));
+      }
+      if (cancelledRef.current) return;
+      if (i < script.lines.length - 1) {
+        await sleep(lineAfterSec(line.holdSec) * 1000);
+      }
+    }
+
+    if (!cancelledRef.current) {
+      setCueLabel(null);
+      setCueText('');
+      setHighlightIndex(-1);
+    }
+  };
+
+  const previewScript = async () => {
+    if (!dialogueScript || previewing || recording) return;
+    cancelledRef.current = false;
+    setPreviewing(true);
+    setShowDialogue(true);
+    try {
+      await playParsedScript(parseDialogueScript(dialogueScript));
+    } finally {
+      setPreviewing(false);
+      stopDialogueAssist();
     }
   };
 
   const startDialogueAssist = async () => {
     if (guidanceLines?.length) {
+      setCueLabel(t('video.mimicGuidance'));
+      setCueText(guidanceLines.join(' '));
       void speakLines(guidanceLines);
       return;
     }
     if (dialogueMode === 'script_tts' && dialogueScript) {
-      const lines = dialogueScript
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean);
-      void speakLines(lines);
+      void playParsedScript(parseDialogueScript(dialogueScript));
     }
     if (dialogueMode === 'audio_file' && dialogueAudioUrl) {
       const player = createAudioPlayer({ uri: dialogueAudioUrl });
@@ -167,6 +380,9 @@ export function VideoRecorder({
     if (!cameraRef.current || recording || countdown !== null) return;
 
     setUri(null);
+    cancelledRef.current = true;
+    stopDialogueAssist();
+    setPreviewing(false);
     cancelledRef.current = false;
     await runCountdown();
     if (cancelledRef.current || !cameraRef.current) return;
@@ -190,6 +406,9 @@ export function VideoRecorder({
     } finally {
       setRecording(false);
       stopDialogueAssist();
+      setCueLabel(null);
+      setCueText('');
+      setHighlightIndex(-1);
     }
   };
 
@@ -222,7 +441,7 @@ export function VideoRecorder({
     );
   }
 
-  const busy = recording || countdown !== null;
+  const busy = recording || countdown !== null || previewing;
 
   return (
     <View style={styles.wrap}>
@@ -257,6 +476,25 @@ export function VideoRecorder({
               <Text style={styles.flipLabel}>{t('video.flipCamera')}</Text>
             </Pressable>
           ) : null}
+          {dialogueMode === 'script_tts' || guidanceLines?.length ? (
+            <Pressable
+              style={styles.dialogueToggle}
+              onPress={() => setShowDialogue((v) => !v)}
+              hitSlop={12}
+            >
+              <Ionicons
+                name={showDialogue ? 'eye-outline' : 'eye-off-outline'}
+                size={20}
+                color={Colors.textOnDark}
+              />
+              <Text style={styles.dialogueToggleLabel}>
+                {showDialogue ? t('video.hideDialogue') : t('video.showDialogue')}
+              </Text>
+            </Pressable>
+          ) : null}
+          {showDialogue && cueText ? (
+            <DialogueWords text={cueText} label={cueLabel} highlightIndex={highlightIndex} />
+          ) : null}
         </View>
       )}
       <View style={styles.controls}>
@@ -272,6 +510,24 @@ export function VideoRecorder({
         ) : null}
         {!uri ? (
           <>
+            {dialogueMode === 'script_tts' && dialogueScript && !isSimulator ? (
+              <Button
+                label={previewing ? t('video.stopPreview') : t('video.previewScript')}
+                variant="secondary"
+                onPress={() => {
+                  if (previewing) {
+                    cancelledRef.current = true;
+                    stopDialogueAssist();
+                    setPreviewing(false);
+                    setCueLabel(null);
+                    setCueText('');
+                    return;
+                  }
+                  void previewScript();
+                }}
+                disabled={recording || countdown !== null}
+              />
+            ) : null}
             {isSimulator ? (
               <Button label={t('video.pickVideo')} onPress={() => void pickFromLibrary()} />
             ) : (
@@ -281,7 +537,9 @@ export function VideoRecorder({
                     ? String(countdown)
                     : recording
                       ? t('video.stop')
-                      : t('video.start')
+                      : previewing
+                        ? t('video.previewing')
+                        : t('video.start')
                 }
                 onPress={recording ? stop : () => void start()}
                 variant={recording ? 'danger' : 'primary'}
@@ -373,6 +631,52 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyMedium,
     fontSize: 11,
     color: Colors.gold,
+  },
+  dialogueToggle: {
+    position: 'absolute',
+    top: Spacing.md,
+    left: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: Radius.md,
+  },
+  dialogueToggleLabel: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 12,
+    color: Colors.textOnDark,
+  },
+  dialogueCard: {
+    position: 'absolute',
+    left: Spacing.md,
+    right: Spacing.md,
+    bottom: Spacing.lg,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: 'rgba(20,8,32,0.72)',
+  },
+  dialogueWho: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: 12,
+    color: Colors.gold,
+    marginBottom: 6,
+    letterSpacing: 0.4,
+  },
+  dialogueLine: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 20,
+    lineHeight: 30,
+    color: Colors.textOnDark,
+  },
+  dialogueWord: {
+    color: 'rgba(255,255,255,0.55)',
+  },
+  dialogueWordOn: {
+    color: '#FFFFFF',
+    fontFamily: Fonts.bodyBold,
   },
   simPlaceholder: {
     alignItems: 'center',

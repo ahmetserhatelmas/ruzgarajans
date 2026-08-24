@@ -1,4 +1,4 @@
--- Rüzgâr Ajans — initial schema
+-- Rüzgâr Oyunculuk — initial schema
 -- Run in Supabase SQL editor or via CLI
 
 create extension if not exists "pgcrypto";
@@ -86,6 +86,8 @@ create table public.cast_listings (
   shoot_date date,
   shoot_location text,
   deadline date,
+  option_date date,
+  payment_due_date date,
   budget_amount numeric(12,2),
   budget_currency text not null default 'TRY',
   allow_budget_counter boolean not null default true,

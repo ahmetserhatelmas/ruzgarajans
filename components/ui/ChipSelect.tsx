@@ -73,8 +73,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   chipActive: {
-    backgroundColor: Colors.ink,
-    borderColor: Colors.ink,
+    backgroundColor: Colors.brand,
+    borderColor: Colors.brand,
   },
   chipText: {
     fontFamily: Fonts.bodyMedium,

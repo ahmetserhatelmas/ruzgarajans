@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serializeLanguageSkills, type LanguageSkill } from '@/constants/languages';
+import { serializeDrivingLicenses } from '@/constants/licenses';
 import { updateActorProfile, updateProfileBasics } from '@/services/actors';
 
 export type RegistrationDraft = {
   fullName: string;
+  isTurkishCitizen: boolean | null;
   nationalId: string;
   nationality: string;
   birthDate: string;
@@ -40,7 +42,8 @@ export type RegistrationDraft = {
   hasActingEducation: boolean | null;
   actingEducationDetail: string;
   hasDriving: boolean | null;
-  drivingDetail: string;
+  drivingLicenses: string[];
+  drivingDetail?: string;
   experience: string;
   availability: string;
   hasOtherAgency: boolean | null;
@@ -56,6 +59,8 @@ export type RegistrationDraft = {
   visaCountries: string;
   hasWorkPermit: boolean | null;
   hasResidencePermit: boolean | null;
+  insuranceStatus: string;
+  insuranceOther: string;
   kvkk: boolean;
 };
 
@@ -101,7 +106,8 @@ export async function persistRegistrationDraftRemote(userId: string, draft: Regi
   }
 
   await updateActorProfile(userId, {
-    national_id: draft.nationalId.trim() || null,
+    is_turkish_citizen: draft.isTurkishCitizen,
+    national_id: draft.isTurkishCitizen === true ? draft.nationalId.trim() || null : null,
     nationality: draft.nationality || null,
     birth_date: draft.birthDate.trim() || null,
     birth_place: draft.birthPlace.trim() || null,
@@ -135,7 +141,11 @@ export async function persistRegistrationDraftRemote(userId: string, draft: Regi
     additional_notes: draft.additionalNotes.trim() || null,
     languages: serializeLanguageSkills(draft.languages),
     acting_education: yesNo(draft.hasActingEducation, draft.actingEducationDetail),
-    driving_info: yesNo(draft.hasDriving, draft.drivingDetail),
+    driving_info: serializeDrivingLicenses(
+      draft.hasDriving,
+      draft.drivingLicenses ?? [],
+      'Hayır'
+    ),
     experience: draft.experience.trim() || null,
     availability: draft.availability.trim() || null,
     other_agency: yesNo(draft.hasOtherAgency, draft.otherAgencyDetail),
@@ -145,11 +155,16 @@ export async function persistRegistrationDraftRemote(userId: string, draft: Regi
     bank_name: draft.bankName.trim() || null,
     iban: draft.iban.trim() || null,
     has_passport: draft.hasPassport,
-    passport_no: draft.passportNo.trim() || null,
-    passport_type: draft.passportType.trim() || null,
+    passport_no: draft.hasPassport === true ? draft.passportNo.trim() || null : null,
+    passport_type: draft.hasPassport === true ? draft.passportType.trim() || null : null,
     visa_countries: draft.visaCountries.trim() || null,
     has_work_permit: draft.hasWorkPermit,
     has_residence_permit: draft.hasResidencePermit,
+    insurance_status: draft.insuranceStatus || null,
+    insurance_other:
+      draft.insuranceStatus === 'ineligible_other'
+        ? draft.insuranceOther.trim() || null
+        : null,
     kvkk_accepted: draft.kvkk,
   });
 }

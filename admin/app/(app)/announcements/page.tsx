@@ -6,10 +6,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { fetchAnnouncements } from "@/lib/queries";
 import { deleteAnnouncementAction, upsertAnnouncementAction } from "@/lib/actions";
 import { formatDate } from "@/lib/labels";
+import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 export default async function AnnouncementsPage() {
+  await requireAdminPerm("announcements");
   const items = await fetchAnnouncements();
 
   return (

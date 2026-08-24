@@ -2,10 +2,12 @@ import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { fetchConversations } from "@/lib/queries";
 import { formatDate } from "@/lib/labels";
+import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 export default async function MessagesPage() {
+  await requireAdminPerm("messages");
   const items = await fetchConversations();
   return (
     <div>

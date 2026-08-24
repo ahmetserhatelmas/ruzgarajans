@@ -7,6 +7,7 @@ import { BackHeader } from '@/components/ui/BackHeader';
 import { IntroVideoCard } from '@/components/video/IntroVideoCard';
 import { fetchActorDetail } from '@/services/actors';
 import type { ActorProfile, Profile } from '@/types/database';
+import { optionLabel } from '@/lib/optionLabel';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function AdminActorDetail() {
@@ -39,7 +40,8 @@ export default function AdminActorDetail() {
       <Text style={styles.section}>{t('profile.physical')}</Text>
       <Text style={styles.line}>
         {t('profile.height')}: {actor?.height_cm ?? '—'} · {t('profile.hair')}:{' '}
-        {actor?.hair_color ?? '—'} · {t('profile.eyes')}: {actor?.eye_color ?? '—'}
+        {optionLabel(t, 'hair', actor?.hair_color)} · {t('profile.eyes')}:{' '}
+        {optionLabel(t, 'eyes', actor?.eye_color)}
       </Text>
       <Text style={styles.section}>{t('profile.bio')}</Text>
       <Text style={styles.line}>{actor?.bio || '—'}</Text>

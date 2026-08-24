@@ -39,7 +39,7 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'secondary' || variant === 'ghost' ? Colors.ink : Colors.white} />
+        <ActivityIndicator color={variant === 'secondary' || variant === 'ghost' ? Colors.brand : Colors.white} />
       ) : (
         <Text style={[styles.label, styles[`${variant}Label` as const]]}>{label}</Text>
       )}
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: Spacing.lg,
   },
-  primary: { backgroundColor: Colors.ink },
+  primary: { backgroundColor: Colors.brand },
   secondary: {
     backgroundColor: Colors.paperMuted,
     borderWidth: 1,

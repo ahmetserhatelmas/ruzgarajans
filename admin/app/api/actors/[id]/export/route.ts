@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchActorDetail, requireAdmin } from "@/lib/queries";
+import { canAdmin } from "@/lib/admin-perms";
 import { actorExportSlug, buildActorExportZip } from "@/lib/export-actor";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { profile: admin } = await requireAdmin();
-  if (!admin || admin.role !== "admin") {
+  if (!admin || admin.role !== "admin" || !canAdmin(admin, "actors")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

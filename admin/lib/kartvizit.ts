@@ -1,4 +1,4 @@
-import { DANCES, EYES, HAIR, SPORTS, formatLanguages, label } from "@/lib/labels";
+import { DANCES, EYES, HAIR, MODEL, PERFORMANCE, SPORTS, formatLanguages, label } from "@/lib/labels";
 import { displayImageUrl } from "@/lib/media";
 import type { ActorProfile, GalleryPhoto } from "@/lib/types";
 
@@ -48,8 +48,8 @@ export function kartvizitFields(actor: ActorProfile | null) {
     mappedList(DANCES, actor?.dances),
     actor?.dances_other,
     mappedList(SPORTS, actor?.sports),
-    actor?.performance_skills?.join(", "),
-    actor?.model_skills?.join(", "),
+    mappedList(PERFORMANCE, actor?.performance_skills),
+    mappedList(MODEL, actor?.model_skills),
     actor?.instruments,
     actor?.skills?.join(", "),
     actor?.special_interests

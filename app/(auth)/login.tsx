@@ -8,6 +8,7 @@ import { TextField } from '@/components/ui/TextField';
 import { Button } from '@/components/ui/Button';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import { useAuth } from '@/contexts/AuthContext';
+import { BrandMark } from '@/components/ui/BrandMark';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function LoginScreen() {
@@ -40,7 +41,7 @@ export default function LoginScreen() {
     <Screen scroll>
       <LinearGradient />
       <View style={styles.hero}>
-        <Text style={styles.brand}>{t('brand')}</Text>
+        <BrandMark />
         <Text style={styles.tagline}>{t('tagline')}</Text>
         <LanguageSwitcher />
       </View>
@@ -81,12 +82,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { marginTop: Spacing.xxl, gap: Spacing.sm },
-  brand: {
-    fontFamily: Fonts.displayBold,
-    fontSize: 48,
-    color: Colors.ink,
-  },
+  hero: { marginTop: Spacing.xl, gap: Spacing.sm, alignItems: 'center' },
   tagline: {
     fontFamily: Fonts.body,
     fontSize: 16,

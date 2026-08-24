@@ -6,6 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { MultiSearchSelect } from "@/components/multi-search-select";
 import { countryOptions, languageOptions } from "@/lib/geo";
 import type { CastListing } from "@/lib/types";
+import { DialogueEditor } from "@/components/dialogue-editor";
+import { DateInput } from "@/components/date-input";
 
 export function CastForm({ cast }: { cast?: CastListing }) {
   return (
@@ -49,10 +51,16 @@ export function CastForm({ cast }: { cast?: CastListing }) {
           <Input name="shoot_location" defaultValue={cast?.shoot_location ?? ""} />
         </Field>
         <Field label="Çekim tarihi">
-          <Input name="shoot_date" type="date" defaultValue={cast?.shoot_date ?? ""} />
+          <DateInput name="shoot_date" defaultValue={cast?.shoot_date ?? ""} />
         </Field>
         <Field label="Son başvuru">
-          <Input name="deadline" type="date" defaultValue={cast?.deadline ?? ""} />
+          <DateInput name="deadline" defaultValue={cast?.deadline ?? ""} />
+        </Field>
+        <Field label="Opsiyon tarihi">
+          <DateInput name="option_date" defaultValue={cast?.option_date ?? ""} />
+        </Field>
+        <Field label="Ödeme vadesi">
+          <DateInput name="payment_due_date" defaultValue={cast?.payment_due_date ?? ""} />
         </Field>
         <Field label="Bütçe (TRY)">
           <Input name="budget_amount" type="number" defaultValue={cast?.budget_amount ?? ""} />
@@ -80,7 +88,7 @@ export function CastForm({ cast }: { cast?: CastListing }) {
         yine herkese görünür.
       </p>
       <Field label="Diyalog / senaryo">
-        <Textarea name="dialogue_script" rows={4} defaultValue={cast?.dialogue_script ?? ""} />
+        <DialogueEditor defaultValue={cast?.dialogue_script} />
       </Field>
       <label className="flex items-center gap-2 text-sm">
         <input

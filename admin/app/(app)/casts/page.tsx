@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { fetchCasts } from "@/lib/queries";
 import { formatDate, formatMoney, GENDER, label } from "@/lib/labels";
+import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ export default async function CastsPage({
 }: {
   searchParams: Promise<{ q?: string; published?: string }>;
 }) {
+  await requireAdminPerm("casts");
   const { q = "", published = "all" } = await searchParams;
   const casts = await fetchCasts();
   const filtered = casts.filter((c) => {
@@ -69,6 +71,8 @@ export default async function CastsPage({
               <TableHead>Rol</TableHead>
               <TableHead>Yaş / cinsiyet</TableHead>
               <TableHead>Son tarih</TableHead>
+              <TableHead>Opsiyon</TableHead>
+              <TableHead>Ödeme vadesi</TableHead>
               <TableHead>Bütçe</TableHead>
               <TableHead>Başvuru</TableHead>
               <TableHead>Durum</TableHead>
@@ -87,6 +91,8 @@ export default async function CastsPage({
                   {c.age_min ?? "—"}–{c.age_max ?? "—"} / {label(GENDER, c.gender)}
                 </TableCell>
                 <TableCell>{formatDate(c.deadline)}</TableCell>
+                <TableCell>{formatDate(c.option_date)}</TableCell>
+                <TableCell>{formatDate(c.payment_due_date)}</TableCell>
                 <TableCell>{formatMoney(c.budget_amount, c.budget_currency)}</TableCell>
                 <TableCell>{c.applications?.length ?? 0}</TableCell>
                 <TableCell>

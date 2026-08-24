@@ -4,15 +4,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Fonts } from '@/constants/theme';
+import { canAdmin } from '@/lib/adminAccess';
 
 export default function AdminLayout() {
   const { t } = useTranslation();
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
 
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.paper }}>
-        <ActivityIndicator color={Colors.ink} />
+        <ActivityIndicator color={Colors.brand} />
       </View>
     );
   }
@@ -21,11 +22,15 @@ export default function AdminLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
+  if (profile?.role === 'cast_director') {
+    return <Redirect href="/(director)" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: Colors.ink,
+        tabBarActiveTintColor: Colors.brand,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarStyle: {
           backgroundColor: Colors.paper,
@@ -46,6 +51,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="actors/index"
         options={{
+          href: canAdmin(profile, 'actors') ? undefined : null,
           title: t('admin.actors'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
@@ -55,6 +61,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="casts/index"
         options={{
+          href: canAdmin(profile, 'casts') ? undefined : null,
           title: t('admin.casts'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="film-outline" size={size} color={color} />
@@ -64,6 +71,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="applications/index"
         options={{
+          href: canAdmin(profile, 'applications') ? undefined : null,
           title: t('admin.applications'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="document-text-outline" size={size} color={color} />
@@ -73,6 +81,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="messages/index"
         options={{
+          href: canAdmin(profile, 'messages') ? undefined : null,
           title: t('admin.messages'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubbles-outline" size={size} color={color} />
