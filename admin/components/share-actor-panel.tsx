@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { ActorShare, Profile } from "@/lib/types";
 
 function shareWhatsAppText(url: string, pin: string) {
-  return `${url}\n\nŞifre: ${pin}`;
+  return `Oyuncu dosyası:\n${url}\n\nAçılış şifresi: ${pin}\n(Şifreyi linkin içine yazma, sayfada sorunca gir.)`;
 }
 
 function expiryLabel(expiresAt: string | null) {
@@ -118,9 +118,14 @@ export function ShareActorPanel({
               value={latestUrl}
               className="h-10 flex-1 rounded-md border border-input bg-muted px-3 text-xs"
             />
-            <Button type="button" variant="outline" onClick={() => void copy(waText || latestUrl, latest.id)}>
-              {copied === latest.id ? "Kopyalandı" : lastPin ? "Link + şifre" : "Kopyala"}
+            <Button type="button" variant="outline" onClick={() => void copy(latestUrl, latest.id)}>
+              {copied === latest.id ? "Kopyalandı" : "Linki kopyala"}
             </Button>
+            {lastPin ? (
+              <Button type="button" variant="outline" onClick={() => void copy(lastPin, `${latest.id}-pin`)}>
+                {copied === `${latest.id}-pin` ? "Kopyalandı" : `Şifre ${lastPin}`}
+              </Button>
+            ) : null}
             {latestUrl ? (
               <Button asChild variant="outline">
                 <a

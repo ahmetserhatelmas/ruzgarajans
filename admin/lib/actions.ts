@@ -8,7 +8,7 @@ import { attachDialogueAudio } from "@/lib/dialogue-audio";
 import { parseDialogueScript } from "@/lib/dialogue-script";
 import { ADMIN_PERMS, requireAdminPerm, type AdminPerm } from "@/lib/permissions";
 import { fetchSharedActor } from "@/lib/share";
-import { hashSharePin, isSharePin, shareUnlockCookieName } from "@/lib/share-pin";
+import { hashSharePin, isSharePin, parseShareInput, shareUnlockCookieName } from "@/lib/share-pin";
 import type { ActorStatus, ApplicationStatus, CastListing, GenderPref } from "@/lib/types";
 import { cookies } from "next/headers";
 
@@ -322,8 +322,9 @@ export async function createActorShareAction(formData: FormData) {
 }
 
 export async function unlockActorShareAction(formData: FormData) {
-  const token = String(formData.get("token") ?? "").trim();
-  const pin = String(formData.get("pin") ?? "").trim();
+  const parsed = parseShareInput(String(formData.get("token") ?? ""));
+  const token = parsed.token;
+  const pin = String(formData.get("pin") ?? "").trim() || parsed.pin || "";
   if (!token) redirect("/p/missing");
 
   const opened = await fetchSharedActor(token, pin);

@@ -1,6 +1,8 @@
+import { redirect } from "next/navigation";
 import { ActorPortfolio } from "@/components/actor-portfolio";
 import { SharePinGate } from "@/components/share-pin-gate";
 import { fetchSharedActor, readSharePinCookie } from "@/lib/share";
+import { parseShareInput } from "@/lib/share-pin";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +13,14 @@ export default async function SharedActorPage({
   params: Promise<{ token: string }>;
   searchParams: Promise<{ e?: string }>;
 }) {
-  const { token } = await params;
+  const { token: rawToken } = await params;
   const { e } = await searchParams;
-  const pin = await readSharePinCookie(token);
+  const parsed = parseShareInput(rawToken);
+  if (parsed.token && parsed.token !== rawToken) {
+    redirect(`/p/${parsed.token}`);
+  }
+  const token = parsed.token || rawToken;
+  const pin = (await readSharePinCookie(token)) ?? parsed.pin;
   const opened = await fetchSharedActor(token, pin);
 
   if (opened.status === "unavailable") {
