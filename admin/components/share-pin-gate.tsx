@@ -13,9 +13,7 @@ export function SharePinGate({
   const message =
     error === "expired"
       ? "Bu linkin süresi dolmuş veya iptal edilmiş."
-      : error === "pin"
-        ? "Şifre hatalı. 4 haneli sayıyı tekrar dene."
-        : "Bu dosyayı açmak için paylaşılan 4 haneli şifreyi yaz.";
+      : "Bu dosyayı açmak için paylaşılan 4 haneli şifreyi yaz.";
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
@@ -29,7 +27,19 @@ export function SharePinGate({
         <p className="font-heading text-4xl tracking-tight text-foreground">Rüzgâr Oyunculuk</p>
         <div className="mt-3 h-px w-16 bg-primary" />
         <h1 className="mt-5 text-xl font-semibold text-foreground">Oyuncu dosyası</h1>
-        <p className="mt-1 mb-8 text-sm leading-6 text-muted-foreground">{message}</p>
+        {error === "pin" ? (
+          <p
+            role="alert"
+            className="mt-3 mb-8 rounded-xl bg-destructive/10 px-3 py-3 text-sm font-medium leading-6 text-destructive"
+          >
+            Şifre yanlış. 4 haneli sayıyı tekrar dene.
+            <span className="mt-1 block font-normal text-destructive/80">
+              Şifreyi sıfırlayamazsın; ajansın verdiği kodu kullan veya yeni link iste.
+            </span>
+          </p>
+        ) : (
+          <p className="mt-1 mb-8 text-sm leading-6 text-muted-foreground">{message}</p>
+        )}
         {error === "expired" ? null : (
           <form action={unlockActorShareAction} className="grid gap-5">
             <input type="hidden" name="token" value={token} />
@@ -46,6 +56,7 @@ export function SharePinGate({
                 pattern="\d{4}"
                 required
                 placeholder="6060"
+                aria-invalid={error === "pin"}
                 className="h-12 text-center text-2xl tracking-[0.4em]"
               />
             </div>
