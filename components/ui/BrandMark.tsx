@@ -7,7 +7,7 @@ export function BrandMark({ showName = true }: { showName?: boolean }) {
   return (
     <View style={styles.wrap}>
       <Image source={logo} style={styles.logo} resizeMode="contain" />
-      {showName ? <Text style={styles.name}>Rüzgâr Oyunculuk</Text> : null}
+      {showName ? <Text style={styles.name}>Rüzgar Oyunculuk</Text> : null}
     </View>
   );
 }

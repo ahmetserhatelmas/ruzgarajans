@@ -19,6 +19,7 @@ import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
 import { downloadXlsx } from "@/lib/export-table-xlsx";
 import { ACTOR_STATUS, ageFromBirth, DANCES, EYES, GENDER, HAIR, label, SPORTS } from "@/lib/labels";
 import { setActorStatusAction } from "@/lib/actions";
+import { displayImageUrl } from "@/lib/media";
 import type { ActorRow, ActorStatus } from "@/lib/types";
 
 function setParam(params: URLSearchParams, key: string, value: string) {
@@ -209,10 +210,25 @@ export function ActorsBrowser({ rows }: { rows: ActorRow[] }) {
               return (
                 <TableRow key={row.profile.id}>
                   <TableCell>
-                    <Link href={`/actors/${row.profile.id}`} className="font-medium hover:underline">
-                      {row.profile.full_name || "—"}
-                    </Link>
-                    <div className="text-xs text-muted-foreground">{row.profile.email}</div>
+                    <div className="flex items-center gap-3">
+                      {row.chestPhotoUrl ? (
+                        <img
+                          src={displayImageUrl(row.chestPhotoUrl, 160) ?? row.chestPhotoUrl}
+                          alt=""
+                          className="h-14 w-11 shrink-0 rounded-md object-cover ring-1 ring-foreground/10"
+                        />
+                      ) : (
+                        <div className="flex h-14 w-11 shrink-0 items-center justify-center rounded-md bg-muted text-[10px] text-muted-foreground">
+                          —
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <Link href={`/actors/${row.profile.id}`} className="font-medium hover:underline">
+                          {row.profile.full_name || "—"}
+                        </Link>
+                        <div className="truncate text-xs text-muted-foreground">{row.profile.email}</div>
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <ActorStatusBadge status={row.profile.actor_status} />

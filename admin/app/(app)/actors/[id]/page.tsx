@@ -36,6 +36,7 @@ import { ShareActorPanel } from "@/components/share-actor-panel";
 import { fetchActorShares, fetchDirectors, sharePublicUrl } from "@/lib/share";
 import { setActorStatusAction, startConversationAction } from "@/lib/actions";
 import { REQUIRED_PHOTO_KINDS } from "@/lib/types";
+import { BrandedVideo } from "@/components/branded-video";
 import { displayImageUrl } from "@/lib/media";
 import { requireAdminPerm } from "@/lib/permissions";
 
@@ -295,7 +296,7 @@ export default async function ActorDetailPage({
             <div key={v.label}>
               <p className="mb-1 text-sm font-medium">{v.label}</p>
               {v.url ? (
-                <video src={v.url} controls className="w-full rounded-lg bg-black" />
+                <BrandedVideo src={v.url} />
               ) : (
                 <p className="text-sm text-muted-foreground">Yok</p>
               )}
@@ -304,7 +305,7 @@ export default async function ActorDetailPage({
           {extraVideos.map((v) => (
             <div key={v.id}>
               <p className="mb-1 text-sm font-medium">{label(VIDEO_KIND, v.kind)}</p>
-              <video src={v.playback_url!} controls className="w-full rounded-lg bg-black" />
+              <BrandedVideo src={v.playback_url!} />
             </div>
           ))}
         </CardContent>

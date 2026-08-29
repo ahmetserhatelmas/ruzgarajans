@@ -1,4 +1,4 @@
--- Rüzgâr Oyunculuk — initial schema
+-- Rüzgar Oyunculuk — initial schema
 -- Run in Supabase SQL editor or via CLI
 
 create extension if not exists "pgcrypto";

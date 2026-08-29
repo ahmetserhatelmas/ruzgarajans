@@ -63,14 +63,29 @@ export default function RootLayout() {
       <AuthProvider>
         <NotificationObserver />
         <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.paper } }}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            orientation: 'portrait',
+            contentStyle: { backgroundColor: Colors.paper },
+          }}
+        >
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(actor)" />
           <Stack.Screen name="(admin)" />
-          <Stack.Screen name="record/intro" options={{ presentation: 'fullScreenModal' }} />
-          <Stack.Screen name="record/[kind]" options={{ presentation: 'fullScreenModal' }} />
-          <Stack.Screen name="record/audition" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen
+            name="record/intro"
+            options={{ presentation: 'fullScreenModal', orientation: 'landscape' }}
+          />
+          <Stack.Screen
+            name="record/[kind]"
+            options={{ presentation: 'fullScreenModal', orientation: 'landscape' }}
+          />
+          <Stack.Screen
+            name="record/audition"
+            options={{ presentation: 'fullScreenModal', orientation: 'landscape' }}
+          />
         </Stack>
       </AuthProvider>
     </SafeAreaProvider>

@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
+import { VideoLogoMark } from '@/components/video/VideoLogoMark';
 import { VideoPlayerModal } from '@/components/video/VideoPlayerModal';
 import { streamThumbnailUrl } from '@/lib/cloudflare';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
@@ -85,6 +86,7 @@ export function IntroVideoCard({
           <Ionicons name="play-circle" size={64} color={Colors.gold} />
           <Text style={styles.playLabel}>{t('admin.watchVideo')}</Text>
         </View>
+        <VideoLogoMark size={40} />
       </Pressable>
 
       <View style={styles.actions}>

@@ -9,6 +9,7 @@ import { fetchActorRows, fetchCastDetail, matchesCast } from "@/lib/queries";
 import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
 import { ageFromBirth, GENDER, label } from "@/lib/labels";
 import { toggleCastPublishedAction } from "@/lib/actions";
+import { BrandedVideo } from "@/components/branded-video";
 import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -104,7 +105,7 @@ export default async function CastDetailPage({
           <CardContent className="grid gap-4 md:grid-cols-2">
             {videos.map((v) =>
               v.playback_url ? (
-                <video key={v.id} src={v.playback_url} controls className="w-full rounded-lg bg-black" />
+                <BrandedVideo key={v.id} src={v.playback_url} />
               ) : null
             )}
           </CardContent>

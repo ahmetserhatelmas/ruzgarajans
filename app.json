@@ -1,14 +1,15 @@
 {
   "expo": {
-    "name": "Rüzgâr Oyunculuk",
+    "name": "Rüzgar Oyunculuk",
     "slug": "ajansapp",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "ajansapp",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
+      "requireFullScreen": true,
       "bundleIdentifier": "com.ruzgarajans.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Tanıtım ve audition videoları çekmek için kamera erişimi gerekir.",
@@ -41,6 +42,12 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT_UP"
+        }
+      ],
       "expo-router",
       "expo-secure-store",
       [

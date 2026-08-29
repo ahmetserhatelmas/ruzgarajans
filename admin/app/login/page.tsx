@@ -22,11 +22,11 @@ export default async function LoginPage({
       <div className="relative w-full max-w-md rounded-3xl bg-card p-8 shadow-[0_24px_80px_rgba(107,44,145,0.08)] ring-1 ring-border sm:p-10">
         <img
           src="/brand-logo.png"
-          alt="Rüzgâr Oyunculuk"
+          alt="Rüzgar Oyunculuk"
           className="mb-4 h-20 w-20 rounded-2xl object-cover"
         />
         <p className="font-heading text-4xl tracking-tight text-foreground">
-          Rüzgâr Oyunculuk
+          Rüzgar Oyunculuk
         </p>
         <div className="mt-3 h-px w-16 bg-primary" />
         <h1 className="mt-5 text-xl font-semibold text-foreground">Admin girişi</h1>

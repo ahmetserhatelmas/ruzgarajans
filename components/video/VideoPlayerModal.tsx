@@ -2,6 +2,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { VideoLogoMark } from '@/components/video/VideoLogoMark';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 type Props = {
@@ -17,13 +18,16 @@ function Player({ uri }: { uri: string }) {
   });
 
   return (
-    <VideoView
-      style={styles.video}
-      player={player}
-      nativeControls
-      contentFit="contain"
-      fullscreenOptions={{ enable: true }}
-    />
+    <View style={styles.video}>
+      <VideoView
+        style={StyleSheet.absoluteFill}
+        player={player}
+        nativeControls
+        contentFit="contain"
+        fullscreenOptions={{ enable: true }}
+      />
+      <VideoLogoMark />
+    </View>
   );
 }
 

@@ -1,5 +1,5 @@
 export default {
-  brand: 'Rüzgâr Oyunculuk',
+  brand: 'Rüzgar Oyunculuk',
   tagline: 'Oyuncu portföyün ve cast başvuruların tek yerde.',
   common: {
     continue: 'Devam',
@@ -38,7 +38,7 @@ export default {
     hasAccount: 'Zaten üyeliğin var mı?',
     pendingTitle: 'Onay bekleniyor',
     pendingBody:
-      'Başvurun Rüzgâr Oyunculuk tarafından inceleniyor. Onaylandığında cast ilanlarına erişebilirsin.',
+      'Başvurun Rüzgar Oyunculuk tarafından inceleniyor. Onaylandığında cast ilanlarına erişebilirsin.',
     rejectedTitle: 'Başvuru reddedildi',
     rejectedBody: 'Üyeliğin onaylanmadı. Destek için WhatsApp üzerinden yazabilirsin.',
   },
@@ -214,7 +214,7 @@ export default {
       additionalNotes: 'İlave etmek istedikleriniz',
       insuranceOther: 'Yapılamaz ise nedeni',
       kvkk:
-        'KVKK kapsamında kişisel verilerimin, fotoğraf ve videolarımın Rüzgâr Oyunculuk tarafından kullanılmasına ve başka bir ajansla bağlayıcı sözleşmem olmadığına onay veriyorum.',
+        'KVKK kapsamında kişisel verilerimin, fotoğraf ve videolarımın Rüzgar Oyunculuk tarafından kullanılmasına ve başka bir ajansla bağlayıcı sözleşmem olmadığına onay veriyorum.',
       kvkkRead: 'Tam metni oku',
       kvkkTitle: 'Onay ve KVKK metni',
       kvkkFullAgency:
@@ -379,7 +379,7 @@ export default {
     empty: 'Henüz mesaj yok. Ajansa yazarak iletişime geçebilirsin.',
     placeholder: 'Mesajını yaz…',
     send: 'Gönder',
-    agencyOnly: 'Yalnızca Rüzgâr Oyunculuk ile mesajlaşabilirsin.',
+    agencyOnly: 'Yalnızca Rüzgar Oyunculuk ile mesajlaşabilirsin.',
     lockedTitle: 'Mesajlaşma kilitli',
     lockedBody:
       'Ajansa mesaj göndermek için üyeliğinin onaylanması gerekir. Onaylandıktan sonra buradan yazabilirsin.',
@@ -420,6 +420,8 @@ export default {
       'Video kaydı yalnızca gerçek telefonda çalışır. Test için galeriden bir video seçebilirsin.',
     pickVideo: 'Galeriden video seç',
     flipCamera: 'Çevir',
+    landscapeRequired: 'Telefonu yatay tut',
+    landscapeRequiredBody: 'Video kaydı yalnızca yatay çekilir. Telefonu yan çevir, sonra kayda başla.',
     previewHint: 'Yüklemeden önce oynatıcıyla izleyebilirsin.',
   },
   media: {

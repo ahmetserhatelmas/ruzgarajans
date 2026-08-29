@@ -299,7 +299,7 @@ export async function buildActorExportZip(input: ExportInput): Promise<Buffer> {
 <html lang="tr">
 <head>
   <meta charset="utf-8" />
-  <title>${escapeHtml(name)} — Rüzgâr Oyunculuk</title>
+  <title>${escapeHtml(name)} — Rüzgar Oyunculuk</title>
   <style>
     body { font-family: Georgia, serif; background: #ffffff; color: #16181d; margin: 0; padding: 32px; }
     h1 { font-size: 32px; margin: 0 0 4px; color: #6b2c91; }

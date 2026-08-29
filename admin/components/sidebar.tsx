@@ -43,8 +43,8 @@ export function Sidebar({
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar print:hidden">
       <div className="px-5 py-6">
-        <img src="/brand-logo.png" alt="Rüzgâr Oyunculuk" className="mb-3 h-16 w-16 rounded-2xl object-cover" />
-        <p className="font-heading text-2xl tracking-tight">Rüzgâr Oyunculuk</p>
+        <img src="/brand-logo.png" alt="Rüzgar Oyunculuk" className="mb-3 h-16 w-16 rounded-2xl object-cover" />
+        <p className="font-heading text-2xl tracking-tight">Rüzgar Oyunculuk</p>
         <p className="mt-1 text-xs text-muted-foreground">Admin paneli</p>
       </div>
       <nav className="flex flex-1 flex-col gap-1 px-3">

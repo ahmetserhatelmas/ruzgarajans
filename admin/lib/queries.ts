@@ -38,24 +38,31 @@ export async function fetchActorRows(): Promise<ActorRow[]> {
       .eq("role", "actor")
       .order("created_at", { ascending: false }),
     supabase.from("actor_profiles").select("*"),
-    supabase.from("gallery_photos").select("user_id, kind"),
+    supabase.from("gallery_photos").select("user_id, kind, public_url"),
   ]);
 
   const actorMap = new Map(
     ((actors ?? []) as ActorProfile[]).map((a) => [a.user_id, a])
   );
   const photoMap = new Map<string, string[]>();
-  for (const p of (photos ?? []) as { user_id: string; kind: string | null }[]) {
+  const chestMap = new Map<string, string>();
+  for (const p of (photos ?? []) as {
+    user_id: string;
+    kind: string | null;
+    public_url: string | null;
+  }[]) {
     if (!p.kind) continue;
     const list = photoMap.get(p.user_id) ?? [];
     list.push(p.kind);
     photoMap.set(p.user_id, list);
+    if (p.kind === "chest" && p.public_url) chestMap.set(p.user_id, p.public_url);
   }
 
   return ((profiles ?? []) as Profile[]).map((profile) => ({
     profile,
     actor: actorMap.get(profile.id) ?? null,
     photoKinds: photoMap.get(profile.id) ?? [],
+    chestPhotoUrl: chestMap.get(profile.id) ?? null,
   }));
 }
 

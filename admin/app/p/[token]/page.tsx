@@ -33,7 +33,7 @@ export default async function SharedActorPage({
 
   return (
     <div className="mx-auto min-h-screen max-w-3xl bg-background px-4 py-8">
-      <p className="font-heading text-2xl">Rüzgâr Oyunculuk</p>
+      <p className="font-heading text-2xl">Rüzgar Oyunculuk</p>
       <p className="mt-1 text-sm text-muted-foreground">Oyuncu dosyası · yalnızca bu profil</p>
       <h1 className="mt-6 mb-6 font-heading text-3xl">{opened.data.profile.full_name || "Oyuncu"}</h1>
       <ActorPortfolio data={opened.data} />

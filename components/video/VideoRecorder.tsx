@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import {
   CameraView,
   useCameraPermissions,
@@ -14,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import * as Speech from 'expo-speech';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { Button } from '@/components/ui/Button';
+import { VideoLogoMark } from '@/components/video/VideoLogoMark';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import {
   estimateActorHoldMs,
@@ -120,13 +130,16 @@ function VideoPreview({ uri }: { uri: string }) {
   });
 
   return (
-    <VideoView
-      style={styles.camera}
-      player={player}
-      nativeControls
-      contentFit="contain"
-      fullscreenOptions={{ enable: true }}
-    />
+    <View style={styles.camera}>
+      <VideoView
+        style={StyleSheet.absoluteFill}
+        player={player}
+        nativeControls
+        contentFit="contain"
+        fullscreenOptions={{ enable: true }}
+      />
+      <VideoLogoMark />
+    </View>
   );
 }
 
@@ -143,6 +156,10 @@ export function VideoRecorder({
   hint,
 }: Props) {
   const { t, i18n } = useTranslation();
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+  const landscapeRef = useRef(isLandscape);
+  landscapeRef.current = isLandscape;
   const cameraRef = useRef<CameraView>(null);
   const [camPerm, requestCam] = useCameraPermissions();
   const [micPerm, requestMic] = useMicrophonePermissions();
@@ -171,9 +188,11 @@ export function VideoRecorder({
   };
 
   useEffect(() => {
+    void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
     return () => {
       cancelledRef.current = true;
       stopDialogueAssist();
+      void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     };
   }, []);
 
@@ -377,6 +396,11 @@ export function VideoRecorder({
       return;
     }
 
+    if (!landscapeRef.current) {
+      Alert.alert(t('video.landscapeRequired'), t('video.landscapeRequiredBody'));
+      return;
+    }
+
     if (!cameraRef.current || recording || countdown !== null) return;
 
     setUri(null);
@@ -386,6 +410,11 @@ export function VideoRecorder({
     cancelledRef.current = false;
     await runCountdown();
     if (cancelledRef.current || !cameraRef.current) return;
+    if (!landscapeRef.current) {
+      setCountdown(null);
+      Alert.alert(t('video.landscapeRequired'), t('video.landscapeRequiredBody'));
+      return;
+    }
 
     setRecording(true);
     void startDialogueAssist();
@@ -466,6 +495,13 @@ export function VideoRecorder({
               <Text style={styles.countdownNum}>{countdown}</Text>
             </View>
           ) : null}
+          {!isLandscape && !uri ? (
+            <View style={styles.landscapeOverlay} pointerEvents="none">
+              <Ionicons name="phone-landscape-outline" size={48} color={Colors.gold} />
+              <Text style={styles.landscapeTitle}>{t('video.landscapeRequired')}</Text>
+              <Text style={styles.landscapeBody}>{t('video.landscapeRequiredBody')}</Text>
+            </View>
+          ) : null}
           {!busy ? (
             <Pressable
               style={styles.flipBtn}
@@ -495,10 +531,14 @@ export function VideoRecorder({
           {showDialogue && cueText ? (
             <DialogueWords text={cueText} label={cueLabel} highlightIndex={highlightIndex} />
           ) : null}
+          <VideoLogoMark />
         </View>
       )}
       <View style={styles.controls}>
         {hint && !uri ? <Text style={styles.mode}>{hint}</Text> : null}
+        {!uri && !isLandscape ? (
+          <Text style={styles.mode}>{t('video.landscapeRequired')}</Text>
+        ) : null}
         {(dialogueMode !== 'none' || guidanceLines?.length) && !uri ? (
           <Text style={styles.mode}>
             {guidanceLines?.length
@@ -543,7 +583,7 @@ export function VideoRecorder({
                 }
                 onPress={recording ? stop : () => void start()}
                 variant={recording ? 'danger' : 'primary'}
-                disabled={countdown !== null}
+                disabled={countdown !== null || (!recording && !isLandscape)}
               />
             )}
             {!busy ? (
@@ -611,6 +651,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  landscapeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+    gap: Spacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+  },
+  landscapeTitle: {
+    fontFamily: Fonts.displayBold,
+    fontSize: 28,
+    color: Colors.gold,
+    textAlign: 'center',
+  },
+  landscapeBody: {
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    color: Colors.textOnDark,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   countdownNum: {
     fontFamily: Fonts.displayBold,

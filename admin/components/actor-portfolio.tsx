@@ -21,6 +21,7 @@ import {
   label,
   listLabel,
 } from "@/lib/labels";
+import { BrandedVideo } from "@/components/branded-video";
 import { displayImageUrl } from "@/lib/media";
 import type { SharedActorPayload } from "@/lib/types";
 
@@ -151,14 +152,14 @@ export function ActorPortfolio({ data }: { data: SharedActorPayload }) {
             v.url ? (
               <div key={v.label}>
                 <p className="mb-1 text-sm font-medium">{v.label}</p>
-                <video src={v.url} controls className="w-full rounded-lg bg-black" />
+                <BrandedVideo src={v.url} />
               </div>
             ) : null
           )}
           {extras.map((v) => (
             <div key={v.id}>
               <p className="mb-1 text-sm font-medium">{label(VIDEO_KIND, v.kind)}</p>
-              <video src={v.playback_url!} controls className="w-full rounded-lg bg-black" />
+              <BrandedVideo src={v.playback_url!} />
             </div>
           ))}
         </div>

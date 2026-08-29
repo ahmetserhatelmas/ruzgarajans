@@ -212,6 +212,7 @@ export type ActorRow = {
   profile: Profile;
   actor: ActorProfile | null;
   photoKinds: string[];
+  chestPhotoUrl: string | null;
 };
 
 export const REQUIRED_PHOTO_KINDS = [

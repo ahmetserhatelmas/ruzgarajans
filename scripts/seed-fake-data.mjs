@@ -330,7 +330,7 @@ const CASTS = [
     dialogue_mode: 'none',
   },
   {
-    project_name: 'Kuzey Rüzgârı',
+    project_name: 'Kuzey Rüzgarı',
     role_name: 'Kaptan Yusuf',
     role_description:
       '35–50 yaş erkek. Denizcilik dizisi. Sakallı tercihen, otoriter ama sıcak. Tekne sahnesi var.',
@@ -347,7 +347,7 @@ const CASTS = [
     allow_budget_counter: true,
     is_published: true,
     dialogue_mode: 'script_tts',
-    dialogue_script: 'Rüzgâr değişti.\nBu limanda daha fazla kalamayız.\nYelkenleri hazırla.',
+    dialogue_script: 'Rüzgar değişti.\nBu limanda daha fazla kalamayız.\nYelkenleri hazırla.',
   },
   {
     project_name: 'Pazar Sabahı',

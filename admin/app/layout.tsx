@@ -15,7 +15,7 @@ const sans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Rüzgâr Oyunculuk · Admin",
+  title: "Rüzgar Oyunculuk · Admin",
   description: "Oyuncu, cast ve başvuru yönetim paneli",
 };
 

@@ -6,7 +6,7 @@ export default function SetupScreen() {
   return (
     <Screen>
       <View style={styles.box}>
-        <Text style={styles.brand}>Rüzgâr Oyunculuk</Text>
+        <Text style={styles.brand}>Rüzgar Oyunculuk</Text>
         <Text style={styles.title}>Supabase yapılandırması gerekli</Text>
         <Text style={styles.body}>
           Proje köküne `.env` dosyası ekleyin ve şu değerleri doldurun:

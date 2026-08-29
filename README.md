@@ -1,6 +1,6 @@
-# Rüzgâr Oyunculuk — Mobil Uygulama
+# Rüzgar Oyunculuk — Mobil Uygulama
 
-Oyuncuların dijital portföy oluşturduğu, yalnızca **Rüzgâr Oyunculuk** cast ilanlarına başvurduğu React Native (Expo) uygulaması.
+Oyuncuların dijital portföy oluşturduğu, yalnızca **Rüzgar Oyunculuk** cast ilanlarına başvurduğu React Native (Expo) uygulaması.
 
 **Stack:** Expo Router · Supabase (Auth, Postgres, Storage, Edge Functions) · Cloudflare Stream (video)
 

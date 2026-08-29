@@ -420,6 +420,8 @@ export default {
       'Video recording only works on a real device. For testing, pick a video from your library.',
     pickVideo: 'Pick video from library',
     flipCamera: 'Flip',
+    landscapeRequired: 'Hold the phone sideways',
+    landscapeRequiredBody: 'Videos must be recorded in landscape. Rotate the phone, then start recording.',
     previewHint: 'Preview with the player before uploading.',
   },
   media: {

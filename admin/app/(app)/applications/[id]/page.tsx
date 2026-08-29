@@ -8,6 +8,7 @@ import { fetchApplicationDetail } from "@/lib/queries";
 import { APP_STATUS, formatDate, formatMoney, GENDER, HAIR, EYES, label } from "@/lib/labels";
 import { deleteApplicationAction, setApplicationStatusAction } from "@/lib/actions";
 import type { ApplicationStatus } from "@/lib/types";
+import { BrandedVideo } from "@/components/branded-video";
 import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -88,11 +89,7 @@ export default async function ApplicationDetailPage({
               <Link href={`/actors/${app.actor_id}`}>Tam profil</Link>
             </Button>
             {actor.actor?.intro_video_playback_url ? (
-              <video
-                src={actor.actor.intro_video_playback_url}
-                controls
-                className="mt-3 w-full rounded-lg bg-black"
-              />
+              <BrandedVideo src={actor.actor.intro_video_playback_url} className="mt-3" />
             ) : null}
           </CardContent>
         </Card>
@@ -132,7 +129,7 @@ export default async function ApplicationDetailPage({
           ) : (
             videos.map((v) =>
               v.playback_url ? (
-                <video key={v.id} src={v.playback_url} controls className="w-full rounded-lg bg-black" />
+                <BrandedVideo key={v.id} src={v.playback_url} />
               ) : (
                 <p key={v.id} className="text-sm text-muted-foreground">
                   Video hazır değil
