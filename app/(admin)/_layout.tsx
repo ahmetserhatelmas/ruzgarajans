@@ -30,6 +30,7 @@ export default function AdminLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: Colors.brand,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarStyle: {

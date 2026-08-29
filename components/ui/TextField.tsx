@@ -35,9 +35,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
+    paddingVertical: 14,
     fontFamily: Fonts.body,
     fontSize: 16,
     color: Colors.text,
+    textAlignVertical: 'center',
   },
   error: {
     fontFamily: Fonts.body,

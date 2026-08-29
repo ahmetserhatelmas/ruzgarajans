@@ -33,6 +33,7 @@ export default function ActorLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: Colors.brand,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarStyle: {

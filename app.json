@@ -18,6 +18,7 @@
       }
     },
     "android": {
+      "softwareKeyboardLayoutMode": "pan",
       "package": "com.ruzgarajans.app",
       "adaptiveIcon": {
         "backgroundColor": "#120A1C",
