@@ -324,7 +324,7 @@ export async function createActorShareAction(formData: FormData) {
 export async function unlockActorShareAction(formData: FormData) {
   const parsed = parseShareInput(String(formData.get("token") ?? ""));
   const token = parsed.token;
-  const pin = (String(formData.get("pin") ?? "").replace(/\D/g, "") || parsed.pin || "").slice(0, 4);
+  const pin = String(formData.get("pin") ?? "").replace(/\D/g, "").slice(0, 4);
   if (!token) redirect("/p/missing");
 
   const opened = await fetchSharedActor(token, pin);

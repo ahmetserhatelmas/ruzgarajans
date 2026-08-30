@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 import { ActorPortfolio } from "@/components/actor-portfolio";
 import { SharePinGate } from "@/components/share-pin-gate";
@@ -5,6 +6,7 @@ import { fetchSharedActor, readSharePinCookie } from "@/lib/share";
 import { parseShareInput } from "@/lib/share-pin";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export default async function SharedActorPage({
   params,
@@ -13,6 +15,7 @@ export default async function SharedActorPage({
   params: Promise<{ token: string }>;
   searchParams: Promise<{ e?: string }>;
 }) {
+  noStore();
   const { token: rawToken } = await params;
   const { e } = await searchParams;
   const parsed = parseShareInput(rawToken);
@@ -20,7 +23,7 @@ export default async function SharedActorPage({
     redirect(`/p/${parsed.token}`);
   }
   const token = parsed.token || rawToken;
-  const pin = (await readSharePinCookie(token)) ?? parsed.pin;
+  const pin = await readSharePinCookie(token);
   const opened = await fetchSharedActor(token, pin);
 
   if (opened.status === "unavailable") {

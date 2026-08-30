@@ -50,15 +50,17 @@ export type SharedActorOpen =
 
 export async function fetchSharedActor(token: string, pin?: string | null): Promise<SharedActorOpen> {
   const supabase = await createClient();
+  const safePin = isSharePin(pin ?? "") ? pin : null;
   const { data, error } = await supabase.rpc("open_actor_share", {
     p_token: token,
-    p_pin: pin || null,
+    p_pin: safePin,
   });
   if (error || !data) return { status: "unavailable" };
   const row = data as SharedActorPayload & { error?: string };
   if (row.error === "pin_required" || row.error === "bad_pin" || row.error === "unavailable") {
     return { status: row.error };
   }
-  if (!row.profile) return { status: "unavailable" };
+  // Never render a portfolio unless this request actually sent a PIN.
+  if (!safePin || !row.profile) return { status: safePin ? "unavailable" : "pin_required" };
   return { status: "ok", data: row };
 }
