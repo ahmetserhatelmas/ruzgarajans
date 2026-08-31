@@ -11,7 +11,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { profile: admin } = await requireAdmin();
-  if (!admin || admin.role !== "admin" || !canAdmin(admin, "actors")) {
+  if (!admin || admin.role !== "admin" || !canAdmin(admin, "export_actors")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

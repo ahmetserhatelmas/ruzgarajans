@@ -31,6 +31,8 @@ type ExportInput = {
   actor: ActorProfile | null;
   photos: GalleryPhoto[];
   videos: Video[];
+  extraSections?: { title: string; fields: { label: string; value: string }[] }[];
+  extraFiles?: { path: string; data: string | Uint8Array }[];
 };
 
 function escapeHtml(value: string) {
@@ -108,6 +110,10 @@ export function actorExportSlug(profile: Profile) {
   return slugify(profile.full_name || profile.email || profile.id);
 }
 
+export function listingExportSlug(value?: string | null) {
+  return slugify(value || "ilan");
+}
+
 export async function buildActorExportZip(input: ExportInput): Promise<Buffer> {
   const { profile, actor, photos, videos } = input;
   const zip = new JSZip();
@@ -159,9 +165,21 @@ export async function buildActorExportZip(input: ExportInput): Promise<Buffer> {
   ];
 
   const seen = new Set(videoSlots.map((v) => v.kind));
+  let langIntroIndex = 0;
   for (const video of videos) {
     const kind = (video.kind ?? "").toLowerCase();
-    if (!kind || seen.has(kind) || video.status !== "ready" || !video.playback_url) continue;
+    if (video.status !== "ready" || !video.playback_url) continue;
+    if (kind === "lang_intro") {
+      langIntroIndex += 1;
+      videoSlots.push({
+        kind: `lang_intro_${langIntroIndex}`,
+        label: video.title || `${label(VIDEO_KIND, "lang_intro")} ${langIntroIndex}`,
+        id: null,
+        url: video.playback_url,
+      });
+      continue;
+    }
+    if (!kind || seen.has(kind)) continue;
     seen.add(kind);
     videoSlots.push({
       kind,
@@ -294,6 +312,12 @@ export async function buildActorExportZip(input: ExportInput): Promise<Buffer> {
     })
     .join("");
 
+  const extraHtml = (input.extraSections ?? [])
+    .map((item) =>
+      section(item.title, item.fields.map((field) => row(field.label, field.value)).join(""))
+    )
+    .join("");
+
   const name = profile.full_name || "Oyuncu";
   const html = `<!DOCTYPE html>
 <html lang="tr">
@@ -319,6 +343,7 @@ export async function buildActorExportZip(input: ExportInput): Promise<Buffer> {
 <body>
   <h1>${escapeHtml(name)}</h1>
   <p class="meta">${escapeHtml(profile.email ?? "")} · ${escapeHtml(label(ACTOR_STATUS, profile.actor_status))}</p>
+  ${extraHtml}
   ${section("Kimlik", kimlik)}
   ${section("Fiziksel", fiziksel)}
   ${section("Kariyer", kariyer)}
@@ -330,6 +355,9 @@ export async function buildActorExportZip(input: ExportInput): Promise<Buffer> {
 </html>`;
 
   zip.file("profil.html", html);
+  for (const file of input.extraFiles ?? []) {
+    zip.file(file.path, file.data);
+  }
   const bytes = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
   return Buffer.from(bytes);
 }

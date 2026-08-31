@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Application, CastListing } from '@/types/database';
+import type { Application, CastListing, CastOption, CastOptionStatus } from '@/types/database';
 
 export async function fetchPublishedCasts(): Promise<CastListing[]> {
   const { data, error } = await supabase
@@ -29,6 +29,72 @@ export async function fetchMyApplications(actorId: string): Promise<Application[
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data ?? []) as Application[];
+}
+
+export async function fetchMyIntroducedCastIds(actorId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('cast_introductions')
+    .select('cast_id')
+    .eq('actor_id', actorId);
+  if (error) throw error;
+  return ((data ?? []) as { cast_id: string }[]).map((row) => row.cast_id);
+}
+
+export async function fetchIntroductionForCast(
+  castId: string,
+  actorId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('cast_introductions')
+    .select('id')
+    .eq('cast_id', castId)
+    .eq('actor_id', actorId)
+    .maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
+}
+
+export async function fetchMyCastOptions(
+  actorId: string
+): Promise<{ cast_id: string; status: CastOptionStatus }[]> {
+  const { data, error } = await supabase
+    .from('cast_options')
+    .select('cast_id, status')
+    .eq('actor_id', actorId);
+  if (error) throw error;
+  return (data ?? []) as { cast_id: string; status: CastOptionStatus }[];
+}
+
+export async function fetchOptionForCast(
+  castId: string,
+  actorId: string
+): Promise<CastOption | null> {
+  const { data, error } = await supabase
+    .from('cast_options')
+    .select('*')
+    .eq('cast_id', castId)
+    .eq('actor_id', actorId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as CastOption | null) ?? null;
+}
+
+export async function respondToCastOption(
+  castId: string,
+  actorId: string,
+  status: 'accepted' | 'declined'
+): Promise<CastOption> {
+  const { data, error } = await supabase
+    .from('cast_options')
+    .update({ status, responded_at: new Date().toISOString() })
+    .eq('cast_id', castId)
+    .eq('actor_id', actorId)
+    .eq('status', 'pending')
+    .select('*')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('option_already_answered');
+  return data as CastOption;
 }
 
 export async function applyToCast(input: {
@@ -114,6 +180,7 @@ export async function updateCast(
       | 'budget_amount'
       | 'budget_currency'
       | 'allow_budget_counter'
+      | 'requires_video'
       | 'is_published'
       | 'dialogue_mode'
       | 'dialogue_script'

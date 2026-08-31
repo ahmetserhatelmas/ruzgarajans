@@ -76,15 +76,15 @@ export default function RootLayout() {
           <Stack.Screen name="(admin)" />
           <Stack.Screen
             name="record/intro"
-            options={{ presentation: 'fullScreenModal', orientation: 'landscape' }}
+            options={{ presentation: 'fullScreenModal', orientation: 'all' }}
           />
           <Stack.Screen
             name="record/[kind]"
-            options={{ presentation: 'fullScreenModal', orientation: 'landscape' }}
+            options={{ presentation: 'fullScreenModal', orientation: 'all' }}
           />
           <Stack.Screen
             name="record/audition"
-            options={{ presentation: 'fullScreenModal', orientation: 'landscape' }}
+            options={{ presentation: 'fullScreenModal', orientation: 'all' }}
           />
         </Stack>
       </AuthProvider>

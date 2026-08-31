@@ -9,6 +9,10 @@ import {
   lineAfterSec,
   parseDialogueScript,
   stringifyDialogueScript,
+  alignTtsMarks,
+  wordIndexAt,
+  wordIndexAtProgress,
+  wordIndexAtTime,
   type DialogueLine,
   type DialogueScript,
   type DialogueVoice,
@@ -21,7 +25,9 @@ function wait(ms: number) {
 export function DialogueEditor({ defaultValue }: { defaultValue?: string | null }) {
   const [script, setScript] = useState<DialogueScript>(() => {
     const parsed = parseDialogueScript(defaultValue);
-    return parsed.lines.length ? parsed : { ...emptyDialogueScript(), lines: [{ speaker: "ai", text: "", holdSec: 1 }] };
+    return parsed.lines.length
+      ? parsed
+      : { ...emptyDialogueScript(), lines: [{ speaker: "ai", text: "", holdSec: 1 }] };
   });
   const [playing, setPlaying] = useState(false);
   const [previewHint, setPreviewHint] = useState<string | null>(null);
@@ -34,6 +40,7 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
   const stopRef = useRef(false);
   const runId = useRef(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const highlightRaf = useRef<number | null>(null);
   const scriptRef = useRef(script);
   scriptRef.current = script;
 
@@ -48,6 +55,7 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
       window.speechSynthesis.removeEventListener("voiceschanged", load);
       window.speechSynthesis.cancel();
       audioRef.current?.pause();
+      if (highlightRaf.current != null) cancelAnimationFrame(highlightRaf.current);
       stopRef.current = true;
     };
   }, []);
@@ -59,9 +67,17 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
     }));
   };
 
+  const stopHighlight = () => {
+    if (highlightRaf.current != null) {
+      cancelAnimationFrame(highlightRaf.current);
+      highlightRaf.current = null;
+    }
+  };
+
   const stopPreview = () => {
     runId.current += 1;
     stopRef.current = true;
+    stopHighlight();
     if (typeof window !== "undefined") window.speechSynthesis.cancel();
     audioRef.current?.pause();
     audioRef.current = null;
@@ -81,20 +97,23 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
     setPreview((prev) => (prev ? { ...prev, waitLeft: undefined } : prev));
   };
 
-  const highlightWhile = (text: string, durationMs: number) => {
-    const words = text.split(/\s+/).filter(Boolean);
-    if (!words.length) return;
-    const step = Math.max(180, durationMs / words.length);
-    let i = 0;
-    const tick = window.setInterval(() => {
-      if (stopRef.current) {
-        window.clearInterval(tick);
-        return;
+  const followAudio = (audio: HTMLAudioElement, text: string, marks: { at: number; text?: string }[]) => {
+    stopHighlight();
+    const aligned = alignTtsMarks(text, marks);
+    const tick = () => {
+      if (stopRef.current || audio !== audioRef.current) return;
+      const time = audio.currentTime;
+      const index = aligned.length
+        ? wordIndexAtTime(aligned, time)
+        : Number.isFinite(audio.duration) && audio.duration > 0
+          ? wordIndexAtProgress(text, time / audio.duration)
+          : 0;
+      setPreview((prev) => (prev && prev.wordIndex !== index ? { ...prev, wordIndex: index } : prev));
+      if (!audio.paused && !audio.ended && !stopRef.current) {
+        highlightRaf.current = requestAnimationFrame(tick);
       }
-      setPreview((prev) => (prev ? { ...prev, wordIndex: i } : prev));
-      i += 1;
-      if (i >= words.length) window.clearInterval(tick);
-    }, step);
+    };
+    highlightRaf.current = requestAnimationFrame(tick);
   };
 
   const speakNeural = async (text: string) => {
@@ -105,19 +124,25 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
       body: JSON.stringify({ text, voice, rate }),
     });
     if (!res.ok) throw new Error("neural");
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+    const payload = (await res.json()) as { audio?: string; words?: { at: number }[] };
+    if (!payload.audio) throw new Error("neural");
+    const bytes = Uint8Array.from(atob(payload.audio), (c) => c.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
+    const marks = Array.isArray(payload.words) ? payload.words : [];
     await new Promise<void>((resolve, reject) => {
       const audio = new Audio(url);
       audioRef.current = audio;
-      audio.onloadedmetadata = () => {
-        highlightWhile(text, (audio.duration || 2) * 1000);
+      audio.onplay = () => followAudio(audio, text, marks);
+      audio.ontimeupdate = () => {
+        if (highlightRaf.current == null && !audio.paused) followAudio(audio, text, marks);
       };
       audio.onended = () => {
+        stopHighlight();
         URL.revokeObjectURL(url);
         resolve();
       };
       audio.onerror = () => {
+        stopHighlight();
         URL.revokeObjectURL(url);
         reject(new Error("audio"));
       };
@@ -146,10 +171,9 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
       utterance.rate = Math.min(2, Math.max(0.1, scriptRef.current.rate));
       utterance.pitch = 1;
       utterance.onboundary = (event) => {
-        if (event.name !== "word") return;
-        const spoken = text.slice(0, event.charIndex);
-        const index = spoken.trim() ? spoken.trim().split(/\s+/).length : 0;
-        setPreview((prev) => (prev ? { ...prev, wordIndex: index } : prev));
+        if (event.name && event.name !== "word") return;
+        const index = wordIndexAt(text, event.charIndex ?? 0);
+        setPreview((prev) => (prev && prev.wordIndex !== index ? { ...prev, wordIndex: index } : prev));
       };
       utterance.onend = () => resolve();
       utterance.onerror = () => resolve();
@@ -172,6 +196,7 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
     runId.current += 1;
     const id = runId.current;
     stopRef.current = false;
+    stopHighlight();
     setPlaying(true);
     if (typeof window !== "undefined") window.speechSynthesis.cancel();
     audioRef.current?.pause();
@@ -211,8 +236,8 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
     <div className="space-y-4 rounded-xl border border-border p-4">
       <input type="hidden" name="dialogue_script" value={json} />
       <p className="text-sm text-muted-foreground">
-        Yapay zeka satırını sesli okur. Oyuncu satırında ses susar, metin ekranda kalır;
-        oyuncu kendini çekerken onu okur. Sırayı böyle diyalog gibi kur.
+        İlk satır oyuncu veya yapay zeka olabilir. Yapay zeka satırını sesli okur.
+        Oyuncu satırında ses susar, metin ekranda kalır; oyuncu kendini çekerken onu okur.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="grid gap-1.5">
@@ -344,7 +369,11 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
             ...prev,
             lines: [
               ...prev.lines,
-              { speaker: prev.lines.at(-1)?.speaker === "ai" ? "actor" : "ai", text: "", holdSec: 1 },
+              {
+                speaker: prev.lines.at(-1)?.speaker === "ai" ? "actor" : "ai",
+                text: "",
+                holdSec: 1,
+              },
             ],
           }))
         }

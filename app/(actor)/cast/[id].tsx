@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Image, StyleSheet, Switch, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/ui/Screen';
@@ -9,8 +9,15 @@ import { TextField } from '@/components/ui/TextField';
 import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
-import { applyToCast, fetchCastById, fetchMyApplications } from '@/services/casts';
-import type { Application, CastListing } from '@/types/database';
+import {
+  applyToCast,
+  fetchCastById,
+  fetchIntroductionForCast,
+  fetchMyApplications,
+  fetchOptionForCast,
+  respondToCastOption,
+} from '@/services/casts';
+import type { Application, CastListing, CastOption } from '@/types/database';
 import { countryLabel } from '@/constants/countries';
 import { languageLabel } from '@/constants/languages';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
@@ -27,14 +34,23 @@ export default function CastDetailScreen() {
   const [counter, setCounter] = useState('');
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
+  const [introduced, setIntroduced] = useState(false);
+  const [option, setOption] = useState<CastOption | null>(null);
+  const [optionLoading, setOptionLoading] = useState(false);
 
   useEffect(() => {
     if (!id || !user || !castOk) return;
     (async () => {
-      const c = await fetchCastById(id);
+      const [c, apps, intro, opt] = await Promise.all([
+        fetchCastById(id),
+        fetchMyApplications(user.id),
+        fetchIntroductionForCast(id, user.id),
+        fetchOptionForCast(id, user.id),
+      ]);
       setCast(c);
-      const apps = await fetchMyApplications(user.id);
       setApp(apps.find((a) => a.cast_id === id) ?? null);
+      setIntroduced(intro);
+      setOption(opt);
     })().catch(() => undefined);
   }, [id, user, castOk]);
 
@@ -47,6 +63,20 @@ export default function CastDetailScreen() {
       </Screen>
     );
   }
+
+  const onOption = async (status: 'accepted' | 'declined') => {
+    if (!user || !cast) return;
+    try {
+      setOptionLoading(true);
+      const next = await respondToCastOption(cast.id, user.id, status);
+      setOption(next);
+      Alert.alert(t('common.success'), t('cast.optionSaved'));
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+    } finally {
+      setOptionLoading(false);
+    }
+  };
 
   const onApply = async () => {
     if (!user || !cast) return;
@@ -79,11 +109,59 @@ export default function CastDetailScreen() {
   return (
     <Screen scroll>
       <BackHeader fallbackHref="/(actor)/cast" />
-      <Text style={styles.project}>{cast.project_name}</Text>
-      <Text style={styles.role}>
-        {t('cast.role')}: {cast.role_name}
-      </Text>
+      <View style={styles.hero}>
+        {cast.cover_image_url ? (
+          <Image source={{ uri: cast.cover_image_url }} style={styles.logo} />
+        ) : (
+          <View style={[styles.logo, styles.logoEmpty]} />
+        )}
+        <View style={styles.heroCopy}>
+          <Text style={styles.project}>{cast.project_name}</Text>
+          <Text style={styles.role}>
+            {t('cast.role')}: {cast.role_name}
+          </Text>
+        </View>
+      </View>
       <Text style={styles.desc}>{cast.role_description}</Text>
+
+      {option ? (
+        <View style={styles.introBanner}>
+          <Text style={styles.introTitle}>
+            {option.status === 'pending'
+              ? t('cast.optionAsk')
+              : option.status === 'accepted'
+                ? t('cast.optionAccepted')
+                : t('cast.optionDeclined')}
+          </Text>
+          {option.status === 'pending' ? (
+            <>
+              <Text style={styles.introHint}>{t('cast.optionAskHint')}</Text>
+              <View style={styles.optionRow}>
+                <Button
+                  label={t('cast.optionYes')}
+                  onPress={() => void onOption('accepted')}
+                  loading={optionLoading}
+                  style={styles.optionBtn}
+                />
+                <Button
+                  label={t('cast.optionNo')}
+                  variant="secondary"
+                  onPress={() => void onOption('declined')}
+                  disabled={optionLoading}
+                  style={styles.optionBtn}
+                />
+              </View>
+            </>
+          ) : null}
+        </View>
+      ) : null}
+
+      {introduced ? (
+        <View style={styles.introBanner}>
+          <Text style={styles.introTitle}>{t('cast.introduced')}</Text>
+          <Text style={styles.introHint}>{t('cast.introducedHint')}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.meta}>
         <Meta label={t('cast.ageRange')} value={`${cast.age_min ?? '—'}–${cast.age_max ?? '—'}`} />
@@ -153,24 +231,26 @@ export default function CastDetailScreen() {
         </View>
       )}
 
-      <View style={styles.auditionBox}>
-        <Text style={styles.hint}>{t('cast.auditionHint')}</Text>
-        {!app ? <Text style={styles.hint}>{t('cast.auditionNeedApply')}</Text> : null}
-        <Button
-          label={t('cast.audition')}
-          variant={app ? 'primary' : 'secondary'}
-          disabled={!app}
-          onPress={() =>
-            router.push({
-              pathname: '/record/audition',
-              params: {
-                castId: cast.id,
-                ...(app?.id ? { applicationId: app.id } : {}),
-              },
-            })
-          }
-        />
-      </View>
+      {cast.requires_video !== false ? (
+        <View style={styles.auditionBox}>
+          <Text style={styles.hint}>{t('cast.auditionHint')}</Text>
+          {!app ? <Text style={styles.hint}>{t('cast.auditionNeedApply')}</Text> : null}
+          <Button
+            label={t('cast.audition')}
+            variant={app ? 'primary' : 'secondary'}
+            disabled={!app}
+            onPress={() =>
+              router.push({
+                pathname: '/record/audition',
+                params: {
+                  castId: cast.id,
+                  ...(app?.id ? { applicationId: app.id } : {}),
+                },
+              })
+            }
+          />
+        </View>
+      ) : null}
     </Screen>
   );
 }
@@ -185,17 +265,36 @@ function Meta({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  logo: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.paperMuted,
+  },
+  logoEmpty: {
+    backgroundColor: Colors.border,
+  },
+  heroCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   project: {
     fontFamily: Fonts.displayBold,
-    fontSize: 40,
+    fontSize: 32,
     color: Colors.ink,
-    marginTop: Spacing.md,
   },
   role: {
     fontFamily: Fonts.bodyMedium,
     fontSize: 16,
     color: Colors.goldDeep,
-    marginBottom: Spacing.md,
+    marginTop: 4,
   },
   desc: {
     fontFamily: Fonts.body,
@@ -203,6 +302,34 @@ const styles = StyleSheet.create({
     color: Colors.text,
     lineHeight: 24,
     marginBottom: Spacing.lg,
+  },
+  introBanner: {
+    backgroundColor: Colors.paperMuted,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 14,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    gap: 4,
+  },
+  introTitle: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: 15,
+    color: Colors.brandDeep,
+  },
+  introHint: {
+    fontFamily: Fonts.body,
+    fontSize: 13,
+    color: Colors.textMuted,
+    lineHeight: 18,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  optionBtn: {
+    flex: 1,
   },
   meta: { gap: Spacing.sm, marginBottom: Spacing.lg },
   metaItem: {

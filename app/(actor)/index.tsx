@@ -9,16 +9,18 @@ import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard'
 import { RegistrationSteps } from '@/components/ui/RegistrationSteps';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
-import { fetchPublishedCasts } from '@/services/casts';
+import { fetchMyCastOptions, fetchMyIntroducedCastIds, fetchPublishedCasts } from '@/services/casts';
 import { supabase } from '@/lib/supabase';
-import type { Announcement, CastListing } from '@/types/database';
+import type { Announcement, CastListing, CastOptionStatus } from '@/types/database';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
-  const { profile, actorProfile, galleryPhotos, refreshProfile } = useAuth();
+  const { user, profile, actorProfile, galleryPhotos, refreshProfile } = useAuth();
   const router = useRouter();
   const [casts, setCasts] = useState<CastListing[]>([]);
+  const [introducedIds, setIntroducedIds] = useState<Set<string>>(new Set());
+  const [optionByCast, setOptionByCast] = useState<Map<string, CastOptionStatus>>(new Map());
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const castOk = canAccessCasts(profile, actorProfile, galleryPhotos);
 
@@ -28,7 +30,7 @@ export default function HomeScreen() {
       void refreshProfile();
       (async () => {
         try {
-          const [c, a] = await Promise.all([
+          const [c, a, introIds, optionRows] = await Promise.all([
             castOk
               ? fetchPublishedCasts()
               : Promise.resolve([] as CastListing[]),
@@ -38,10 +40,18 @@ export default function HomeScreen() {
               .order('created_at', { ascending: false })
               .limit(3)
               .then((r) => (r.data as Announcement[]) ?? []),
+            user && castOk
+              ? fetchMyIntroducedCastIds(user.id)
+              : Promise.resolve([] as string[]),
+            user && castOk
+              ? fetchMyCastOptions(user.id)
+              : Promise.resolve([] as { cast_id: string; status: CastOptionStatus }[]),
           ]);
           if (!active) return;
           setCasts(c.slice(0, 3));
           setAnnouncements(a);
+          setIntroducedIds(new Set(introIds));
+          setOptionByCast(new Map(optionRows.map((r) => [r.cast_id, r.status])));
         } catch {
           // ignore offline / unset env during scaffold
         }
@@ -49,7 +59,7 @@ export default function HomeScreen() {
       return () => {
         active = false;
       };
-    }, [castOk, refreshProfile])
+    }, [castOk, refreshProfile, user])
   );
 
   return (
@@ -99,6 +109,16 @@ export default function HomeScreen() {
             >
               <Text style={styles.castName}>{c.project_name}</Text>
               <Text style={styles.castRole}>{c.role_name}</Text>
+              {optionByCast.get(c.id) === 'pending' ? (
+                <Text style={styles.castIntro}>{t('cast.optionChipPending')}</Text>
+              ) : optionByCast.get(c.id) === 'accepted' ? (
+                <Text style={styles.castIntro}>{t('cast.optionChipYes')}</Text>
+              ) : optionByCast.get(c.id) === 'declined' ? (
+                <Text style={styles.castIntro}>{t('cast.optionChipNo')}</Text>
+              ) : null}
+              {introducedIds.has(c.id) ? (
+                <Text style={styles.castIntro}>{t('cast.introduced')}</Text>
+              ) : null}
             </Pressable>
           ))
         )}
@@ -205,6 +225,12 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.body,
     fontSize: 13,
     color: Colors.textMuted,
+  },
+  castIntro: {
+    marginTop: 4,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 12,
+    color: Colors.brandDeep,
   },
   announce: {
     paddingVertical: Spacing.sm,

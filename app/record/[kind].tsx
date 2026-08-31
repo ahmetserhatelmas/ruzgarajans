@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useTranslation } from 'react-i18next';
@@ -9,19 +9,29 @@ import {
 } from 'react-native-safe-area-context';
 import { VideoRecorder } from '@/components/video/VideoRecorder';
 import { useAuth } from '@/contexts/AuthContext';
-import { recordAndUploadVideo } from '@/services/videos';
+import { languageLabel } from '@/constants/languages';
+import { LANG_INTRO_KIND, offerLangIntroAfterLeave, pickLangIntroThen } from '@/lib/langIntro';
+import { fetchLangIntroVideos, recordAndUploadVideo } from '@/services/videos';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 import type { VideoKind } from '@/types/database';
 
-const RECORDABLE: VideoKind[] = ['intro', 'mimic', 'showreel', 'talent'];
+const RECORDABLE: VideoKind[] = ['intro', 'mimic', 'showreel', 'talent', LANG_INTRO_KIND];
 
 function RecordKindContent() {
-  const { t } = useTranslation();
-  const { kind: raw } = useLocalSearchParams<{ kind: string }>();
+  const { t, i18n } = useTranslation();
+  const { kind: raw, replaceId: replaceRaw, lang: langRaw } = useLocalSearchParams<{
+    kind: string;
+    replaceId?: string;
+    lang?: string;
+  }>();
   const kind = (Array.isArray(raw) ? raw[0] : raw) as VideoKind;
-  const { user, refreshProfile } = useAuth();
+  const replaceId = Array.isArray(replaceRaw) ? replaceRaw[0] : replaceRaw;
+  const lang = Array.isArray(langRaw) ? langRaw[0] : langRaw;
+  const { user, actorProfile, refreshProfile } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
@@ -32,6 +42,15 @@ function RecordKindContent() {
           title: t('media.videos.intro'),
           maxDuration: 30,
           hint: t('media.videos.introHint'),
+          guidanceLines: null as string[] | null,
+        };
+      case LANG_INTRO_KIND:
+        return {
+          title: lang
+            ? t('media.videos.langIntroNamed', { language: languageLabel(lang, i18n.language) })
+            : t('media.videos.langIntro'),
+          maxDuration: 30,
+          hint: t('media.videos.langIntroHint'),
           guidanceLines: null as string[] | null,
         };
       case 'mimic':
@@ -58,7 +77,7 @@ function RecordKindContent() {
       default:
         return null;
     }
-  }, [kind, t]);
+  }, [kind, lang, t, i18n.language]);
 
   if (!RECORDABLE.includes(kind) || !config) {
     return <Redirect href="/" />;
@@ -74,10 +93,27 @@ function RecordKindContent() {
         userId: user.id,
         kind,
         title: config.title,
+        replaceVideoId: replaceId,
         onProgress: setUploadProgress,
       });
       setUploadProgress(100);
       await refreshProfile();
+      if (kind === LANG_INTRO_KIND && !replaceId) {
+        const count = (await fetchLangIntroVideos(user.id)).length;
+        offerLangIntroAfterLeave({
+          t,
+          count,
+          leave: () => router.back(),
+          onRecord: () =>
+            pickLangIntroThen(t, i18n.language, actorProfile?.languages, (nextLang) => {
+              router.push({
+                pathname: '/record/lang_intro',
+                params: nextLang ? { lang: nextLang } : {},
+              } as any);
+            }),
+        });
+        return;
+      }
       Alert.alert(t('common.success'));
       router.back();
     } catch (e: any) {
@@ -95,26 +131,7 @@ function RecordKindContent() {
 
   return (
     <View style={styles.safe}>
-      <StatusBar style="light" />
-      <View style={[styles.head, { paddingTop: Math.max(insets.top, 12) + Spacing.sm }]}>
-        <Text style={styles.title} numberOfLines={1}>
-          {config.title}
-        </Text>
-        <Pressable
-          hitSlop={16}
-          onPress={() => router.back()}
-          style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
-        >
-          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
-        </Pressable>
-      </View>
-      {uploading ? (
-        <Text style={styles.uploading}>
-          {t('video.uploadingPercent', {
-            percent: Math.max(0, Math.min(100, uploadProgress ?? 0)),
-          })}
-        </Text>
-      ) : null}
+      <StatusBar style="light" hidden />
       <VideoRecorder
         onRecorded={onRecorded}
         uploading={uploading}
@@ -124,6 +141,25 @@ function RecordKindContent() {
         guidanceLines={guidance}
         hint={config.hint}
       />
+      <View
+        style={[styles.head, { paddingTop: Math.max(insets.top, 8) }]}
+        pointerEvents="box-none"
+      >
+        {isLandscape ? (
+          <Text style={styles.title} numberOfLines={1}>
+            {config.title}
+          </Text>
+        ) : (
+          <View style={{ flex: 1 }} />
+        )}
+        <Pressable
+          hitSlop={16}
+          onPress={() => router.back()}
+          style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -139,7 +175,11 @@ export default function RecordKindScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.ink },
   head: {
-    zIndex: 10,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.sm,
     flexDirection: 'row',
@@ -161,11 +201,5 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyBold,
     fontSize: 16,
     color: Colors.gold,
-  },
-  uploading: {
-    color: Colors.textOnDark,
-    fontFamily: Fonts.body,
-    textAlign: 'center',
-    padding: Spacing.sm,
   },
 });

@@ -26,7 +26,7 @@ export function SharePinGate({
         />
         <p className="font-heading text-4xl tracking-tight text-foreground">Rüzgar Oyunculuk</p>
         <div className="mt-3 h-px w-16 bg-primary" />
-        <h1 className="mt-5 text-xl font-semibold text-foreground">Oyuncu dosyası</h1>
+        <h1 className="mt-5 text-xl font-semibold text-foreground">Paylaşılan dosya</h1>
         {error === "pin" ? (
           <p
             role="alert"

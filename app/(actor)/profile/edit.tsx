@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { parseLanguageSkills, serializeLanguageSkills } from '@/constants/languages';
 import { useAuth } from '@/contexts/AuthContext';
 import {
+  clearProfileImage,
   updateActorProfile,
   updateProfileBasics,
   uploadProfileImage,
@@ -36,6 +37,34 @@ export default function EditProfileScreen() {
   const [city, setCity] = useState(actorProfile?.city ?? '');
   const [loading, setLoading] = useState(false);
   const [photoBusy, setPhotoBusy] = useState<'avatar' | 'cover' | null>(null);
+
+  const removeImage = (role: 'avatar' | 'cover') => {
+    if (!user) return;
+    Alert.alert(
+      t('profile.deleteImageTitle', { label: t(`media.${role}`) }),
+      t('profile.deletePhotoBody'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                setPhotoBusy(role);
+                await clearProfileImage(user.id, role);
+                await refreshProfile();
+              } catch (e: any) {
+                Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+              } finally {
+                setPhotoBusy(null);
+              }
+            })();
+          },
+        },
+      ]
+    );
+  };
 
   const uploadImage = async (role: 'avatar' | 'cover') => {
     if (!user) return;
@@ -107,17 +136,33 @@ export default function EditProfileScreen() {
         )}
         <View style={{ flex: 1, gap: Spacing.sm }}>
           <Button
-            label={t('media.avatar')}
+            label={profile?.avatar_url ? t('media.changePhoto') : t('media.avatar')}
             variant="secondary"
             loading={photoBusy === 'avatar'}
             onPress={() => void uploadImage('avatar')}
           />
+          {profile?.avatar_url ? (
+            <Button
+              label={t('common.delete')}
+              variant="danger"
+              loading={photoBusy === 'avatar'}
+              onPress={() => removeImage('avatar')}
+            />
+          ) : null}
           <Button
-            label={t('media.cover')}
+            label={profile?.cover_url ? t('media.changePhoto') : t('media.cover')}
             variant="secondary"
             loading={photoBusy === 'cover'}
             onPress={() => void uploadImage('cover')}
           />
+          {profile?.cover_url ? (
+            <Button
+              label={t('common.delete')}
+              variant="danger"
+              loading={photoBusy === 'cover'}
+              onPress={() => removeImage('cover')}
+            />
+          ) : null}
         </View>
       </View>
       {profile?.cover_url ? (

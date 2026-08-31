@@ -1,7 +1,13 @@
 import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { isSharePin, shareUnlockCookieName } from "@/lib/share-pin";
-import type { ActorShare, Profile, SharedActorPayload } from "@/lib/types";
+import type {
+  ActorShare,
+  ApplicationShare,
+  Profile,
+  SharedActorPayload,
+  SharedApplicationPayload,
+} from "@/lib/types";
 
 const PRODUCTION_SITE_URL = "https://ruzgarajans.vercel.app";
 
@@ -15,16 +21,42 @@ export async function sharePublicUrl(token: string) {
   return `${origin.replace(/\/$/, "")}/p/${token}`;
 }
 
+export async function purgeExpiredActorShares() {
+  const supabase = await createClient();
+  await supabase
+    .from("actor_shares")
+    .delete()
+    .not("expires_at", "is", null)
+    .lte("expires_at", new Date().toISOString());
+}
+
 export async function fetchActorShares(actorId: string) {
   const supabase = await createClient();
+  await purgeExpiredActorShares();
   const { data, error } = await supabase
     .from("actor_shares")
     .select("*")
-    .eq("actor_id", actorId)
+    .is("revoked_at", null)
+    .or(`actor_id.eq.${actorId},actor_ids.cs.{${actorId}}`)
+    .order("created_at", { ascending: false });
+  if (error) return [];
+  return ((data ?? []) as ActorShare[]).filter(
+    (share) => !share.expires_at || new Date(share.expires_at).getTime() > Date.now()
+  );
+}
+
+export async function fetchActiveActorShares() {
+  const supabase = await createClient();
+  await purgeExpiredActorShares();
+  const { data, error } = await supabase
+    .from("actor_shares")
+    .select("*")
     .is("revoked_at", null)
     .order("created_at", { ascending: false });
   if (error) return [];
-  return (data ?? []) as ActorShare[];
+  return ((data ?? []) as ActorShare[]).filter(
+    (share) => !share.expires_at || new Date(share.expires_at).getTime() > Date.now()
+  );
 }
 
 export async function fetchDirectors() {
@@ -45,8 +77,16 @@ export async function readSharePinCookie(token: string) {
 }
 
 export type SharedActorOpen =
-  | { status: "ok"; data: SharedActorPayload }
+  | { status: "ok"; items: SharedActorPayload[] }
   | { status: "pin_required" | "bad_pin" | "unavailable" };
+
+function shareItems(row: SharedActorPayload & { error?: string; items?: SharedActorPayload[] }) {
+  if (Array.isArray(row.items) && row.items.length) {
+    return row.items.filter((item) => item?.profile);
+  }
+  if (row.profile) return [row];
+  return [];
+}
 
 export async function fetchSharedActor(token: string, pin?: string | null): Promise<SharedActorOpen> {
   const supabase = await createClient();
@@ -56,11 +96,82 @@ export async function fetchSharedActor(token: string, pin?: string | null): Prom
     p_pin: safePin,
   });
   if (error || !data) return { status: "unavailable" };
-  const row = data as SharedActorPayload & { error?: string };
+  const row = data as SharedActorPayload & { error?: string; items?: SharedActorPayload[] };
   if (row.error === "pin_required" || row.error === "bad_pin" || row.error === "unavailable") {
     return { status: row.error };
   }
-  // Never render a portfolio unless this request actually sent a PIN.
-  if (!safePin || !row.profile) return { status: safePin ? "unavailable" : "pin_required" };
-  return { status: "ok", data: row };
+  const items = shareItems(row);
+  if (!safePin || items.length === 0) return { status: safePin ? "unavailable" : "pin_required" };
+  return { status: "ok", items };
+}
+
+export async function purgeExpiredApplicationShares() {
+  const supabase = await createClient();
+  await supabase
+    .from("application_shares")
+    .delete()
+    .not("expires_at", "is", null)
+    .lte("expires_at", new Date().toISOString());
+}
+
+export async function fetchApplicationShares(applicationId: string) {
+  const supabase = await createClient();
+  await purgeExpiredApplicationShares();
+  const { data, error } = await supabase
+    .from("application_shares")
+    .select("*")
+    .is("revoked_at", null)
+    .or(`application_id.eq.${applicationId},application_ids.cs.{${applicationId}}`)
+    .order("created_at", { ascending: false });
+  if (error) return [];
+  return ((data ?? []) as ApplicationShare[]).filter(
+    (share) => !share.expires_at || new Date(share.expires_at).getTime() > Date.now()
+  );
+}
+
+export async function fetchActiveApplicationShares() {
+  const supabase = await createClient();
+  await purgeExpiredApplicationShares();
+  const { data, error } = await supabase
+    .from("application_shares")
+    .select("*")
+    .is("revoked_at", null)
+    .order("created_at", { ascending: false });
+  if (error) return [];
+  return ((data ?? []) as ApplicationShare[]).filter(
+    (share) => !share.expires_at || new Date(share.expires_at).getTime() > Date.now()
+  );
+}
+
+export type SharedApplicationOpen =
+  | { status: "ok"; items: SharedApplicationPayload[] }
+  | { status: "pin_required" | "bad_pin" | "unavailable" };
+
+function applicationShareItems(
+  row: { error?: string; items?: SharedApplicationPayload[] }
+) {
+  if (Array.isArray(row.items) && row.items.length) {
+    return row.items.filter((item) => item?.application?.id);
+  }
+  return [];
+}
+
+export async function fetchSharedApplication(
+  token: string,
+  pin?: string | null
+): Promise<SharedApplicationOpen> {
+  const supabase = await createClient();
+  const safePin = isSharePin(pin ?? "") ? pin : null;
+  const { data, error } = await supabase.rpc("open_application_share", {
+    p_token: token,
+    p_pin: safePin,
+  });
+  if (error || !data) return { status: "unavailable" };
+  const row = data as { error?: string; items?: SharedApplicationPayload[] };
+  if (row.error === "pin_required" || row.error === "bad_pin" || row.error === "unavailable") {
+    return { status: row.error };
+  }
+  const items = applicationShareItems(row);
+  if (!safePin || items.length === 0) return { status: safePin ? "unavailable" : "pin_required" };
+  return { status: "ok", items };
 }

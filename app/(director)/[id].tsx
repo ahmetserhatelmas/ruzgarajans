@@ -80,13 +80,17 @@ export default function DirectorActorDetail() {
         title={t('media.videos.showreel')}
       />
       {videos
-        .filter((v) => v.playback_url)
+        .filter(
+          (v) =>
+            v.playback_url &&
+            !['intro', 'mimic', 'showreel', 'talent'].includes((v.kind ?? '').toLowerCase())
+        )
         .map((v) => (
           <IntroVideoCard
             key={v.id}
             playbackUrl={v.playback_url}
             videoId={v.cf_uid ?? v.id}
-            title={v.kind ?? t('director.videos')}
+            title={v.title || t('media.videos.langIntro')}
           />
         ))}
     </Screen>

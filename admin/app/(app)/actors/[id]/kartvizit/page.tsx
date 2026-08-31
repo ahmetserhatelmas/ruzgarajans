@@ -3,7 +3,7 @@ import { KartvizitActions } from "@/components/kartvizit-actions";
 import { KartvizitCard } from "@/components/kartvizit-card";
 import { kartvizitFields, kartvizitPhotos } from "@/lib/kartvizit";
 import { fetchActorDetail } from "@/lib/queries";
-import { requireAdminPerm } from "@/lib/permissions";
+import { canAdmin, requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export default async function ActorKartvizitPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  await requireAdminPerm("actors");
+  const { profile: admin } = await requireAdminPerm("actors");
   const { profile, actor, photos } = await fetchActorDetail(id);
   if (!profile) notFound();
 
@@ -49,7 +49,7 @@ export default async function ActorKartvizitPage({
             seçin.
           </p>
         </div>
-        <KartvizitActions actorId={profile.id} />
+        <KartvizitActions actorId={profile.id} canDownload={canAdmin(admin, "export_actors")} />
       </div>
 
       <div className="kartvizit-frame">

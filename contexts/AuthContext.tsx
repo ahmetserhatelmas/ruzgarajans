@@ -10,6 +10,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import type { ActorProfile, Profile } from '@/types/database';
 import { fetchGalleryPhotos, type GalleryPhoto } from '@/services/gallery';
+import i18n from '@/lib/i18n';
 
 type AuthContextValue = {
   session: Session | null;
@@ -46,7 +47,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       supabase.from('actor_profiles').select('*').eq('user_id', userId).maybeSingle(),
       fetchGalleryPhotos(userId).catch(() => [] as GalleryPhoto[]),
     ]);
-    setProfile((p as Profile) ?? null);
+    let nextProfile = (p as Profile) ?? null;
+    const appLocale = i18n.language?.toLowerCase().startsWith('en') ? 'en' : 'tr';
+    if (nextProfile && nextProfile.locale !== appLocale) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ locale: appLocale })
+        .eq('id', userId);
+      if (!error) nextProfile = { ...nextProfile, locale: appLocale };
+    }
+    setProfile(nextProfile);
     setActorProfile((a as ActorProfile) ?? null);
     setGalleryPhotos(photos);
   }, []);

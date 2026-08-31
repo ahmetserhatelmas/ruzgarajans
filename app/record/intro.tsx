@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useTranslation } from 'react-i18next';
@@ -9,14 +9,17 @@ import {
 } from 'react-native-safe-area-context';
 import { VideoRecorder } from '@/components/video/VideoRecorder';
 import { useAuth } from '@/contexts/AuthContext';
-import { recordAndUploadVideo } from '@/services/videos';
+import { offerLangIntroAfterLeave, pickLangIntroThen } from '@/lib/langIntro';
+import { fetchLangIntroVideos, recordAndUploadVideo } from '@/services/videos';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 function IntroRecordContent() {
-  const { t } = useTranslation();
-  const { user, refreshProfile } = useAuth();
+  const { t, i18n } = useTranslation();
+  const { user, actorProfile, refreshProfile } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
@@ -34,8 +37,19 @@ function IntroRecordContent() {
       });
       setUploadProgress(100);
       await refreshProfile();
-      Alert.alert(t('common.success'));
-      router.back();
+      const count = (await fetchLangIntroVideos(user.id)).length;
+      offerLangIntroAfterLeave({
+        t,
+        count,
+        leave: () => router.back(),
+        onRecord: () =>
+          pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
+            router.push({
+              pathname: '/record/lang_intro',
+              params: lang ? { lang } : {},
+            } as any);
+          }),
+      });
     } catch (e: any) {
       Alert.alert(t('common.error'), e?.message ?? t('common.error'));
     } finally {
@@ -46,26 +60,7 @@ function IntroRecordContent() {
 
   return (
     <View style={styles.safe}>
-      <StatusBar style="light" />
-      <View style={[styles.head, { paddingTop: Math.max(insets.top, 12) + Spacing.sm }]}>
-        <Text style={styles.title} numberOfLines={1}>
-          {t('home.introCta')}
-        </Text>
-        <Pressable
-          hitSlop={16}
-          onPress={() => router.back()}
-          style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
-        >
-          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
-        </Pressable>
-      </View>
-      {uploading ? (
-        <Text style={styles.uploading}>
-          {t('video.uploadingPercent', {
-            percent: Math.max(0, Math.min(100, uploadProgress ?? 0)),
-          })}
-        </Text>
-      ) : null}
+      <StatusBar style="light" hidden />
       <VideoRecorder
         onRecorded={onRecorded}
         uploading={uploading}
@@ -74,6 +69,25 @@ function IntroRecordContent() {
         countdownEnabled
         hint={t('media.videos.introHint')}
       />
+      <View
+        style={[styles.head, { paddingTop: Math.max(insets.top, 8) }]}
+        pointerEvents="box-none"
+      >
+        {isLandscape ? (
+          <Text style={styles.title} numberOfLines={1}>
+            {t('home.introCta')}
+          </Text>
+        ) : (
+          <View style={{ flex: 1 }} />
+        )}
+        <Pressable
+          hitSlop={16}
+          onPress={() => router.back()}
+          style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -90,7 +104,11 @@ export default function IntroRecordScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.ink },
   head: {
-    zIndex: 10,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.sm,
     flexDirection: 'row',
@@ -112,11 +130,5 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyBold,
     fontSize: 16,
     color: Colors.gold,
-  },
-  uploading: {
-    color: Colors.textOnDark,
-    fontFamily: Fonts.body,
-    textAlign: 'center',
-    padding: Spacing.sm,
   },
 });

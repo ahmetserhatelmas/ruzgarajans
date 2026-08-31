@@ -7,27 +7,39 @@ import { CastCard } from '@/components/cast/CastCard';
 import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
-import { fetchPublishedCasts } from '@/services/casts';
-import type { CastListing } from '@/types/database';
+import { fetchMyCastOptions, fetchMyIntroducedCastIds, fetchPublishedCasts } from '@/services/casts';
+import type { CastListing, CastOptionStatus } from '@/types/database';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function CastListScreen() {
   const { t } = useTranslation();
-  const { profile, actorProfile, galleryPhotos } = useAuth();
+  const { user, profile, actorProfile, galleryPhotos } = useAuth();
   const router = useRouter();
   const [items, setItems] = useState<CastListing[]>([]);
+  const [introducedIds, setIntroducedIds] = useState<Set<string>>(new Set());
+  const [optionByCast, setOptionByCast] = useState<Map<string, CastOptionStatus>>(new Map());
   const castOk = canAccessCasts(profile, actorProfile, galleryPhotos);
 
   useFocusEffect(
     useCallback(() => {
       if (!castOk) {
         setItems([]);
+        setIntroducedIds(new Set());
+        setOptionByCast(new Map());
         return;
       }
       fetchPublishedCasts()
         .then(setItems)
         .catch(() => setItems([]));
-    }, [castOk])
+      if (user) {
+        fetchMyIntroducedCastIds(user.id)
+          .then((ids) => setIntroducedIds(new Set(ids)))
+          .catch(() => setIntroducedIds(new Set()));
+        fetchMyCastOptions(user.id)
+          .then((rows) => setOptionByCast(new Map(rows.map((r) => [r.cast_id, r.status]))))
+          .catch(() => setOptionByCast(new Map()));
+      }
+    }, [castOk, user])
   );
 
   return (
@@ -46,7 +58,12 @@ export default function CastListScreen() {
           ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
           ListEmptyComponent={<Text style={styles.empty}>{t('cast.empty')}</Text>}
           renderItem={({ item }) => (
-            <CastCard item={item} onPress={() => router.push(`/(actor)/cast/${item.id}`)} />
+            <CastCard
+              item={item}
+              introduced={introducedIds.has(item.id)}
+              optionStatus={optionByCast.get(item.id)}
+              onPress={() => router.push(`/(actor)/cast/${item.id}`)}
+            />
           )}
         />
       )}

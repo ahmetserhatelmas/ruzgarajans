@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useTranslation } from 'react-i18next';
@@ -23,14 +23,25 @@ function AuditionRecordContent() {
   const { user } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
   const [cast, setCast] = useState<CastListing | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   useEffect(() => {
     if (!castId) return;
-    fetchCastById(castId).then(setCast).catch(() => undefined);
-  }, [castId]);
+    fetchCastById(castId)
+      .then((next) => {
+        if (next && next.requires_video === false) {
+          Alert.alert(t('cast.noVideoNeeded'), t('cast.noVideoNeededBody'));
+          router.back();
+          return;
+        }
+        setCast(next);
+      })
+      .catch(() => undefined);
+  }, [castId, router, t]);
 
   const onRecorded = async (uri: string) => {
     if (!user || !castId) return;
@@ -59,27 +70,7 @@ function AuditionRecordContent() {
 
   return (
     <View style={styles.safe}>
-      <StatusBar style="light" />
-      <View style={[styles.head, { paddingTop: Math.max(insets.top, 12) + Spacing.sm }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{t('cast.audition')}</Text>
-          <Text style={styles.sub}>{cast?.project_name}</Text>
-        </View>
-        <Pressable
-          hitSlop={16}
-          onPress={() => router.back()}
-          style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
-        >
-          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
-        </Pressable>
-      </View>
-      {uploading ? (
-        <Text style={styles.uploading}>
-          {t('video.uploadingPercent', {
-            percent: Math.max(0, Math.min(100, uploadProgress ?? 0)),
-          })}
-        </Text>
-      ) : null}
+      <StatusBar style="light" hidden />
       <VideoRecorder
         onRecorded={onRecorded}
         uploading={uploading}
@@ -88,7 +79,28 @@ function AuditionRecordContent() {
         dialogueScript={cast?.dialogue_script}
         dialogueAudioUrl={cast?.dialogue_audio_url}
         countdownEnabled
+        allowLibrary={false}
       />
+      <View
+        style={[styles.head, { paddingTop: Math.max(insets.top, 8) }]}
+        pointerEvents="box-none"
+      >
+        {isLandscape ? (
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>{t('cast.audition')}</Text>
+            <Text style={styles.sub}>{cast?.project_name}</Text>
+          </View>
+        ) : (
+          <View style={{ flex: 1 }} />
+        )}
+        <Pressable
+          hitSlop={16}
+          onPress={() => router.back()}
+          style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+        >
+          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -105,7 +117,11 @@ export default function AuditionRecordScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.ink },
   head: {
-    zIndex: 10,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.sm,
     flexDirection: 'row',
@@ -130,11 +146,5 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyBold,
     fontSize: 16,
     color: Colors.gold,
-  },
-  uploading: {
-    color: Colors.textOnDark,
-    fontFamily: Fonts.body,
-    textAlign: 'center',
-    padding: Spacing.sm,
   },
 });

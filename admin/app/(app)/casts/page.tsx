@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { fetchCasts } from "@/lib/queries";
 import { formatDate, formatMoney, GENDER, label } from "@/lib/labels";
+import { displayImageUrl } from "@/lib/media";
 import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -82,7 +83,19 @@ export default async function CastsPage({
             {filtered.map((c) => (
               <TableRow key={c.id}>
                 <TableCell>
-                  <Link href={`/casts/${c.id}`} className="font-medium hover:underline">
+                  <Link href={`/casts/${c.id}`} className="flex items-center gap-3 font-medium hover:underline">
+                    {c.cover_image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={displayImageUrl(c.cover_image_url, 96) ?? c.cover_image_url}
+                        alt=""
+                        className="size-12 shrink-0 rounded-full object-cover ring-1 ring-foreground/10"
+                      />
+                    ) : (
+                      <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
+                        Logo
+                      </span>
+                    )}
                     {c.project_name}
                   </Link>
                 </TableCell>

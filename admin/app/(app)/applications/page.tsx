@@ -1,30 +1,35 @@
-import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { AppStatusBadge } from "@/components/status-badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { fetchApplications, fetchCasts } from "@/lib/queries";
-import { APP_STATUS, formatDate, formatMoney } from "@/lib/labels";
+import { APP_STATUS } from "@/lib/labels";
 import type { ApplicationStatus } from "@/lib/types";
-import { requireAdminPerm } from "@/lib/permissions";
+import { canAdmin, requireAdminPerm } from "@/lib/permissions";
+import { ApplicationsExcelButton } from "@/components/applications-excel";
+import { applicationExcelRow } from "@/lib/export-application";
+import { fetchActiveApplicationShares, sharePublicUrl } from "@/lib/share";
+import { ApplicationsBrowser } from "./applications-browser";
 
 export const dynamic = "force-dynamic";
 
 export default async function ApplicationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; cast?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; cast?: string; share?: string; shared?: string }>;
 }) {
-  await requireAdminPerm("applications");
-  const { q = "", status = "all", cast = "all" } = await searchParams;
-  const [apps, casts] = await Promise.all([fetchApplications(), fetchCasts()]);
+  const { profile } = await requireAdminPerm("applications");
+  const canExport = canAdmin(profile, "export_applications");
+  const { q = "", status = "all", cast = "all", share, shared } = await searchParams;
+  const [apps, casts, shares] = await Promise.all([
+    fetchApplications(),
+    fetchCasts(),
+    fetchActiveApplicationShares(),
+  ]);
+  const shareUrls: Record<string, string> = {};
+  await Promise.all(
+    shares.map(async (item) => {
+      shareUrls[item.id] = await sharePublicUrl(item.token);
+    })
+  );
   const filtered = apps.filter((a) => {
     const hay = `${a.profiles?.full_name ?? ""} ${a.profiles?.email ?? ""} ${a.cast_listings?.project_name ?? ""} ${a.cast_listings?.role_name ?? ""}`.toLowerCase();
     if (q && !hay.includes(q.toLowerCase())) return false;
@@ -38,6 +43,14 @@ export default async function ApplicationsPage({
       <PageHeader
         title="Başvurular"
         description="Durum ve ilana göre filtrele, detayda audition videosunu izle."
+        actions={
+          canExport ? (
+            <ApplicationsExcelButton
+              filename={`basvurular-${new Date().toISOString().slice(0, 10)}.xlsx`}
+              rows={filtered.map((a) => applicationExcelRow(a, a.profiles, a.cast_listings))}
+            />
+          ) : null
+        }
       />
       <form className="mb-4 flex flex-wrap gap-2">
         <input
@@ -74,43 +87,22 @@ export default async function ApplicationsPage({
           Filtrele
         </Button>
       </form>
-      <p className="mb-3 text-sm text-muted-foreground">{filtered.length} başvuru</p>
-      <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Oyuncu</TableHead>
-              <TableHead>İlan</TableHead>
-              <TableHead>Durum</TableHead>
-              <TableHead>Bütçe</TableHead>
-              <TableHead>Tarih</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((a) => (
-              <TableRow key={a.id}>
-                <TableCell>
-                  <Link href={`/applications/${a.id}`} className="font-medium hover:underline">
-                    {a.profiles?.full_name || a.profiles?.email}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  {a.cast_listings?.project_name} · {a.cast_listings?.role_name}
-                </TableCell>
-                <TableCell>
-                  <AppStatusBadge status={a.status} />
-                </TableCell>
-                <TableCell>
-                  {a.accept_budget
-                    ? "Kabul"
-                    : formatMoney(a.counter_budget)}
-                </TableCell>
-                <TableCell>{formatDate(a.created_at)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <ApplicationsBrowser
+        apps={filtered}
+        shares={shares}
+        shareUrls={shareUrls}
+        shareNames={Object.fromEntries(
+          filtered.map((a) => [
+            a.id,
+            `${a.profiles?.full_name || a.profiles?.email || "Oyuncu"}${
+              a.cast_listings?.role_name ? ` · ${a.cast_listings.role_name}` : ""
+            }`,
+          ])
+        )}
+        sharedToken={shared}
+        shareError={share}
+        canExport={canExport}
+      />
     </div>
   );
 }

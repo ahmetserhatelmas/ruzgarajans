@@ -9,7 +9,9 @@ import { APP_STATUS, formatDate, formatMoney, GENDER, HAIR, EYES, label } from "
 import { deleteApplicationAction, setApplicationStatusAction } from "@/lib/actions";
 import type { ApplicationStatus } from "@/lib/types";
 import { BrandedVideo } from "@/components/branded-video";
-import { requireAdminPerm } from "@/lib/permissions";
+import { canAdmin, requireAdminPerm } from "@/lib/permissions";
+import { ShareApplicationPanel } from "@/components/share-application-panel";
+import { fetchApplicationShares, fetchDirectors, sharePublicUrl } from "@/lib/share";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +26,27 @@ const STATUSES: ApplicationStatus[] = [
 
 export default async function ApplicationDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ share?: string }>;
 }) {
   const { id } = await params;
-  await requireAdminPerm("applications");
-  const { app, actor, videos } = await fetchApplicationDetail(id);
+  const { share } = await searchParams;
+  const { profile: admin } = await requireAdminPerm("applications");
+  const canExport = canAdmin(admin, "export_applications");
+  const [{ app, actor, videos }, shares, directors] = await Promise.all([
+    fetchApplicationDetail(id),
+    fetchApplicationShares(id),
+    fetchDirectors(),
+  ]);
   if (!app || !actor) notFound();
+  const shareUrls: Record<string, string> = {};
+  await Promise.all(
+    shares.map(async (item) => {
+      shareUrls[item.id] = await sharePublicUrl(item.token);
+    })
+  );
 
   const listing = app.cast_listings as {
     id: string;
@@ -50,11 +66,18 @@ export default async function ApplicationDetailPage({
         title={listing?.project_name ?? "Başvuru"}
         description={listing?.role_name}
         actions={
-          <form action={deleteApplicationAction.bind(null, app.id)}>
-            <Button type="submit" variant="destructive">
-              Başvuruyu sil
-            </Button>
-          </form>
+          <div className="flex flex-wrap gap-2">
+            {canExport ? (
+              <Button asChild variant="outline">
+                <a href={`/api/applications/${app.id}/export`}>İndir</a>
+              </Button>
+            ) : null}
+            <form action={deleteApplicationAction.bind(null, app.id)}>
+              <Button type="submit" variant="destructive">
+                Başvuruyu sil
+              </Button>
+            </form>
+          </div>
         }
       />
 
@@ -68,6 +91,17 @@ export default async function ApplicationDetailPage({
           </form>
         ))}
       </div>
+
+      <ShareApplicationPanel
+        applicationId={app.id}
+        title={`${listing?.project_name ?? "Başvuru"}${listing?.role_name ? ` · ${listing.role_name}` : ""}${
+          actor.profile?.full_name ? ` · ${actor.profile.full_name}` : ""
+        }`}
+        shares={shares}
+        directors={directors}
+        urls={shareUrls}
+        pinError={share === "pin"}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

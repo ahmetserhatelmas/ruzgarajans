@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
+import i18n from '@/lib/i18n';
 
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
@@ -23,6 +24,10 @@ export async function registerAndSavePushToken(userId: string) {
       name: 'Cast ilanları',
       importance: Notifications.AndroidImportance.HIGH,
     });
+    await Notifications.setNotificationChannelAsync('options', {
+      name: 'Opsiyon',
+      importance: Notifications.AndroidImportance.HIGH,
+    });
   }
 
   const existing = await Notifications.getPermissionsAsync();
@@ -40,5 +45,9 @@ export async function registerAndSavePushToken(userId: string) {
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   if (!token) return;
 
-  await supabase.from('profiles').update({ expo_push_token: token }).eq('id', userId);
+  const locale = i18n.language?.toLowerCase().startsWith('en') ? 'en' : 'tr';
+  await supabase
+    .from('profiles')
+    .update({ expo_push_token: token, locale })
+    .eq('id', userId);
 }

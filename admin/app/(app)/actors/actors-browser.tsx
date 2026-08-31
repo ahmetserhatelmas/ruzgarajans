@@ -1,11 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { createActorShareAction, deleteActorsAction, setActorStatusAction } from "@/lib/actions";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { SharePacksList } from "@/components/share-packs-list";
+import type { ActorRow, ActorShare, ActorStatus } from "@/lib/types";
 import {
   Table,
   TableBody,
@@ -17,17 +28,40 @@ import {
 import { ActorStatusBadge } from "@/components/status-badge";
 import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
 import { downloadXlsx } from "@/lib/export-table-xlsx";
-import { ACTOR_STATUS, ageFromBirth, DANCES, EYES, GENDER, HAIR, label, SPORTS } from "@/lib/labels";
-import { setActorStatusAction } from "@/lib/actions";
+import {
+  ACTOR_STATUS,
+  ageFromBirth,
+  countryLabel,
+  DANCES,
+  EYES,
+  formatLanguages,
+  GENDER,
+  HAIR,
+  label,
+  SPORTS,
+} from "@/lib/labels";
 import { displayImageUrl } from "@/lib/media";
-import type { ActorRow, ActorStatus } from "@/lib/types";
 
 function setParam(params: URLSearchParams, key: string, value: string) {
   if (!value || value === "all") params.delete(key);
   else params.set(key, value);
 }
 
-export function ActorsBrowser({ rows }: { rows: ActorRow[] }) {
+export function ActorsBrowser({
+  rows,
+  shares = [],
+  shareUrls = {},
+  shareNames = {},
+  canExport = false,
+  canApprove = false,
+}: {
+  rows: ActorRow[];
+  shares?: ActorShare[];
+  shareUrls?: Record<string, string>;
+  shareNames?: Record<string, string>;
+  canExport?: boolean;
+  canApprove?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -78,8 +112,45 @@ export function ActorsBrowser({ rows }: { rows: ActorRow[] }) {
     });
   }, [rows, q, status, gender, form, media, hair, eyes, sport, dance, ageMin, ageMax, heightMin, heightMax]);
 
+  const [selected, setSelected] = useState<string[]>([]);
+  const [pin, setPin] = useState("");
+  const [exportingSelected, setExportingSelected] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const sharedToken = searchParams.get("shared") ?? "";
+  const shareError = searchParams.get("share");
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const allFilteredSelected =
+    filtered.length > 0 && filtered.every((row) => selectedSet.has(row.profile.id));
+
+  const toggle = (id: string) => {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
+  const toggleAllFiltered = () => {
+    if (allFilteredSelected) {
+      const visible = new Set(filtered.map((row) => row.profile.id));
+      setSelected((prev) => prev.filter((id) => !visible.has(id)));
+      return;
+    }
+    setSelected((prev) => [...new Set([...prev, ...filtered.map((row) => row.profile.id)])]);
+  };
+
   const exportExcel = () => {
-    const headers = ["Ad", "E-posta", "Durum", "Yaş", "Cinsiyet", "Boy", "Saç", "Göz", "Form", "Medya"];
+    const headers = [
+      "Ad",
+      "E-posta",
+      "Durum",
+      "Yaş",
+      "Cinsiyet",
+      "Boy",
+      "Saç",
+      "Göz",
+      "Uyruk",
+      "Diller",
+      "Form",
+      "Medya",
+    ];
     const data = filtered.map((row) => {
       const mediaOk = hasRequiredMedia(row.profile, row.actor, row.photoKinds);
       return [
@@ -91,12 +162,41 @@ export function ActorsBrowser({ rows }: { rows: ActorRow[] }) {
         row.actor?.height_cm != null ? String(row.actor.height_cm) : "",
         label(HAIR, row.actor?.hair_color),
         label(EYES, row.actor?.eye_color),
+        countryLabel(row.actor?.nationality),
+        formatLanguages(row.actor?.languages),
         hasCompletedForm(row.actor) ? "Tamam" : "Eksik",
         mediaOk ? "Tamam" : "Eksik",
       ];
     });
     const today = new Date().toISOString().slice(0, 10);
     void downloadXlsx(`oyuncular-${today}.xlsx`, headers, data, "Oyuncular");
+  };
+
+  const exportSelectedExcel = async () => {
+    if (!selected.length || exportingSelected) return;
+    try {
+      setExportingSelected(true);
+      const res = await fetch("/api/actors/export-xlsx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selected }),
+      });
+      if (!res.ok) throw new Error("export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const today = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `oyuncular-secili-${today}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      window.alert("Excel indirilemedi.");
+    } finally {
+      setExportingSelected(false);
+    }
   };
 
   return (
@@ -185,20 +285,119 @@ export function ActorsBrowser({ rows }: { rows: ActorRow[] }) {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">{filtered.length} oyuncu</p>
-        <Button type="button" variant="outline" disabled={filtered.length === 0} onClick={exportExcel}>
-          Excel indir
-        </Button>
+        <p className="text-sm text-muted-foreground">
+          {filtered.length} oyuncu
+          {selected.length ? ` · ${selected.length} seçili` : ""}
+        </p>
+        {canExport ? (
+          <Button type="button" variant="outline" disabled={filtered.length === 0} onClick={exportExcel}>
+            Excel indir
+          </Button>
+        ) : null}
       </div>
+
+      {shareError === "pin" ? (
+        <p className="text-sm text-destructive">Paket için 4 haneli şifre yaz.</p>
+      ) : null}
+      {shareError === "pick" ? (
+        <p className="text-sm text-destructive">En az bir oyuncu seç.</p>
+      ) : null}
+
+      <SharePacksList
+        shares={shares}
+        urls={shareUrls}
+        names={shareNames}
+        highlightToken={sharedToken}
+      />
+
+      <form
+        action={createActorShareAction}
+        className="grid gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10"
+      >
+        {selected.map((id) => (
+          <input key={id} type="hidden" name="actor_ids" value={id} />
+        ))}
+        <p className="text-sm text-muted-foreground">
+          Birden fazla oyuncu seç, tek 4 haneli şifre koy. Aynı linkte hepsi açılır.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-[12rem_11rem_auto] sm:items-end">
+          <label className="grid gap-1 text-sm">
+            <span className="text-muted-foreground">4 haneli şifre</span>
+            <input
+              name="pin"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={4}
+              pattern="\d{4}"
+              required
+              placeholder="6060"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              className="h-10 w-full rounded-md border border-input bg-background px-4 text-center text-lg tracking-[0.3em] [text-indent:0.3em]"
+            />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="text-muted-foreground">Süre</span>
+            <select
+              name="ttl"
+              defaultValue="1d"
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="1d">1 gün</option>
+              <option value="7d">7 gün</option>
+              <option value="forever">Süresiz</option>
+            </select>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" className="h-10" disabled={selected.length === 0}>
+              {selected.length ? `${selected.length} profili şifreli linkle paylaş` : "Oyuncu seç"}
+            </Button>
+            {canExport ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10"
+                disabled={selected.length === 0 || exportingSelected}
+                onClick={() => void exportSelectedExcel()}
+              >
+                {exportingSelected
+                  ? "Excel hazırlanıyor…"
+                  : selected.length
+                    ? `${selected.length} kişiyi Excel indir`
+                    : "Excel için seç"}
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="destructive"
+              className="h-10"
+              disabled={selected.length === 0 || deleting}
+              onClick={() => setConfirmDelete(true)}
+            >
+              {selected.length ? `${selected.length} kişiyi sil` : "Silmek için seç"}
+            </Button>
+          </div>
+        </div>
+      </form>
 
       <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <input
+                  type="checkbox"
+                  checked={allFilteredSelected}
+                  onChange={toggleAllFiltered}
+                  aria-label="Görünenleri seç"
+                />
+              </TableHead>
               <TableHead>Oyuncu</TableHead>
               <TableHead>Durum</TableHead>
               <TableHead>Yaş / cinsiyet</TableHead>
               <TableHead>Boy / saç / göz</TableHead>
+              <TableHead>Uyruk</TableHead>
+              <TableHead>Diller</TableHead>
               <TableHead>Form</TableHead>
               <TableHead>Medya</TableHead>
               <TableHead />
@@ -210,15 +409,23 @@ export function ActorsBrowser({ rows }: { rows: ActorRow[] }) {
               return (
                 <TableRow key={row.profile.id}>
                   <TableCell>
+                    <input
+                      type="checkbox"
+                      checked={selectedSet.has(row.profile.id)}
+                      onChange={() => toggle(row.profile.id)}
+                      aria-label={`${row.profile.full_name || "Oyuncu"} seç`}
+                    />
+                  </TableCell>
+                  <TableCell>
                     <div className="flex items-center gap-3">
                       {row.chestPhotoUrl ? (
                         <img
-                          src={displayImageUrl(row.chestPhotoUrl, 160) ?? row.chestPhotoUrl}
+                          src={displayImageUrl(row.chestPhotoUrl, 400) ?? row.chestPhotoUrl}
                           alt=""
-                          className="h-14 w-11 shrink-0 rounded-md object-cover ring-1 ring-foreground/10"
+                          className="h-28 w-20 shrink-0 rounded-lg object-cover object-top ring-1 ring-foreground/10"
                         />
                       ) : (
-                        <div className="flex h-14 w-11 shrink-0 items-center justify-center rounded-md bg-muted text-[10px] text-muted-foreground">
+                        <div className="flex h-28 w-20 shrink-0 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">
                           —
                         </div>
                       )}
@@ -240,10 +447,14 @@ export function ActorsBrowser({ rows }: { rows: ActorRow[] }) {
                     {row.actor?.height_cm ?? "—"} · {label(HAIR, row.actor?.hair_color)} ·{" "}
                     {label(EYES, row.actor?.eye_color)}
                   </TableCell>
+                  <TableCell>{countryLabel(row.actor?.nationality)}</TableCell>
+                  <TableCell className="max-w-56 whitespace-normal text-sm">
+                    {formatLanguages(row.actor?.languages)}
+                  </TableCell>
                   <TableCell>{hasCompletedForm(row.actor) ? "Tamam" : "Eksik"}</TableCell>
                   <TableCell>{mediaOk ? "Tamam" : "Eksik"}</TableCell>
                   <TableCell className="text-right">
-                    {row.profile.actor_status === "pending" ? (
+                    {row.profile.actor_status === "pending" && canApprove ? (
                       <div className="flex justify-end gap-1">
                         <Button
                           size="sm"
@@ -280,6 +491,48 @@ export function ActorsBrowser({ rows }: { rows: ActorRow[] }) {
           </p>
         ) : null}
       </div>
+
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent showCloseButton={!deleting}>
+          <DialogHeader>
+            <DialogTitle>Oyuncu profillerini sil</DialogTitle>
+            <DialogDescription>
+              {selected.length} kişiyi silmek istiyorsunuz. Emin misiniz? Bu işlem geri alınamaz.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deleting}
+              onClick={() => setConfirmDelete(false)}
+            >
+              Vazgeç
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleting || selected.length === 0}
+              onClick={() => {
+                void (async () => {
+                  setDeleting(true);
+                  const result = await deleteActorsAction(selected);
+                  setDeleting(false);
+                  if (!result.ok) {
+                    window.alert(result.error || "Silinemedi.");
+                    return;
+                  }
+                  setSelected([]);
+                  setConfirmDelete(false);
+                  router.refresh();
+                })();
+              }}
+            >
+              {deleting ? "Siliniyor…" : "Evet, sil"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

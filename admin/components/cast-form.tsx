@@ -6,19 +6,25 @@ import { Textarea } from "@/components/ui/textarea";
 import { MultiSearchSelect } from "@/components/multi-search-select";
 import { countryOptions, languageOptions } from "@/lib/geo";
 import type { CastListing } from "@/lib/types";
-import { DialogueEditor } from "@/components/dialogue-editor";
 import { DateInput } from "@/components/date-input";
+import { CastVideoOption } from "@/components/cast-video-option";
+import { CastLogoField } from "@/components/cast-logo-field";
 
 export function CastForm({ cast }: { cast?: CastListing }) {
   return (
     <form action={upsertCastAction} className="grid max-w-3xl gap-4">
       {cast ? <input type="hidden" name="id" value={cast.id} /> : null}
-      <Field label="Proje">
-        <Input name="project_name" required defaultValue={cast?.project_name} />
-      </Field>
-      <Field label="Rol">
-        <Input name="role_name" required defaultValue={cast?.role_name} />
-      </Field>
+      <div className="flex items-start gap-5">
+        <CastLogoField defaultUrl={cast?.cover_image_url} />
+        <div className="grid min-w-0 flex-1 gap-4">
+          <Field label="Proje">
+            <Input name="project_name" required defaultValue={cast?.project_name} />
+          </Field>
+          <Field label="Rol">
+            <Input name="role_name" required defaultValue={cast?.role_name} />
+          </Field>
+        </div>
+      </div>
       <Field label="Rol açıklaması">
         <Textarea name="role_description" required rows={5} defaultValue={cast?.role_description} />
       </Field>
@@ -87,9 +93,10 @@ export function CastForm({ cast }: { cast?: CastListing }) {
         “Size uygun bir rol var” bildirimi gider. Hepsi boşsa bildirim gitmez; ilan
         yine herkese görünür.
       </p>
-      <Field label="Diyalog / senaryo">
-        <DialogueEditor defaultValue={cast?.dialogue_script} />
-      </Field>
+      <CastVideoOption
+        defaultChecked={cast?.requires_video ?? true}
+        defaultScript={cast?.dialogue_script}
+      />
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"

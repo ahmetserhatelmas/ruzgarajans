@@ -5,6 +5,8 @@ import type {
   ActorRow,
   Announcement,
   Application,
+  CastIntroduction,
+  CastOption,
   CastListing,
   Conversation,
   GalleryPhoto,
@@ -68,7 +70,7 @@ export async function fetchActorRows(): Promise<ActorRow[]> {
 
 export async function fetchActorDetail(id: string) {
   const supabase = await createClient();
-  const [{ data: profile }, { data: actor }, { data: photos }, { data: apps }, { data: videos }] =
+  const [{ data: profile }, { data: actor }, { data: photos }, { data: apps }, { data: videos }, { data: intros }, { data: optionRows }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", id).maybeSingle(),
       supabase.from("actor_profiles").select("*").eq("user_id", id).maybeSingle(),
@@ -89,6 +91,16 @@ export async function fetchActorDetail(id: string) {
         .select("*")
         .eq("user_id", id)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("cast_introductions")
+        .select("*, cast_listings(id, project_name, role_name)")
+        .eq("actor_id", id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("cast_options")
+        .select("*, cast_listings(id, project_name, role_name)")
+        .eq("actor_id", id)
+        .order("created_at", { ascending: false }),
     ]);
 
   return {
@@ -108,6 +120,12 @@ export async function fetchActorDetail(id: string) {
       > | null;
     })[],
     videos: (videos ?? []) as Video[],
+    introductions: (intros ?? []) as (CastIntroduction & {
+      cast_listings: Pick<CastListing, "id" | "project_name" | "role_name"> | null;
+    })[],
+    options: (optionRows ?? []) as (CastOption & {
+      cast_listings: Pick<CastListing, "id" | "project_name" | "role_name"> | null;
+    })[],
   };
 }
 
@@ -125,7 +143,8 @@ export async function fetchCasts() {
 
 export async function fetchCastDetail(id: string) {
   const supabase = await createClient();
-  const [{ data: cast }, { data: apps }, { data: videos }] = await Promise.all([
+  const [{ data: cast }, { data: apps }, { data: videos }, { data: intros }, { data: optionRows }] =
+    await Promise.all([
     supabase.from("cast_listings").select("*").eq("id", id).maybeSingle(),
     supabase
       .from("applications")
@@ -133,6 +152,16 @@ export async function fetchCastDetail(id: string) {
       .eq("cast_id", id)
       .order("created_at", { ascending: false }),
     supabase.from("videos").select("*").eq("cast_id", id).eq("kind", "audition"),
+    supabase
+      .from("cast_introductions")
+      .select("*, profiles:actor_id(id, full_name, email, actor_status)")
+      .eq("cast_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("cast_options")
+      .select("*, profiles:actor_id(id, full_name, email, actor_status)")
+      .eq("cast_id", id)
+      .order("created_at", { ascending: false }),
   ]);
   return {
     cast: cast as CastListing | null,
@@ -140,6 +169,12 @@ export async function fetchCastDetail(id: string) {
       profiles: Pick<Profile, "id" | "full_name" | "email" | "avatar_url" | "actor_status"> | null;
     })[],
     videos: (videos ?? []) as Video[],
+    introductions: (intros ?? []) as (CastIntroduction & {
+      profiles: Pick<Profile, "id" | "full_name" | "email" | "actor_status"> | null;
+    })[],
+    options: (optionRows ?? []) as (CastOption & {
+      profiles: Pick<Profile, "id" | "full_name" | "email" | "actor_status"> | null;
+    })[],
   };
 }
 

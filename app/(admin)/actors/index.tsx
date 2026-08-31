@@ -9,6 +9,8 @@ import { supabase } from '@/lib/supabase';
 import type { ActorStatus, Profile } from '@/types/database';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import { AdminPermGate } from '@/components/ui/AdminPermGate';
+import { useAuth } from '@/contexts/AuthContext';
+import { canAdmin } from '@/lib/adminAccess';
 
 const FILTERS: ActorStatus[] = ['approved', 'pending', 'rejected'];
 
@@ -21,6 +23,8 @@ function formatBadgeCount(n: number) {
 export default function AdminActorsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { profile } = useAuth();
+  const canApprove = canAdmin(profile, 'actor_approvals');
   const [filter, setFilter] = useState<ActorStatus>('approved');
   const [items, setItems] = useState<Profile[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
@@ -91,7 +95,7 @@ export default function AdminActorsScreen() {
               <Text style={styles.name}>{item.full_name || item.email}</Text>
               <Text style={styles.email}>{item.email}</Text>
             </Pressable>
-            {item.actor_status === 'pending' ? (
+            {item.actor_status === 'pending' && canApprove ? (
               <View style={styles.actions}>
                 <Button
                   label={t('admin.approve')}

@@ -52,13 +52,12 @@ export function hasRequiredMedia(
 export function canAccessCasts(
   profile: Profile | null | undefined,
   actorProfile: ActorProfile | null | undefined,
-  photos: GalleryPhoto[] = []
+  _photos: GalleryPhoto[] = []
 ): boolean {
   return (
     profile?.role === 'actor' &&
     profile.actor_status === 'approved' &&
-    Boolean(actorProfile?.registration_completed_at) &&
-    hasRequiredMedia(profile, actorProfile, photos)
+    Boolean(actorProfile?.registration_completed_at)
   );
 }
 
@@ -80,6 +79,9 @@ export function getActorAccessState(
   photos: GalleryPhoto[] = []
 ): ActorAccessState {
   if (profile?.actor_status === 'rejected') return 'rejected';
+  if (profile?.actor_status === 'approved' && actorProfile?.registration_completed_at) {
+    return 'ready';
+  }
   if (!actorProfile?.registration_completed_at) return 'needs_form';
   if (!hasRequiredMedia(profile, actorProfile, photos)) return 'needs_media';
   if (profile?.actor_status !== 'approved') return 'pending_approval';

@@ -31,6 +31,7 @@ export default function NewCastScreen() {
   const [paymentDue, setPaymentDue] = useState('');
   const [budget, setBudget] = useState('');
   const [allowCounter, setAllowCounter] = useState(true);
+  const [requiresVideo, setRequiresVideo] = useState(true);
   const [dialogueScript, setDialogueScript] = useState('');
   const [publish, setPublish] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -55,8 +56,12 @@ export default function NewCastScreen() {
         payment_due_date: paymentDue || null,
         budget_amount: budget ? Number(budget) : null,
         allow_budget_counter: allowCounter,
-        dialogue_mode: parseDialogueScript(dialogueScript).lines.length ? 'script_tts' : 'none',
-        dialogue_script: stringifyDialogueScript(parseDialogueScript(dialogueScript)) || null,
+        requires_video: requiresVideo,
+        dialogue_mode:
+          requiresVideo && parseDialogueScript(dialogueScript).lines.length ? 'script_tts' : 'none',
+        dialogue_script: requiresVideo
+          ? stringifyDialogueScript(parseDialogueScript(dialogueScript)) || null
+          : null,
         is_published: publish,
         gender: 'any',
         budget_currency: 'TRY',
@@ -95,7 +100,11 @@ export default function NewCastScreen() {
         <Text style={styles.switchLabel}>{t('cast.counterBudget')}</Text>
         <Switch value={allowCounter} onValueChange={setAllowCounter} />
       </View>
-      <DialogueFields value={dialogueScript} onChange={setDialogueScript} />
+      <View style={styles.switchRow}>
+        <Text style={styles.switchLabel}>{t('cast.requiresVideo')}</Text>
+        <Switch value={requiresVideo} onValueChange={setRequiresVideo} />
+      </View>
+      {requiresVideo ? <DialogueFields value={dialogueScript} onChange={setDialogueScript} /> : null}
       <View style={styles.switchRow}>
         <Text style={styles.switchLabel}>{t('admin.publish')}</Text>
         <Switch value={publish} onValueChange={setPublish} />

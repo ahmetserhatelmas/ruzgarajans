@@ -19,7 +19,7 @@ export const GENDER: Record<string, string> = {
   female: "Kadın",
   male: "Erkek",
   any: "Fark etmez",
-  non_binary: "Non-binary",
+  non_binary: "İkili olmayan",
 };
 
 export const HAIR: Record<string, string> = {
@@ -54,14 +54,17 @@ export const PHOTO_KIND: Record<string, string> = {
   profile_left: "Sol profil",
   model_pose: "Model pozu",
   hands: "El",
+  favorite_1: "Beğendiğin 1 (kartvizit)",
+  favorite_2: "Beğenilen 2",
 };
 
 export const VIDEO_KIND: Record<string, string> = {
   intro: "Tanıtım",
+  lang_intro: "Yabancı dil tanıtımı",
   mimic: "Mimik",
   showreel: "Showreel",
   talent: "Yetenek",
-  audition: "Audition",
+  audition: "Oyun",
   promo: "Promo",
 };
 
@@ -121,6 +124,7 @@ export const EDUCATION: Record<string, string> = {
   high_school: "Lise",
   associate: "Ön lisans",
   bachelor: "Lisans",
+  university: "Lisans",
   master: "Yüksek lisans",
   doctorate: "Doktora",
   other: "Diğer",
@@ -193,14 +197,37 @@ export const INSURANCE: Record<string, string> = {
   ineligible_other: "Yapılamaz — diğer",
 };
 
+const KEY_ALIASES: Record<string, string> = {
+  university: "bachelor",
+  college: "bachelor",
+  uni: "bachelor",
+  lisans: "bachelor",
+  universite: "bachelor",
+  üniversite: "bachelor",
+  highschool: "high_school",
+  "high-school": "high_school",
+  lise: "high_school",
+  phd: "doctorate",
+  nonbinary: "non_binary",
+  "non-binary": "non_binary",
+};
+
+function lookupKey(key: string) {
+  const trimmed = key.trim();
+  const normalized = trimmed.toLocaleLowerCase("tr-TR").replace(/[\s-]+/g, "_");
+  return KEY_ALIASES[normalized] ?? normalized;
+}
+
 export function label(map: Record<string, string>, key?: string | null) {
   if (!key) return "—";
-  return map[key] ?? key;
+  const trimmed = key.trim();
+  const aliased = lookupKey(trimmed);
+  return map[trimmed] ?? map[aliased] ?? trimmed;
 }
 
 export function listLabel(map: Record<string, string>, keys?: string[] | null) {
   if (!keys?.length) return "—";
-  return keys.map((k) => map[k] ?? k).join(", ");
+  return keys.map((k) => label(map, k)).join(", ");
 }
 
 export function ageFromBirth(birth?: string | null) {

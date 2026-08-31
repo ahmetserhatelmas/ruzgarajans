@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
 import { canAdmin, isSuperAdmin, type AdminPerm } from "@/lib/admin-perms";
 
-export { ADMIN_PERMS, ADMIN_PERM_LABELS, canAdmin, isSuperAdmin } from "@/lib/admin-perms";
+export { ADMIN_PERMS, ADMIN_PERM_GROUPS, ADMIN_PERM_LABELS, canAdmin, isSuperAdmin } from "@/lib/admin-perms";
 export type { AdminPerm } from "@/lib/admin-perms";
 
 export async function getAdminProfile() {

@@ -8,7 +8,14 @@ export type ApplicationStatus =
   | 'accepted'
   | 'rejected';
 export type GenderPref = 'female' | 'male' | 'any' | 'non_binary';
-export type VideoKind = 'intro' | 'showreel' | 'audition' | 'promo' | 'mimic' | 'talent';
+export type VideoKind =
+  | 'intro'
+  | 'showreel'
+  | 'audition'
+  | 'promo'
+  | 'mimic'
+  | 'talent'
+  | 'lang_intro';
 export type DialogueMode = 'none' | 'script_tts' | 'audio_file';
 export type NotificationType =
   | 'new_cast'
@@ -141,6 +148,7 @@ export type CastListing = {
   budget_amount: number | null;
   budget_currency: string;
   allow_budget_counter: boolean;
+  requires_video: boolean;
   is_published: boolean;
   dialogue_mode: DialogueMode;
   dialogue_script: string | null;
@@ -148,6 +156,26 @@ export type CastListing = {
   cover_image_url: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type CastIntroduction = {
+  id: string;
+  cast_id: string;
+  actor_id: string;
+  created_by: string;
+  created_at: string;
+};
+
+export type CastOptionStatus = 'pending' | 'accepted' | 'declined';
+
+export type CastOption = {
+  id: string;
+  cast_id: string;
+  actor_id: string;
+  created_by: string;
+  status: CastOptionStatus;
+  responded_at: string | null;
+  created_at: string;
 };
 
 export type Application = {

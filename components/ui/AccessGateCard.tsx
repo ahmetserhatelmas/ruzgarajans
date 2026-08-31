@@ -50,6 +50,9 @@ export function MediaAccessCard({ compact }: Props) {
   const { profile, actorProfile, galleryPhotos } = useAuth();
   const router = useRouter();
 
+  if (profile?.actor_status === 'approved' && actorProfile?.registration_completed_at) {
+    return null;
+  }
   if (hasRequiredMedia(profile, actorProfile, galleryPhotos)) return null;
 
   return (

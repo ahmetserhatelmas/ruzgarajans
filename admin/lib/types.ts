@@ -128,6 +128,7 @@ export type CastListing = {
   budget_amount: number | null;
   budget_currency: string;
   allow_budget_counter: boolean;
+  requires_video: boolean;
   is_published: boolean;
   dialogue_mode: string;
   dialogue_script: string | null;
@@ -135,6 +136,26 @@ export type CastListing = {
   cover_image_url: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type CastIntroduction = {
+  id: string;
+  cast_id: string;
+  actor_id: string;
+  created_by: string;
+  created_at: string;
+};
+
+export type CastOptionStatus = "pending" | "accepted" | "declined";
+
+export type CastOption = {
+  id: string;
+  cast_id: string;
+  actor_id: string;
+  created_by: string;
+  status: CastOptionStatus;
+  responded_at: string | null;
+  created_at: string;
 };
 
 export type Application = {
@@ -191,6 +212,7 @@ export type Announcement = {
 export type ActorShare = {
   id: string;
   actor_id: string;
+  actor_ids?: string[];
   token: string;
   created_by: string;
   recipient_id: string | null;
@@ -199,13 +221,46 @@ export type ActorShare = {
   revoked_at: string | null;
   created_at: string;
   pin_hash?: string | null;
+  pin_label?: string | null;
 };
 
 export type SharedActorPayload = {
   profile: Pick<Profile, "id" | "full_name" | "email" | "phone" | "avatar_url" | "cover_url">;
   actor: ActorProfile | null;
   photos: GalleryPhoto[];
-  videos: { id: string; kind: string | null; playback_url: string | null }[];
+  videos: { id: string; kind: string | null; playback_url: string | null; title: string | null }[];
+};
+
+export type ApplicationShare = {
+  id: string;
+  application_id: string;
+  application_ids?: string[];
+  token: string;
+  created_by: string;
+  recipient_id: string | null;
+  note: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  pin_hash?: string | null;
+  pin_label?: string | null;
+};
+
+export type SharedApplicationListing = {
+  id: string;
+  project_name: string | null;
+  role_name: string | null;
+  role_description: string | null;
+  deadline: string | null;
+  option_date: string | null;
+  budget_amount: number | null;
+  budget_currency: string | null;
+};
+
+export type SharedApplicationPayload = SharedActorPayload & {
+  application: Pick<Application, "id" | "status" | "accept_budget" | "counter_budget" | "note" | "created_at">;
+  listing: SharedApplicationListing | null;
+  auditions: { id: string; playback_url: string | null; title: string | null }[];
 };
 
 export type ActorRow = {

@@ -5,7 +5,9 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActorStatusBadge, AppStatusBadge } from "@/components/status-badge";
-import { fetchActorDetail } from "@/lib/queries";
+import { fetchActorDetail, fetchCasts } from "@/lib/queries";
+import { ActorIntroduceCast } from "@/components/actor-introduce-cast";
+import { ActorOptionCast } from "@/components/actor-option-cast";
 import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
 import {
   ageFromBirth,
@@ -38,7 +40,7 @@ import { setActorStatusAction, startConversationAction } from "@/lib/actions";
 import { REQUIRED_PHOTO_KINDS } from "@/lib/types";
 import { BrandedVideo } from "@/components/branded-video";
 import { displayImageUrl } from "@/lib/media";
-import { requireAdminPerm } from "@/lib/permissions";
+import { canAdmin, requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -63,12 +65,18 @@ export default async function ActorDetailPage({
 }) {
   const { id } = await params;
   const { share } = await searchParams;
-  await requireAdminPerm("actors");
-  const [{ profile, actor, photos, applications, videos }, shares, directors] = await Promise.all([
-    fetchActorDetail(id),
-    fetchActorShares(id),
-    fetchDirectors(),
-  ]);
+  const { profile: admin } = await requireAdminPerm("actors");
+  const canExportActor = canAdmin(admin, "export_actors");
+  const canExportApplication = canAdmin(admin, "export_applications");
+  const canApproveActor = canAdmin(admin, "actor_approvals");
+  const canIntroduce = canAdmin(admin, "casts");
+  const [{ profile, actor, photos, applications, videos, introductions, options }, shares, directors, casts] =
+    await Promise.all([
+      fetchActorDetail(id),
+      fetchActorShares(id),
+      fetchDirectors(),
+      canIntroduce ? fetchCasts() : Promise.resolve([]),
+    ]);
   if (!profile) notFound();
   const shareUrls: Record<string, string> = {};
   await Promise.all(
@@ -81,7 +89,9 @@ export default async function ActorDetailPage({
   const mediaOk = hasRequiredMedia(profile, actor, photoKinds);
   const age = ageFromBirth(actor?.birth_date);
   const avatarSrc = displayImageUrl(profile.avatar_url);
-  const coverSrc = displayImageUrl(profile.cover_url, 1200);
+  const chestPhoto = photos.find((p) => p.kind === "chest");
+  const chestSrc =
+    displayImageUrl(chestPhoto?.public_url, 800) ?? chestPhoto?.public_url ?? avatarSrc;
   const profileVideoKinds = new Set(["intro", "mimic", "showreel", "talent"]);
   const extraVideos = videos.filter((v) => {
     const kind = (v.kind ?? "").toLowerCase();
@@ -97,44 +107,70 @@ export default async function ActorDetailPage({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={profile.full_name || "Oyuncu"}
-        description={profile.email ?? undefined}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <a href={`/api/actors/${profile.id}/export`}>İndir</a>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href={`/actors/${profile.id}/kartvizit`}>Kartvizit</Link>
-            </Button>
-            <form action={startConversationAction.bind(null, profile.id)}>
-              <Button type="submit" variant="outline">
-                Mesaj yaz
-              </Button>
-            </form>
-            {profile.actor_status !== "approved" ? (
-              <form action={setActorStatusAction.bind(null, profile.id, "approved")}>
-                <Button type="submit">Onayla</Button>
-              </form>
-            ) : null}
-            {profile.actor_status !== "rejected" ? (
-              <form action={setActorStatusAction.bind(null, profile.id, "rejected")}>
-                <Button type="submit" variant="destructive">
-                  Reddet
-                </Button>
-              </form>
-            ) : null}
+      <div className="flex items-start gap-5">
+        {chestSrc ? (
+          <a
+            href={chestSrc}
+            target="_blank"
+            rel="noreferrer"
+            className="relative block aspect-[3/4] w-36 shrink-0 overflow-hidden rounded-xl bg-muted ring-1 ring-foreground/10 sm:w-40"
+          >
+            <Image
+              src={chestSrc}
+              alt="Göğüs plan"
+              fill
+              className="object-cover object-[center_18%]"
+              unoptimized
+            />
+          </a>
+        ) : (
+          <div className="flex aspect-[3/4] w-36 shrink-0 items-center justify-center rounded-xl bg-muted text-center text-xs text-muted-foreground ring-1 ring-foreground/10 sm:w-40">
+            Göğüs plan yok
           </div>
-        }
-      />
+        )}
+        <div className="min-w-0 flex-1">
+          <PageHeader
+            title={profile.full_name || "Oyuncu"}
+            description={profile.email ?? undefined}
+            actions={
+              <div className="flex flex-wrap gap-2">
+                {canExportActor ? (
+                  <Button asChild variant="outline">
+                    <a href={`/api/actors/${profile.id}/export`}>İndir</a>
+                  </Button>
+                ) : null}
+                <Button asChild variant="outline">
+                  <Link href={`/actors/${profile.id}/kartvizit`}>Kartvizit</Link>
+                </Button>
+                <form action={startConversationAction.bind(null, profile.id)}>
+                  <Button type="submit" variant="outline">
+                    Mesaj yaz
+                  </Button>
+                </form>
+                {canApproveActor && profile.actor_status !== "approved" ? (
+                  <form action={setActorStatusAction.bind(null, profile.id, "approved")}>
+                    <Button type="submit">Onayla</Button>
+                  </form>
+                ) : null}
+                {canApproveActor && profile.actor_status !== "rejected" ? (
+                  <form action={setActorStatusAction.bind(null, profile.id, "rejected")}>
+                    <Button type="submit" variant="destructive">
+                      Reddet
+                    </Button>
+                  </form>
+                ) : null}
+              </div>
+            }
+          />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <ActorStatusBadge status={profile.actor_status} />
-        <span className="text-sm text-muted-foreground">
-          Form: {hasCompletedForm(actor) ? "tamam" : "eksik"} · Medya:{" "}
-          {mediaOk ? "tamam" : "eksik"}
-        </span>
+          <div className="-mt-4 flex flex-wrap items-center gap-3">
+            <ActorStatusBadge status={profile.actor_status} />
+            <span className="text-sm text-muted-foreground">
+              Form: {hasCompletedForm(actor) ? "tamam" : "eksik"} · Medya:{" "}
+              {mediaOk ? "tamam" : "eksik"}
+            </span>
+          </div>
+        </div>
       </div>
 
       <ShareActorPanel
@@ -145,10 +181,8 @@ export default async function ActorDetailPage({
         pinError={share === "pin"}
       />
 
-      {coverSrc ? (
-        <div className="relative h-40 overflow-hidden rounded-xl bg-muted">
-          <Image src={coverSrc} alt="" fill className="object-cover" unoptimized />
-        </div>
+      {canIntroduce ? (
+        <ActorIntroduceCast actorId={profile.id} casts={casts} introductions={introductions} />
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -304,7 +338,7 @@ export default async function ActorDetailPage({
           ))}
           {extraVideos.map((v) => (
             <div key={v.id}>
-              <p className="mb-1 text-sm font-medium">{label(VIDEO_KIND, v.kind)}</p>
+              <p className="mb-1 text-sm font-medium">{v.title || label(VIDEO_KIND, v.kind)}</p>
               <BrandedVideo src={v.playback_url!} />
             </div>
           ))}
@@ -320,16 +354,22 @@ export default async function ActorDetailPage({
             <p className="text-sm text-muted-foreground">Başvuru yok.</p>
           ) : (
             applications.map((a) => (
-              <Link
+              <div
                 key={a.id}
-                href={`/applications/${a.id}`}
-                className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted/40"
+                className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"
               >
-                <span>
+                <Link href={`/applications/${a.id}`} className="min-w-0 hover:underline">
                   {a.cast_listings?.project_name} · {a.cast_listings?.role_name}
-                </span>
-                <AppStatusBadge status={a.status} />
-              </Link>
+                </Link>
+                <div className="flex shrink-0 items-center gap-2">
+                  <AppStatusBadge status={a.status} />
+                  {canExportApplication ? (
+                    <Button asChild size="sm" variant="outline">
+                      <a href={`/api/applications/${a.id}/export`}>İndir</a>
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
             ))
           )}
         </CardContent>
@@ -337,6 +377,7 @@ export default async function ActorDetailPage({
 
       <AcceptedProjectsTable
         actorName={profile.full_name || "oyuncu"}
+        canExport={canExportActor}
         rows={applications
           .filter((a) => a.status === "accepted")
           .map((a) => {
@@ -355,6 +396,10 @@ export default async function ActorDetailPage({
             };
           })}
       />
+
+      {canIntroduce ? (
+        <ActorOptionCast actorId={profile.id} casts={casts} options={options} />
+      ) : null}
     </div>
   );
 }

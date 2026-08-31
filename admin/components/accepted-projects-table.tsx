@@ -26,9 +26,11 @@ const HEADERS = ["Yapım", "Proje", "Tarih", "Ücret", "Aldığı ödeme"] as co
 export function AcceptedProjectsTable({
   actorName,
   rows,
+  canExport = false,
 }: {
   actorName: string;
   rows: AcceptedProjectRow[];
+  canExport?: boolean;
 }) {
   const exportExcel = () => {
     const slug = (actorName || "oyuncu").replace(/[^\wğüşıöçĞÜŞİÖÇ-]+/g, "-").slice(0, 40);
@@ -45,9 +47,11 @@ export function AcceptedProjectsTable({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Kabul edildiği projeler</CardTitle>
-        <Button type="button" variant="outline" disabled={rows.length === 0} onClick={exportExcel}>
-          Excel indir
-        </Button>
+        {canExport ? (
+          <Button type="button" variant="outline" disabled={rows.length === 0} onClick={exportExcel}>
+            Excel indir
+          </Button>
+        ) : null}
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (

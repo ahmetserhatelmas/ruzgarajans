@@ -3,15 +3,11 @@
 import { useState } from "react";
 import { createActorShareAction, revokeActorShareAction } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
+import { sharePinLabel, shareRemainingLabel } from "@/lib/share-label";
 import type { ActorShare, Profile } from "@/lib/types";
 
 function shareWhatsAppText(url: string, pin: string) {
   return `Oyuncu dosyası:\n${url}\n\nAçılış şifresi: ${pin}\n(Şifreyi linkin içine yazma, sayfada sorunca gir.)`;
-}
-
-function expiryLabel(expiresAt: string | null) {
-  if (!expiresAt) return "Süresiz";
-  return `${new Date(expiresAt).toLocaleString("tr-TR")} tarihine kadar`;
 }
 
 export function ShareActorPanel({
@@ -29,10 +25,6 @@ export function ShareActorPanel({
 }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [pin, setPin] = useState("");
-  const [lastPin, setLastPin] = useState("");
-  const latest = shares[0];
-  const latestUrl = latest ? urls[latest.id] ?? "" : "";
-  const waText = latestUrl && lastPin ? shareWhatsAppText(latestUrl, lastPin) : latestUrl;
 
   const copy = async (text: string, id: string) => {
     await navigator.clipboard.writeText(text);
@@ -51,11 +43,7 @@ export function ShareActorPanel({
           <p className="mt-2 text-sm text-destructive">Link için 4 haneli şifre yaz.</p>
         ) : null}
       </div>
-      <form
-        action={createActorShareAction}
-        onSubmit={() => setLastPin(pin)}
-        className="grid gap-3"
-      >
+      <form action={createActorShareAction} className="grid gap-3">
         <input type="hidden" name="actor_id" value={actorId} />
         <label className="grid gap-1 text-sm">
           <span className="text-muted-foreground">Alıcı</span>
@@ -85,7 +73,7 @@ export function ShareActorPanel({
               placeholder="6060"
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              className="h-10 rounded-md border border-input bg-background px-3 text-center text-lg tracking-[0.4em]"
+              className="h-10 w-full rounded-md border border-input bg-background px-4 text-center text-lg tracking-[0.3em] [text-indent:0.3em]"
             />
           </label>
           <label className="grid gap-1 text-sm">
@@ -105,66 +93,60 @@ export function ShareActorPanel({
           Link oluştur
         </Button>
       </form>
-      {latest ? (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            {expiryLabel(latest.expires_at)}
-            {latest.pin_hash ? " · şifreli" : ""}
-            {lastPin ? ` · şifre ${lastPin}` : ""}
-          </p>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              readOnly
-              value={latestUrl}
-              className="h-10 flex-1 rounded-md border border-input bg-muted px-3 text-xs"
-            />
-            <Button type="button" variant="outline" onClick={() => void copy(latestUrl, latest.id)}>
-              {copied === latest.id ? "Kopyalandı" : "Linki kopyala"}
-            </Button>
-            {lastPin ? (
-              <Button type="button" variant="outline" onClick={() => void copy(lastPin, `${latest.id}-pin`)}>
-                {copied === `${latest.id}-pin` ? "Kopyalandı" : `Şifre ${lastPin}`}
-              </Button>
-            ) : null}
-            {latestUrl ? (
-              <Button asChild variant="outline">
-                <a
-                  href={`https://wa.me/?text=${encodeURIComponent(waText || latestUrl)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  WhatsApp
-                </a>
-              </Button>
-            ) : null}
-            <form action={revokeActorShareAction}>
-              <input type="hidden" name="share_id" value={latest.id} />
-              <input type="hidden" name="actor_id" value={actorId} />
-              <Button type="submit" variant="ghost">
-                İptal
-              </Button>
-            </form>
-          </div>
-        </div>
-      ) : null}
-      {shares.length > 1 ? (
-        <ul className="space-y-2 text-sm">
-          {shares.slice(1).map((s) => (
-            <li key={s.id} className="flex items-center justify-between gap-2">
-              <span className="truncate text-muted-foreground">
-                {new Date(s.created_at).toLocaleString("tr-TR")}
-                {" · "}
-                {expiryLabel(s.expires_at)}
-              </span>
-              <form action={revokeActorShareAction}>
-                <input type="hidden" name="share_id" value={s.id} />
-                <input type="hidden" name="actor_id" value={actorId} />
-                <Button type="submit" size="sm" variant="ghost">
-                  İptal
-                </Button>
-              </form>
-            </li>
-          ))}
+      {shares.length ? (
+        <ul className="space-y-3">
+          {shares.map((share) => {
+            const url = urls[share.id] ?? "";
+            const savedPin = sharePinLabel(share);
+            const waText = savedPin ? shareWhatsAppText(url, savedPin) : url;
+            return (
+              <li key={share.id} className="space-y-2 rounded-lg border border-border px-3 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-2 text-sm">
+                  <p className="text-muted-foreground">
+                    {shareRemainingLabel(share.expires_at)}
+                    {savedPin ? ` · şifre ${savedPin}` : ""}
+                  </p>
+                  <form action={revokeActorShareAction}>
+                    <input type="hidden" name="share_id" value={share.id} />
+                    <input type="hidden" name="actor_id" value={actorId} />
+                    <Button type="submit" size="sm" variant="ghost">
+                      Sil
+                    </Button>
+                  </form>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    readOnly
+                    value={url}
+                    className="h-10 flex-1 rounded-md border border-input bg-muted px-3 text-xs"
+                  />
+                  <Button type="button" variant="outline" onClick={() => void copy(url, share.id)}>
+                    {copied === share.id ? "Kopyalandı" : "Linki kopyala"}
+                  </Button>
+                  {savedPin ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void copy(savedPin, `${share.id}-pin`)}
+                    >
+                      {copied === `${share.id}-pin` ? "Kopyalandı" : `Şifre ${savedPin}`}
+                    </Button>
+                  ) : null}
+                  {url ? (
+                    <Button asChild variant="outline">
+                      <a
+                        href={`https://wa.me/?text=${encodeURIComponent(waText)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        WhatsApp
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </div>

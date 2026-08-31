@@ -17,6 +17,12 @@ type NotifyCast = Pick<
 >;
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+const BRAND_LOGO_URL = "https://ruzgarajans.vercel.app/brand-logo.png";
+
+function isTurkish(locale?: string | null) {
+  const raw = (locale ?? "tr").trim().toLowerCase();
+  return !raw.startsWith("en");
+}
 
 export function hasNotificationCriteria(cast: Pick<
   CastListing,
@@ -62,8 +68,8 @@ export function matchesNotificationCriteria(row: ActorRow, cast: NotifyCast) {
   return true;
 }
 
-function copyFor(locale: string, cast: NotifyCast) {
-  const tr = locale.startsWith("tr");
+function copyFor(locale: string | null | undefined, cast: NotifyCast) {
+  const tr = isTurkish(locale);
   return {
     title: tr ? "Size uygun bir rol var" : "A role that fits you",
     body: `${cast.project_name} · ${cast.role_name}`,
@@ -76,19 +82,33 @@ async function sendExpoPush(
     title: string;
     body: string;
     data: Record<string, string>;
+    sound?: string;
+    channelId?: string;
+    priority?: "default" | "normal" | "high";
+    subtitle?: string;
+    mutableContent?: boolean;
+    richContent?: { image: string };
   }[]
 ) {
   for (let i = 0; i < messages.length; i += 100) {
     const chunk = messages.slice(i, i + 100);
-    await fetch(EXPO_PUSH_URL, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Accept-Encoding": "gzip, deflate",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(chunk),
-    });
+    try {
+      const res = await fetch(EXPO_PUSH_URL, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Accept-Encoding": "gzip, deflate",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(chunk),
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        console.error("expo push failed", res.status, text);
+      }
+    } catch (err) {
+      console.error("expo push failed", err);
+    }
   }
 }
 
@@ -129,10 +149,63 @@ export async function notifyMatchingActors(cast: NotifyCast) {
         title: copy.title,
         body: copy.body,
         data: { castId: cast.id, url: `/(actor)/cast/${cast.id}` },
+        channelId: "casts",
+        priority: "high" as const,
+        subtitle: "Rüzgar Oyunculuk",
+        mutableContent: true,
+        richContent: { image: BRAND_LOGO_URL },
       };
     });
 
   if (messages.length) {
     await sendExpoPush(messages);
+  }
+}
+
+export async function notifyOptionedActor(
+  cast: Pick<CastListing, "id" | "project_name" | "role_name">,
+  actorId: string
+) {
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, locale, expo_push_token")
+    .eq("id", actorId)
+    .maybeSingle();
+  if (!profile) return;
+
+  const tr = isTurkish(profile.locale);
+  const title = tr
+    ? "Sizi bu projeye opsiyonlamak istiyoruz"
+    : "We want to option you for this project";
+  const body = tr
+    ? `${cast.project_name} · ${cast.role_name}. Uygun görüyor musunuz?`
+    : `${cast.project_name} · ${cast.role_name}. Are you available?`;
+  const data = { castId: cast.id, url: `/(actor)/cast/${cast.id}` };
+
+  const { error } = await supabase.from("notifications").insert({
+    user_id: profile.id,
+    type: "new_cast",
+    title,
+    body,
+    data,
+  });
+  if (error) console.error("option notify insert failed", error.message);
+
+  if (profile.expo_push_token) {
+    await sendExpoPush([
+      {
+        to: profile.expo_push_token,
+        title,
+        body,
+        data,
+        sound: "default",
+        channelId: "options",
+        priority: "high" as const,
+        subtitle: "Rüzgar Oyunculuk",
+        mutableContent: true,
+        richContent: { image: BRAND_LOGO_URL },
+      },
+    ]);
   }
 }

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   Alert,
   Platform,
@@ -22,17 +23,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import * as Speech from 'expo-speech';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { VideoLogoMark } from '@/components/video/VideoLogoMark';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import {
+  alignTtsMarks,
   estimateActorHoldMs,
   lineAfterSec,
   parseDialogueScript,
   wordIndexAt,
+  wordIndexAtProgress,
+  wordIndexAtTime,
   wordsOf,
   type DialogueScript,
   type DialogueVoice,
+  type DialogueWordMark,
 } from '@/lib/dialogueScript';
 import type { DialogueMode } from '@/types/database';
 
@@ -51,6 +57,8 @@ type Props = {
   /** Spoken guidance lines while recording (e.g. mimic cues) */
   guidanceLines?: string[] | null;
   hint?: string | null;
+  /** Allow picking a pre-recorded clip. Off for audition (Oyun Ver). */
+  allowLibrary?: boolean;
 };
 
 function sleep(ms: number) {
@@ -124,19 +132,40 @@ function DialogueWords({
   );
 }
 
-function VideoPreview({ uri }: { uri: string }) {
+function stopVideoPlayer(player: {
+  pause: () => void;
+  loop?: boolean;
+  muted?: boolean;
+  currentTime?: number;
+}) {
+  try {
+    player.loop = false;
+    player.pause();
+    player.muted = true;
+    player.currentTime = 0;
+  } catch {
+    // ignore
+  }
+}
+
+function VideoPreview({ uri, width, height }: { uri: string; width: number; height: number }) {
   const player = useVideoPlayer(uri, (p) => {
-    p.loop = true;
+    p.loop = false;
+    p.play();
   });
 
+  useEffect(() => {
+    return () => stopVideoPlayer(player);
+  }, [player]);
+
   return (
-    <View style={styles.camera}>
+    <View style={[styles.previewFill, { width, height }]}>
       <VideoView
         style={StyleSheet.absoluteFill}
         player={player}
         nativeControls
         contentFit="contain"
-        fullscreenOptions={{ enable: true }}
+        fullscreenOptions={{ enable: false }}
       />
       <VideoLogoMark />
     </View>
@@ -154,12 +183,16 @@ export function VideoRecorder({
   countdownEnabled = true,
   guidanceLines,
   hint,
+  allowLibrary = true,
 }: Props) {
   const { t, i18n } = useTranslation();
+  const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const isLandscape = width > height;
+  const isLandscape = width > height && width > 100 && height > 100;
   const landscapeRef = useRef(isLandscape);
   landscapeRef.current = isLandscape;
+  const [cameraBox, setCameraBox] = useState<{ w: number; h: number } | null>(null);
+  const [camGen, setCamGen] = useState(0);
   const cameraRef = useRef<CameraView>(null);
   const [camPerm, requestCam] = useCameraPermissions();
   const [micPerm, requestMic] = useMicrophonePermissions();
@@ -175,6 +208,7 @@ export function VideoRecorder({
   const [cueLabel, setCueLabel] = useState<string | null>(null);
   const [cueText, setCueText] = useState('');
   const [highlightIndex, setHighlightIndex] = useState(-1);
+  const [screenOn, setScreenOn] = useState(true);
 
   const stopDialogueAssist = () => {
     Speech.stop();
@@ -187,14 +221,44 @@ export function VideoRecorder({
     playerRef.current = null;
   };
 
+  const hushAll = () => {
+    cancelledRef.current = true;
+    stopDialogueAssist();
+    try {
+      cameraRef.current?.stopRecording();
+    } catch {
+      // already stopped
+    }
+  };
+
   useEffect(() => {
-    void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+    void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.DEFAULT);
     return () => {
-      cancelledRef.current = true;
-      stopDialogueAssist();
+      hushAll();
       void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     };
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      cancelledRef.current = false;
+      setScreenOn(true);
+      return () => {
+        setScreenOn(false);
+        hushAll();
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    if (countdown !== null || recording) return;
+    if (!isLandscape) {
+      setCameraBox(null);
+      return;
+    }
+    const timer = setTimeout(() => setCameraBox({ w: width, h: height }), 80);
+    return () => clearTimeout(timer);
+  }, [isLandscape, width, height, countdown, recording]);
 
   const speakLines = async (lines: string[]) => {
     const lang = i18n.language?.startsWith('en') ? 'en-US' : 'tr-TR';
@@ -217,13 +281,13 @@ export function VideoRecorder({
     new Promise<void>((resolve) => {
       const words = wordsOf(text);
       let usedBoundary = false;
-      let word = 0;
-      const perWord = Math.max(280, Math.round(500 / opts.rate));
+      const started = Date.now();
+      const estimatedMs = Math.max(800, words.join(' ').length * (72 / Math.max(0.25, opts.rate)));
       const tick = setInterval(() => {
         if (usedBoundary || cancelledRef.current) return;
-        word = Math.min(words.length - 1, word + 1);
-        setHighlightIndex(word);
-      }, perWord);
+        const progress = (Date.now() - started) / estimatedMs;
+        setHighlightIndex(wordIndexAtProgress(text, progress));
+      }, 50);
 
       const finish = () => {
         clearInterval(tick);
@@ -248,7 +312,7 @@ export function VideoRecorder({
       });
     });
 
-  const playRemoteAudio = (uri: string, text: string) =>
+  const playRemoteAudio = (uri: string, text: string, marks?: DialogueWordMark[]) =>
     new Promise<void>((resolve) => {
       try {
         playerRef.current?.pause();
@@ -259,15 +323,24 @@ export function VideoRecorder({
       const player = createAudioPlayer({ uri });
       playerRef.current = player;
       const words = wordsOf(text);
-      highlightWhileFallback(words.length, 1);
+      const aligned = alignTtsMarks(text, marks ?? []);
       player.play();
       const started = Date.now();
       const tick = setInterval(() => {
-        const duration = Number(player.duration ?? 0);
-        const current = Number(player.currentTime ?? 0);
-        if (duration > 0) {
-          const index = Math.min(words.length - 1, Math.floor((current / duration) * words.length));
-          setHighlightIndex(index);
+        let duration = Number(player.duration ?? 0);
+        let current = Number(player.currentTime ?? 0);
+        if (duration > 100) {
+          duration /= 1000;
+          current /= 1000;
+        }
+        if (aligned.length) {
+          setHighlightIndex(wordIndexAtTime(aligned, current + 0.06));
+        } else if (duration > 0) {
+          const lookahead = Math.min(0.28, 0.12 + duration * 0.02);
+          setHighlightIndex(wordIndexAtProgress(text, (current + lookahead) / duration));
+        } else {
+          const estimatedMs = Math.max(800, words.join(' ').length * 72);
+          setHighlightIndex(wordIndexAtProgress(text, (Date.now() - started) / estimatedMs));
         }
         const finished =
           (duration > 0 && current >= duration - 0.08) ||
@@ -276,22 +349,8 @@ export function VideoRecorder({
           clearInterval(tick);
           resolve();
         }
-      }, 80);
+      }, 40);
     });
-
-  const highlightWhileFallback = (wordCount: number, rate: number) => {
-    let word = 0;
-    const step = Math.max(220, Math.round(450 / Math.max(0.25, rate)));
-    const tick = setInterval(() => {
-      if (cancelledRef.current) {
-        clearInterval(tick);
-        return;
-      }
-      word = Math.min(wordCount - 1, word + 1);
-      setHighlightIndex(word);
-      if (word >= wordCount - 1) clearInterval(tick);
-    }, step);
-  };
 
   const playParsedScript = async (script: DialogueScript) => {
     const lang = i18n.language?.startsWith('en') ? 'en-US' : 'tr-TR';
@@ -312,7 +371,7 @@ export function VideoRecorder({
 
       if (line.speaker === 'ai') {
         if (line.audioUrl) {
-          await playRemoteAudio(line.audioUrl, line.text);
+          await playRemoteAudio(line.audioUrl, line.text, line.words);
         } else {
           await speakText(line.text, { language: lang, voice: voice.id, rate, pitch });
         }
@@ -401,7 +460,7 @@ export function VideoRecorder({
       return;
     }
 
-    if (!cameraRef.current || recording || countdown !== null) return;
+    if (recording || countdown !== null) return;
 
     setUri(null);
     cancelledRef.current = true;
@@ -409,7 +468,12 @@ export function VideoRecorder({
     setPreviewing(false);
     cancelledRef.current = false;
     await runCountdown();
-    if (cancelledRef.current || !cameraRef.current) return;
+    if (cancelledRef.current) return;
+    if (!cameraRef.current) {
+      setCountdown(null);
+      Alert.alert(t('common.error'), t('video.permission'));
+      return;
+    }
     if (!landscapeRef.current) {
       setCountdown(null);
       Alert.alert(t('video.landscapeRequired'), t('video.landscapeRequiredBody'));
@@ -461,50 +525,81 @@ export function VideoRecorder({
             await requestMic();
           }}
         />
-        <Button
-          label={t('video.pickVideo')}
-          variant="secondary"
-          onPress={() => void pickFromLibrary()}
-        />
+        {allowLibrary ? (
+          <Button
+            label={t('video.pickVideo')}
+            variant="secondary"
+            onPress={() => void pickFromLibrary()}
+          />
+        ) : null}
       </View>
     );
   }
 
   const busy = recording || countdown !== null || previewing;
 
+  if (!isLandscape && !uri && !isSimulator && countdown === null && !recording) {
+    return (
+      <View
+        style={[
+          styles.turnPhone,
+          {
+            paddingTop: Math.max(insets.top, 72),
+            paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.lg,
+          },
+        ]}
+      >
+        <Ionicons name="phone-landscape-outline" size={64} color={Colors.gold} />
+        <Text style={styles.landscapeTitle}>{t('video.landscapeRequired')}</Text>
+        <Text style={styles.landscapeBody}>{t('video.landscapeRequiredBody')}</Text>
+        {allowLibrary ? (
+          <Button
+            label={t('video.pickVideo')}
+            variant="secondary"
+            style={styles.recBtn}
+            onPress={() => void pickFromLibrary()}
+          />
+        ) : null}
+      </View>
+    );
+  }
+
+  const overlayPad = {
+    paddingLeft: Math.max(insets.left, Spacing.md),
+    paddingRight: Math.max(insets.right, Spacing.md),
+    paddingBottom: Math.max(insets.bottom, Spacing.md) + Spacing.sm,
+  };
+
+  const camW = cameraBox?.w ?? width;
+  const camH = cameraBox?.h ?? height;
+
   return (
-    <View style={styles.wrap}>
-      {uri ? (
-        <VideoPreview key={uri} uri={uri} />
+    <View style={[styles.wrap, { width, height }]}>
+      {uri && screenOn ? (
+        <VideoPreview key={uri} uri={uri} width={width} height={height} />
+      ) : uri ? (
+        <View style={[styles.previewFill, { width, height, backgroundColor: '#000' }]} />
       ) : isSimulator ? (
-        <View style={[styles.camera, styles.simPlaceholder]}>
+        <View style={[styles.previewFill, styles.simPlaceholder]}>
           <Text style={styles.simTitle}>{t('video.simulatorTitle')}</Text>
           <Text style={styles.simBody}>{t('video.simulatorBody')}</Text>
         </View>
       ) : (
-        <View style={styles.cameraWrap}>
-          <CameraView
-            ref={cameraRef}
-            style={styles.camera}
-            facing={facing}
-            mode="video"
-            mirror={facing === 'front'}
-          />
-          {countdown !== null ? (
-            <View style={styles.countdownOverlay} pointerEvents="none">
-              <Text style={styles.countdownNum}>{countdown}</Text>
-            </View>
-          ) : null}
-          {!isLandscape && !uri ? (
-            <View style={styles.landscapeOverlay} pointerEvents="none">
-              <Ionicons name="phone-landscape-outline" size={48} color={Colors.gold} />
-              <Text style={styles.landscapeTitle}>{t('video.landscapeRequired')}</Text>
-              <Text style={styles.landscapeBody}>{t('video.landscapeRequiredBody')}</Text>
-            </View>
+        <View style={[styles.cameraWrap, { width: camW, height: camH }]}>
+          {cameraBox ? (
+            <CameraView
+              key={`cam-${camGen}-${facing}`}
+              ref={cameraRef}
+              style={{ width: cameraBox.w, height: cameraBox.h }}
+              facing={facing}
+              mode="video"
+              mirror={facing === 'front'}
+              onMountError={() => setCamGen((n) => (n < 2 ? n + 1 : n))}
+            />
           ) : null}
           {!busy ? (
             <Pressable
-              style={styles.flipBtn}
+              style={[styles.flipBtn, { top: 52, right: Math.max(insets.right, Spacing.md) }]}
               onPress={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))}
               hitSlop={12}
             >
@@ -514,7 +609,7 @@ export function VideoRecorder({
           ) : null}
           {dialogueMode === 'script_tts' || guidanceLines?.length ? (
             <Pressable
-              style={styles.dialogueToggle}
+              style={[styles.dialogueToggle, { top: 52, left: Math.max(insets.left, Spacing.md) }]}
               onPress={() => setShowDialogue((v) => !v)}
               hitSlop={12}
             >
@@ -534,12 +629,14 @@ export function VideoRecorder({
           <VideoLogoMark />
         </View>
       )}
-      <View style={styles.controls}>
-        {hint && !uri ? <Text style={styles.mode}>{hint}</Text> : null}
-        {!uri && !isLandscape ? (
-          <Text style={styles.mode}>{t('video.landscapeRequired')}</Text>
-        ) : null}
-        {(dialogueMode !== 'none' || guidanceLines?.length) && !uri ? (
+      {countdown !== null ? (
+        <View style={[styles.countdownOverlay, { width, height }]} pointerEvents="none">
+          <Text style={styles.countdownNum}>{countdown}</Text>
+        </View>
+      ) : (
+        <View style={[styles.controls, overlayPad]} pointerEvents="box-none">
+        {hint && !uri && !recording ? <Text style={styles.mode}>{hint}</Text> : null}
+        {(dialogueMode !== 'none' || guidanceLines?.length) && !uri && !recording ? (
           <Text style={styles.mode}>
             {guidanceLines?.length
               ? t('video.mimicGuidance')
@@ -549,11 +646,12 @@ export function VideoRecorder({
           </Text>
         ) : null}
         {!uri ? (
-          <>
-            {dialogueMode === 'script_tts' && dialogueScript && !isSimulator ? (
+          <View style={styles.recActions} pointerEvents="box-none">
+            {dialogueMode === 'script_tts' && dialogueScript && !isSimulator && !recording ? (
               <Button
                 label={previewing ? t('video.stopPreview') : t('video.previewScript')}
                 variant="secondary"
+                style={styles.recBtn}
                 onPress={() => {
                   if (previewing) {
                     cancelledRef.current = true;
@@ -565,37 +663,41 @@ export function VideoRecorder({
                   }
                   void previewScript();
                 }}
-                disabled={recording || countdown !== null}
+                disabled={countdown !== null}
               />
             ) : null}
             {isSimulator ? (
-              <Button label={t('video.pickVideo')} onPress={() => void pickFromLibrary()} />
+              <Button
+                label={t('video.pickVideo')}
+                style={styles.recBtn}
+                onPress={() => void pickFromLibrary()}
+              />
             ) : (
               <Button
                 label={
-                  countdown !== null
-                    ? String(countdown)
-                    : recording
-                      ? t('video.stop')
-                      : previewing
-                        ? t('video.previewing')
-                        : t('video.start')
+                  recording
+                    ? t('video.stop')
+                    : previewing
+                      ? t('video.previewing')
+                      : t('video.start')
                 }
                 onPress={recording ? stop : () => void start()}
                 variant={recording ? 'danger' : 'primary'}
-                disabled={countdown !== null || (!recording && !isLandscape)}
+                disabled={!recording && !isLandscape}
+                style={styles.recBtn}
               />
             )}
-            {!busy ? (
+            {allowLibrary && !busy ? (
               <Button
                 label={t('video.pickVideo')}
                 variant="secondary"
+                style={styles.recBtn}
                 onPress={() => void pickFromLibrary()}
               />
             ) : null}
-          </>
+          </View>
         ) : (
-          <>
+          <View style={styles.recActions}>
             {!uploading ? (
               <Text style={styles.previewHint}>{t('video.previewHint')}</Text>
             ) : (
@@ -628,26 +730,41 @@ export function VideoRecorder({
               onPress={() => onRecorded(uri)}
               loading={uploading}
               disabled={uploading}
+              style={styles.recBtn}
             />
             <Button
               label={t('video.reRecord')}
               variant="secondary"
               onPress={() => setUri(null)}
               disabled={uploading}
+              style={styles.recBtn}
             />
-          </>
+          </View>
         )}
-      </View>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: Colors.ink },
-  cameraWrap: { flex: 1 },
-  camera: { flex: 1 },
+  wrap: { flex: 1, backgroundColor: Colors.ink, overflow: 'hidden' },
+  turnPhone: {
+    flex: 1,
+    backgroundColor: Colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.xl,
+    gap: Spacing.md,
+  },
+  cameraWrap: { overflow: 'hidden', backgroundColor: Colors.ink },
+  previewFill: { flex: 1 },
   countdownOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: 50,
+    elevation: 50,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -680,7 +797,7 @@ const styles = StyleSheet.create({
   },
   flipBtn: {
     position: 'absolute',
-    top: Spacing.md,
+    top: 52,
     right: Spacing.md,
     alignItems: 'center',
     gap: 4,
@@ -695,7 +812,7 @@ const styles = StyleSheet.create({
   },
   dialogueToggle: {
     position: 'absolute',
-    top: Spacing.md,
+    top: 52,
     left: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -714,7 +831,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: Spacing.md,
     right: Spacing.md,
-    bottom: Spacing.lg,
+    bottom: 96,
     padding: Spacing.md,
     borderRadius: Radius.md,
     backgroundColor: 'rgba(20,8,32,0.72)',
@@ -759,9 +876,20 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   controls: {
-    padding: Spacing.lg,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     gap: Spacing.sm,
-    backgroundColor: Colors.ink,
+    backgroundColor: 'transparent',
+  },
+  recActions: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  recBtn: {
+    minWidth: 168,
+    alignSelf: 'center',
   },
   center: {
     flex: 1,
@@ -780,7 +908,9 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyMedium,
     color: Colors.gold,
     textAlign: 'center',
-    marginBottom: Spacing.sm,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   previewHint: {
     fontFamily: Fonts.body,

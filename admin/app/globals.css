@@ -137,12 +137,13 @@
 }
 
 .kartvizit-sheet {
+  position: relative;
   width: 297mm;
   height: 210mm;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  padding: 8mm 10mm 9mm;
+  padding: 12pt 10mm 9mm calc(8pt + 201pt + 5mm);
   background: #fff;
   color: #111;
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
@@ -151,7 +152,7 @@
 
 .kartvizit-header {
   display: grid;
-  grid-template-columns: 34% 1fr 1fr;
+  grid-template-columns: 1fr auto;
   gap: 5mm;
   align-items: start;
   min-height: 22mm;
@@ -159,7 +160,6 @@
 }
 
 .kartvizit-name {
-  grid-column: 2;
   margin: 2mm 0 0;
   text-align: center;
   font-size: 22pt;
@@ -170,7 +170,6 @@
 }
 
 .kartvizit-logo {
-  grid-column: 3;
   justify-self: end;
   width: 42mm;
   text-align: center;
@@ -225,32 +224,65 @@
 
 .kartvizit-body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 94mm);
+  gap: 5mm;
+  align-items: start;
   flex: 1;
   min-height: 0;
-  grid-template-columns: 34% 1fr;
-  gap: 5mm;
 }
 
-.kartvizit-right {
-  display: grid;
-  min-height: 0;
-  grid-template-rows: 1fr 1fr;
-  gap: 5mm;
-}
-
-.kartvizit-profiles,
-.kartvizit-bottom {
-  display: grid;
-  min-height: 0;
-  grid-template-columns: 1fr 1fr;
-  gap: 5mm;
+.kartvizit-photos {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4mm;
+  width: 100%;
+  max-width: 94mm;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .kartvizit-slot {
   overflow: hidden;
   width: 100%;
-  height: 100%;
   background: #f2f2f2;
+}
+
+.kartvizit-slot.kartvizit-pose {
+  width: 88mm;
+  max-width: 100%;
+  aspect-ratio: 3 / 4;
+  height: auto;
+}
+
+.kartvizit-slot.kartvizit-chest {
+  width: 72mm;
+  max-width: 100%;
+  aspect-ratio: 3 / 4;
+  height: auto;
+}
+
+.kartvizit-photos.has-favorite {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4mm;
+  width: 94mm;
+  max-width: 100%;
+}
+
+.kartvizit-photos.has-favorite .kartvizit-slot.kartvizit-pose {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 80mm;
+  justify-self: center;
+}
+
+.kartvizit-photos.has-favorite .kartvizit-slot.kartvizit-chest,
+.kartvizit-slot.kartvizit-favorite {
+  width: 100%;
+  max-width: none;
+  aspect-ratio: 3 / 4;
+  height: auto;
 }
 
 .kartvizit-slot img {
@@ -258,11 +290,29 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 18%;
+}
+
+.kartvizit-slot:has(img) {
+  background: transparent;
+}
+
+.kartvizit-slot.kartvizit-full {
+  position: absolute;
+  top: 12pt;
+  left: 8pt;
+  width: 201pt;
+  height: 524pt;
+}
+
+.kartvizit-slot.kartvizit-full img {
+  object-fit: cover;
   object-position: center top;
 }
 
 .kartvizit-fields {
   margin: 0;
+  min-width: 0;
   overflow: hidden;
   font-size: 9.5pt;
   line-height: 1.35;
@@ -289,6 +339,7 @@
   margin: 0;
   min-width: 0;
   font-weight: 400;
+  overflow-wrap: anywhere;
 }
 
 @media print {

@@ -2,8 +2,8 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  ADMIN_PERM_GROUPS,
   ADMIN_PERM_LABELS,
-  ADMIN_PERMS,
   requireAdminPerm,
 } from "@/lib/permissions";
 import { removeAdminRoleAction, setAdminRoleAction, updateAdminPermsAction } from "@/lib/actions";
@@ -28,7 +28,7 @@ export default async function AdminsPage({
     <div className="space-y-6">
       <PageHeader
         title="Yöneticiler"
-        description="Kişi önce mobil uygulamadan üye olsun. Sonra e-postasını yaz ve hangi bölümlere girebileceğini seç."
+        description="Kişi önce mobil uygulamadan üye olsun. Sonra e-postasını yaz; bölümlere ek olarak indirme ve üyelik onayını ayrı seç."
       />
 
       <Card>
@@ -58,14 +58,21 @@ export default async function AdminsPage({
               <input type="checkbox" name="full" />
               Tam yetki — her şeyi görür ve diğer yöneticileri yönetir
             </label>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {ADMIN_PERMS.map((perm) => (
-                <label key={perm} className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="perm" value={perm} defaultChecked />
-                  {ADMIN_PERM_LABELS[perm]}
-                </label>
-              ))}
-            </div>
+            {ADMIN_PERM_GROUPS.map((group) => (
+              <div key={group.title} className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {group.title}
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {group.perms.map((perm) => (
+                    <label key={perm} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" name="perm" value={perm} defaultChecked />
+                      {ADMIN_PERM_LABELS[perm]}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
             <Button type="submit">Yetkiyi ver</Button>
           </form>
         </CardContent>
@@ -99,22 +106,29 @@ export default async function AdminsPage({
                 <input type="checkbox" name="full" defaultChecked={Boolean(admin.is_super_admin)} />
                 Tam yetki
               </label>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {ADMIN_PERMS.map((perm) => (
-                  <label key={perm} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      name="perm"
-                      value={perm}
-                      defaultChecked={
-                        Boolean(admin.is_super_admin) ||
-                        (admin.admin_permissions ?? []).includes(perm)
-                      }
-                    />
-                    {ADMIN_PERM_LABELS[perm]}
-                  </label>
-                ))}
-              </div>
+              {ADMIN_PERM_GROUPS.map((group) => (
+                <div key={group.title} className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {group.title}
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {group.perms.map((perm) => (
+                      <label key={perm} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name="perm"
+                          value={perm}
+                          defaultChecked={
+                            Boolean(admin.is_super_admin) ||
+                            (admin.admin_permissions ?? []).includes(perm)
+                          }
+                        />
+                        {ADMIN_PERM_LABELS[perm]}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
               <Button type="submit" size="sm">
                 Yetkileri kaydet
               </Button>

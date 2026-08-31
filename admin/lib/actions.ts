@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { notifyMatchingActors } from "@/lib/notify-cast";
+import { notifyMatchingActors, notifyOptionedActor } from "@/lib/notify-cast";
 import { attachDialogueAudio } from "@/lib/dialogue-audio";
 import { parseDialogueScript } from "@/lib/dialogue-script";
 import { ADMIN_PERMS, requireAdminPerm, type AdminPerm } from "@/lib/permissions";
-import { fetchSharedActor } from "@/lib/share";
+import { fetchSharedActor, fetchSharedApplication } from "@/lib/share";
 import { hashSharePin, isSharePin, parseShareInput, shareUnlockCookieName } from "@/lib/share-pin";
 import type { ActorStatus, ApplicationStatus, CastListing, GenderPref } from "@/lib/types";
 import { cookies } from "next/headers";
@@ -44,8 +44,22 @@ export async function signOutAction() {
   redirect("/login");
 }
 
-export async function setActorStatusAction(id: string, status: ActorStatus) {
+export async function deleteActorsAction(ids: string[]) {
   await requireAdminPerm("actors");
+  const unique = [...new Set(ids)].filter((id) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id),
+  );
+  if (!unique.length) return { ok: false as const, count: 0, error: "Oyuncu seç." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_delete_actors", { p_ids: unique });
+  if (error) return { ok: false as const, count: 0, error: error.message };
+  revalidatePath("/actors");
+  revalidatePath("/");
+  return { ok: true as const, count: Number(data ?? 0) };
+}
+
+export async function setActorStatusAction(id: string, status: ActorStatus) {
+  await requireAdminPerm("actor_approvals");
   const supabase = await createClient();
   const { error } = await supabase
     .from("profiles")
@@ -67,13 +81,25 @@ export async function setApplicationStatusAction(id: string, status: Application
   revalidatePath("/casts");
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function deleteApplicationAction(id: string) {
-  await requireAdminPerm("applications");
-  const supabase = await createClient();
-  const { error } = await supabase.from("applications").delete().eq("id", id);
-  if (error) throw error;
-  revalidatePath("/applications");
+  const result = await deleteApplicationsAction([id]);
+  if (!result.ok) throw new Error(result.error);
   redirect("/applications");
+}
+
+export async function deleteApplicationsAction(ids: string[]) {
+  await requireAdminPerm("applications");
+  const unique = [...new Set(ids)].filter((id) => UUID_RE.test(id));
+  if (!unique.length) return { ok: false as const, count: 0, error: "Başvuru seç." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("applications").delete().in("id", unique);
+  if (error) return { ok: false as const, count: 0, error: error.message };
+  revalidatePath("/applications");
+  revalidatePath("/casts");
+  return { ok: true as const, count: unique.length };
 }
 
 export async function upsertCastAction(formData: FormData) {
@@ -111,14 +137,29 @@ export async function upsertCastAction(formData: FormData) {
     budget_currency: "TRY",
     allow_budget_counter: formData.get("allow_budget_counter") === "on",
     is_published: formData.get("is_published") === "on",
+    requires_video: formData.get("requires_video") === "on",
     dialogue_script: emptyToNull(formData.get("dialogue_script")),
     dialogue_mode: String(formData.get("dialogue_script") ?? "").trim()
       ? "script_tts"
       : "none",
+    cover_image_url: undefined as string | null | undefined,
   };
+  const logo = formData.get("logo");
+  if (logo instanceof File && logo.size > 0) {
+    payload.cover_image_url = await uploadCastLogo(supabase, user.id, logo);
+  } else if (formData.get("remove_logo") === "on") {
+    payload.cover_image_url = null;
+  }
+  if (!payload.requires_video) {
+    payload.dialogue_script = null;
+    payload.dialogue_mode = "none";
+  }
 
   if (!payload.project_name || !payload.role_name || !payload.role_description) {
     throw new Error("Proje, rol ve açıklama zorunlu.");
+  }
+  if (payload.cover_image_url === undefined) {
+    delete (payload as { cover_image_url?: string | null }).cover_image_url;
   }
 
   if (id) {
@@ -199,6 +240,126 @@ export async function toggleCastPublishedAction(id: string, isPublished: boolean
   }
   revalidatePath("/casts");
   revalidatePath(`/casts/${id}`);
+}
+
+export async function introduceActorToCastFormAction(formData: FormData) {
+  const castId = String(formData.get("cast_id") ?? "");
+  const actorId = String(formData.get("actor_id") ?? "");
+  await introduceActorToCastAction(castId, actorId);
+}
+
+export async function introduceActorToCastAction(castId: string, actorId: string) {
+  await requireAdminPerm("casts");
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !ACTOR_ID_RE.test(castId) || !ACTOR_ID_RE.test(actorId)) return;
+  const { error } = await supabase.from("cast_introductions").upsert(
+    { cast_id: castId, actor_id: actorId, created_by: user.id },
+    { onConflict: "cast_id,actor_id", ignoreDuplicates: true },
+  );
+  if (error) throw error;
+  revalidatePath(`/casts/${castId}`);
+  revalidatePath(`/actors/${actorId}`);
+}
+
+export async function removeCastIntroductionAction(castId: string, actorId: string) {
+  await requireAdminPerm("casts");
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("cast_introductions")
+    .delete()
+    .eq("cast_id", castId)
+    .eq("actor_id", actorId);
+  if (error) throw error;
+  revalidatePath(`/casts/${castId}`);
+  revalidatePath(`/actors/${actorId}`);
+}
+
+export async function optionActorForCastFormAction(formData: FormData) {
+  const castId = String(formData.get("cast_id") ?? "");
+  const actorId = String(formData.get("actor_id") ?? "");
+  await optionActorForCastAction(castId, actorId);
+}
+
+export async function optionActorForCastAction(castId: string, actorId: string) {
+  await requireAdminPerm("casts");
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !ACTOR_ID_RE.test(castId) || !ACTOR_ID_RE.test(actorId)) return;
+
+  const { data: existing } = await supabase
+    .from("cast_options")
+    .select("id, status")
+    .eq("cast_id", castId)
+    .eq("actor_id", actorId)
+    .maybeSingle();
+
+  if (existing?.status === "pending") {
+    const { data: pendingCast } = await supabase
+      .from("cast_listings")
+      .select("id, project_name, role_name")
+      .eq("id", castId)
+      .maybeSingle();
+    if (pendingCast) {
+      try {
+        await notifyOptionedActor(pendingCast, actorId);
+      } catch (err) {
+        console.error("option notify failed", err);
+      }
+    }
+    revalidatePath(`/casts/${castId}`);
+    revalidatePath(`/actors/${actorId}`);
+    return;
+  }
+
+  if (existing) {
+    const { error } = await supabase
+      .from("cast_options")
+      .update({ status: "pending", responded_at: null, created_by: user.id })
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("cast_options").insert({
+      cast_id: castId,
+      actor_id: actorId,
+      created_by: user.id,
+      status: "pending",
+    });
+    if (error) throw error;
+  }
+
+  const { data: cast } = await supabase
+    .from("cast_listings")
+    .select("id, project_name, role_name")
+    .eq("id", castId)
+    .maybeSingle();
+  if (cast) {
+    try {
+      await notifyOptionedActor(cast, actorId);
+    } catch (err) {
+      console.error("option notify failed", err);
+    }
+  }
+
+  revalidatePath(`/casts/${castId}`);
+  revalidatePath(`/actors/${actorId}`);
+}
+
+export async function removeCastOptionAction(castId: string, actorId: string) {
+  await requireAdminPerm("casts");
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("cast_options")
+    .delete()
+    .eq("cast_id", castId)
+    .eq("actor_id", actorId);
+  if (error) throw error;
+  revalidatePath(`/casts/${castId}`);
+  revalidatePath(`/actors/${actorId}`);
 }
 
 export async function sendMessageAction(conversationId: string, body: string) {
@@ -283,6 +444,26 @@ export async function deleteAnnouncementAction(id: string) {
   revalidatePath("/announcements");
 }
 
+const ACTOR_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function shareExpiry(ttl: string) {
+  if (ttl === "7d") return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  if (ttl === "forever") return null;
+  return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+}
+
+function uniqueActorIds(values: FormDataEntryValue[]) {
+  const ids = values
+    .map((value) => String(value).trim())
+    .filter((id) => ACTOR_ID_RE.test(id));
+  return [...new Set(ids)].slice(0, 40);
+}
+
+function uniqueApplicationIds(values: FormDataEntryValue[]) {
+  return uniqueActorIds(values);
+}
+
 export async function createActorShareAction(formData: FormData) {
   await requireAdminPerm("actors");
   const supabase = await createClient();
@@ -291,34 +472,37 @@ export async function createActorShareAction(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const actorId = String(formData.get("actor_id") ?? "").trim();
+  const actorIds = uniqueActorIds([
+    ...formData.getAll("actor_ids"),
+    formData.get("actor_id") ?? "",
+  ]);
+  const actorId = actorIds[0] ?? "";
   const recipientId = String(formData.get("recipient_id") ?? "").trim() || null;
   const pin = String(formData.get("pin") ?? "").trim();
   const ttl = String(formData.get("ttl") ?? "1d");
-  if (!actorId) redirect("/actors");
+  if (!actorId) redirect("/actors?share=pick");
   if (!isSharePin(pin)) {
-    redirect(`/actors/${actorId}?share=pin`);
+    redirect(actorIds.length > 1 ? "/actors?share=pin" : `/actors/${actorId}?share=pin`);
   }
-
-  const expiresAt =
-    ttl === "7d"
-      ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-      : ttl === "forever"
-        ? null
-        : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
   const token = crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
   const { error } = await supabase.from("actor_shares").insert({
     actor_id: actorId,
+    actor_ids: actorIds,
     token,
     created_by: user.id,
     recipient_id: recipientId,
     pin_hash: hashSharePin(pin),
-    expires_at: expiresAt,
+    note: pin,
+    expires_at: shareExpiry(ttl),
   });
   if (error) throw error;
+  revalidatePath("/actors");
   revalidatePath(`/actors/${actorId}`);
   revalidatePath("/directors");
+  if (formData.getAll("actor_ids").length) {
+    redirect(`/actors?shared=${token}`);
+  }
 }
 
 export async function unlockActorShareAction(formData: FormData) {
@@ -327,7 +511,11 @@ export async function unlockActorShareAction(formData: FormData) {
   const pin = String(formData.get("pin") ?? "").replace(/\D/g, "").slice(0, 4);
   if (!token) redirect("/p/missing");
 
-  const opened = await fetchSharedActor(token, pin);
+  const actor = await fetchSharedActor(token, pin);
+  const application =
+    actor.status === "unavailable" ? await fetchSharedApplication(token, pin) : actor;
+  const opened = actor.status !== "unavailable" ? actor : application;
+
   if (opened.status === "ok" && isSharePin(pin)) {
     const store = await cookies();
     store.set(shareUnlockCookieName(token), pin, {
@@ -344,6 +532,64 @@ export async function unlockActorShareAction(formData: FormData) {
   redirect(`/p/${token}?e=${reason}`);
 }
 
+export async function createApplicationShareAction(formData: FormData) {
+  await requireAdminPerm("applications");
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const applicationIds = uniqueApplicationIds([
+    ...formData.getAll("application_ids"),
+    formData.get("application_id") ?? "",
+  ]);
+  const applicationId = applicationIds[0] ?? "";
+  const recipientId = String(formData.get("recipient_id") ?? "").trim() || null;
+  const pin = String(formData.get("pin") ?? "").trim();
+  const ttl = String(formData.get("ttl") ?? "1d");
+  if (!applicationId) redirect("/applications?share=pick");
+  if (!isSharePin(pin)) {
+    redirect(
+      applicationIds.length > 1
+        ? "/applications?share=pin"
+        : `/applications/${applicationId}?share=pin`
+    );
+  }
+
+  const token = crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
+  const { error } = await supabase.from("application_shares").insert({
+    application_id: applicationId,
+    application_ids: applicationIds,
+    token,
+    created_by: user.id,
+    recipient_id: recipientId,
+    pin_hash: hashSharePin(pin),
+    note: pin,
+    expires_at: shareExpiry(ttl),
+  });
+  if (error) throw error;
+  revalidatePath("/applications");
+  revalidatePath(`/applications/${applicationId}`);
+  if (formData.getAll("application_ids").length) {
+    redirect(`/applications?shared=${token}`);
+  }
+}
+
+export async function revokeApplicationShareAction(formData: FormData) {
+  await requireAdminPerm("applications");
+  const supabase = await createClient();
+  const id = String(formData.get("share_id") ?? "");
+  const applicationId = String(formData.get("application_id") ?? "");
+  const { error } = await supabase
+    .from("application_shares")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+  revalidatePath("/applications");
+  if (applicationId) revalidatePath(`/applications/${applicationId}`);
+}
+
 export async function revokeActorShareAction(formData: FormData) {
   await requireAdminPerm("actors");
   const supabase = await createClient();
@@ -354,6 +600,7 @@ export async function revokeActorShareAction(formData: FormData) {
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw error;
+  revalidatePath("/actors");
   revalidatePath(`/actors/${actorId}`);
   revalidatePath("/directors");
 }
@@ -530,4 +777,27 @@ function dateOrNull(v: FormDataEntryValue | null) {
   const year = Number(raw.slice(0, 4));
   if (year < 1900 || year > 2100) return null;
   return raw;
+}
+
+async function uploadCastLogo(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  file: File,
+) {
+  if (file.size > 4 * 1024 * 1024) {
+    throw new Error("Logo en fazla 4 MB olabilir.");
+  }
+  const type = file.type || "image/jpeg";
+  if (!type.startsWith("image/")) {
+    throw new Error("Logo için bir görsel seç.");
+  }
+  const ext = type.includes("png") ? "png" : type.includes("webp") ? "webp" : "jpg";
+  const path = `${userId}/cast-logos/${Date.now()}.${ext}`;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const { error } = await supabase.storage.from("covers").upload(path, bytes, {
+    contentType: type,
+    upsert: true,
+  });
+  if (error) throw error;
+  return supabase.storage.from("covers").getPublicUrl(path).data.publicUrl;
 }

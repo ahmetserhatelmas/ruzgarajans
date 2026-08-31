@@ -2,9 +2,9 @@ type KartvizitField = { label: string; value: string };
 
 type KartvizitPhotos = {
   fullBody: string | null;
-  profileLeft: string | null;
-  profileRight: string | null;
+  pose: string | null;
   chest: string | null;
+  favorite: string | null;
 };
 
 function PhotoSlot({ src, className }: { src: string | null; className?: string }) {
@@ -29,6 +29,7 @@ export function KartvizitCard({
 }) {
   return (
     <article className="kartvizit-sheet">
+      <PhotoSlot src={photos.fullBody} className="kartvizit-full" />
       <header className="kartvizit-header">
         <h1 className="kartvizit-name">{name}</h1>
         <div className="kartvizit-logo" aria-hidden>
@@ -46,23 +47,20 @@ export function KartvizitCard({
       </header>
 
       <div className="kartvizit-body">
-        <PhotoSlot src={photos.fullBody} className="kartvizit-full" />
-        <div className="kartvizit-right">
-          <div className="kartvizit-profiles">
-            <PhotoSlot src={photos.profileLeft} />
-            <PhotoSlot src={photos.profileRight} />
-          </div>
-          <div className="kartvizit-bottom">
-            <dl className="kartvizit-fields">
-              {fields.map((field) => (
-                <div key={field.label}>
-                  <dt>{field.label}</dt>
-                  <dd>{field.value}</dd>
-                </div>
-              ))}
-            </dl>
-            <PhotoSlot src={photos.chest} />
-          </div>
+        <dl className="kartvizit-fields">
+          {fields.map((field) => (
+            <div key={field.label}>
+              <dt>{field.label}</dt>
+              <dd>{field.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className={photos.favorite ? "kartvizit-photos has-favorite" : "kartvizit-photos"}>
+          <PhotoSlot src={photos.pose} className="kartvizit-pose" />
+          <PhotoSlot src={photos.chest} className="kartvizit-chest" />
+          {photos.favorite ? (
+            <PhotoSlot src={photos.favorite} className="kartvizit-favorite" />
+          ) : null}
         </div>
       </div>
     </article>

@@ -21,6 +21,10 @@ type Props = {
   title?: string;
   /** Actor can change / delete */
   canManage?: boolean;
+  changeLabel?: string;
+  emptyText?: string;
+  deleteTitle?: string;
+  deleteBody?: string;
   onChange?: () => void;
   onDelete?: () => Promise<void> | void;
 };
@@ -30,6 +34,10 @@ export function IntroVideoCard({
   videoId,
   title,
   canManage,
+  changeLabel,
+  emptyText,
+  deleteTitle,
+  deleteBody,
   onChange,
   onDelete,
 }: Props) {
@@ -45,16 +53,19 @@ export function IntroVideoCard({
   if (!playbackUrl) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>{t('profile.noIntroVideo')}</Text>
+        <Text style={styles.emptyText}>{emptyText ?? t('profile.noIntroVideo')}</Text>
         {canManage && onChange ? (
-          <Button label={t('home.introCta')} onPress={onChange} />
+          <Button label={t('media.record')} onPress={onChange} />
         ) : null}
       </View>
     );
   }
 
   const confirmDelete = () => {
-    Alert.alert(t('profile.deleteIntroTitle'), t('profile.deleteIntroBody'), [
+    Alert.alert(
+      deleteTitle ?? t('profile.deleteVideoTitle', { title: title ?? t('profile.introVideo') }),
+      deleteBody ?? t('profile.deleteVideoBody'),
+      [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),
@@ -99,7 +110,7 @@ export function IntroVideoCard({
         {canManage ? (
           <>
             <Button
-              label={t('profile.changeIntro')}
+              label={changeLabel ?? t('profile.changeIntro')}
               onPress={onChange}
               style={styles.actionBtn}
             />

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/ui/Screen';
@@ -14,6 +14,19 @@ export default function DirectorHome() {
   const { profile, signOut } = useAuth();
   const [rows, setRows] = useState<DirectorShareRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const onLogout = async () => {
+    try {
+      setLoggingOut(true);
+      await signOut();
+      router.replace('/(auth)/login');
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -36,6 +49,12 @@ export default function DirectorHome() {
       <Text style={styles.brand}>{t('brand')}</Text>
       <Text style={styles.title}>{t('director.title')}</Text>
       <Text style={styles.sub}>{profile?.email}</Text>
+      <Button
+        label={t('common.logout')}
+        variant="secondary"
+        loading={loggingOut}
+        onPress={() => void onLogout()}
+      />
       <Text style={styles.hint}>{t('director.hint')}</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {rows.length === 0 && !error ? (
@@ -61,7 +80,6 @@ export default function DirectorHome() {
           </Pressable>
         ))
       )}
-      <Button title={t('common.logout')} variant="outline" onPress={() => void signOut()} />
     </Screen>
   );
 }

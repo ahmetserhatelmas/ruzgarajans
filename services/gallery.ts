@@ -8,7 +8,9 @@ export const REQUIRED_PHOTO_KINDS = [
   'profile_left',
 ] as const;
 
-export const OPTIONAL_PHOTO_KINDS = ['model_pose', 'hands'] as const;
+export const FAVORITE_PHOTO_KINDS = ['favorite_1', 'favorite_2'] as const;
+
+export const OPTIONAL_PHOTO_KINDS = ['model_pose', 'hands', ...FAVORITE_PHOTO_KINDS] as const;
 
 export const ALL_PHOTO_KINDS = [...REQUIRED_PHOTO_KINDS, ...OPTIONAL_PHOTO_KINDS] as const;
 
@@ -100,6 +102,15 @@ export async function upsertGalleryPhoto(input: {
     .single();
   if (error) throw error;
   return data as GalleryPhoto;
+}
+
+export async function deleteGalleryPhoto(userId: string, kind: GalleryPhotoKind): Promise<void> {
+  const { error } = await supabase
+    .from('gallery_photos')
+    .delete()
+    .eq('user_id', userId)
+    .eq('kind', kind);
+  if (error) throw error;
 }
 
 export function photosByKind(

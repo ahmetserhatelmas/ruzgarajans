@@ -53,6 +53,15 @@ export async function uploadProfileImage(input: {
   return url;
 }
 
+export async function clearProfileImage(
+  userId: string,
+  role: 'avatar' | 'cover'
+): Promise<void> {
+  await updateProfileBasics(userId, {
+    [role === 'avatar' ? 'avatar_url' : 'cover_url']: null,
+  });
+}
+
 export async function fetchActorsAdmin(status?: ActorStatus): Promise<Profile[]> {
   let q = supabase
     .from('profiles')

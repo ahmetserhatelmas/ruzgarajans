@@ -19,7 +19,7 @@ export function LanguageSwitcher({ persistProfile = false }: Props) {
 
   const change = async (lng: 'tr' | 'en') => {
     await setAppLanguage(lng);
-    if (persistProfile && session) {
+    if ((persistProfile || session) && session) {
       await updateLocale(lng).catch(() => undefined);
     }
   };

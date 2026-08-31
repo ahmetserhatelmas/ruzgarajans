@@ -49,6 +49,7 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json().catch(() => ({}));
     const meta = body?.meta ?? {};
+    const watermarkUid = await getOrCreateLogoWatermark(accountId, token);
 
     const cfRes = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/direct_upload`,
@@ -61,6 +62,7 @@ Deno.serve(async (req: Request) => {
         body: JSON.stringify({
           maxDurationSeconds: 300,
           requireSignedURLs: false,
+          ...(watermarkUid ? { watermark: { uid: watermarkUid } } : {}),
           meta: {
             ...meta,
             uploadedBy: userData.user.id,
@@ -91,3 +93,46 @@ Deno.serve(async (req: Request) => {
     });
   }
 });
+
+const WATERMARK_NAME = 'ruzgar-logo-lower-right';
+
+type CfWatermark = { uid?: string; name?: string };
+
+async function getOrCreateLogoWatermark(accountId: string, token: string) {
+  const auth = { Authorization: `Bearer ${token}` };
+  try {
+    const listRes = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/watermarks`,
+      { headers: auth }
+    );
+    const listJson = await listRes.json();
+    const existing = (listJson?.result as CfWatermark[] | undefined)?.find(
+      (item) => item.name === WATERMARK_NAME && item.uid
+    );
+    if (existing?.uid) return existing.uid;
+
+    const logoUrl =
+      Deno.env.get('BRAND_LOGO_URL') ||
+      'https://ruzgarajans.vercel.app/brand-logo.png';
+
+    const createRes = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/watermarks`,
+      {
+        method: 'POST',
+        headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: logoUrl,
+          name: WATERMARK_NAME,
+          opacity: 0.92,
+          padding: 0.03,
+          scale: 0.12,
+          position: 'lowerRight',
+        }),
+      }
+    );
+    const createJson = await createRes.json();
+    return (createJson?.result?.uid as string | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}

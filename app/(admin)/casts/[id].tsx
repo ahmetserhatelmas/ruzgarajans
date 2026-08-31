@@ -37,6 +37,7 @@ export default function AdminCastDetailScreen() {
   const [paymentDue, setPaymentDue] = useState('');
   const [budget, setBudget] = useState('');
   const [allowCounter, setAllowCounter] = useState(true);
+  const [requiresVideo, setRequiresVideo] = useState(true);
   const [dialogueScript, setDialogueScript] = useState('');
   const [publish, setPublish] = useState(true);
 
@@ -60,6 +61,7 @@ export default function AdminCastDetailScreen() {
         setPaymentDue(c.payment_due_date ?? '');
         setBudget(c.budget_amount != null ? String(c.budget_amount) : '');
         setAllowCounter(c.allow_budget_counter);
+        setRequiresVideo(c.requires_video !== false);
         setDialogueScript(c.dialogue_script ?? '');
         setPublish(c.is_published);
       }
@@ -95,8 +97,12 @@ export default function AdminCastDetailScreen() {
         payment_due_date: paymentDue || null,
         budget_amount: budget ? Number(budget) : null,
         allow_budget_counter: allowCounter,
-        dialogue_mode: parseDialogueScript(dialogueScript).lines.length ? 'script_tts' : 'none',
-        dialogue_script: stringifyDialogueScript(parseDialogueScript(dialogueScript)) || null,
+        requires_video: requiresVideo,
+        dialogue_mode:
+          requiresVideo && parseDialogueScript(dialogueScript).lines.length ? 'script_tts' : 'none',
+        dialogue_script: requiresVideo
+          ? stringifyDialogueScript(parseDialogueScript(dialogueScript)) || null
+          : null,
         is_published: publish,
       });
       setCast(updated);
@@ -165,7 +171,11 @@ export default function AdminCastDetailScreen() {
         <Text style={styles.switchLabel}>{t('cast.counterBudget')}</Text>
         <Switch value={allowCounter} onValueChange={setAllowCounter} />
       </View>
-      <DialogueFields value={dialogueScript} onChange={setDialogueScript} />
+      <View style={styles.switchRow}>
+        <Text style={styles.switchLabel}>{t('cast.requiresVideo')}</Text>
+        <Switch value={requiresVideo} onValueChange={setRequiresVideo} />
+      </View>
+      {requiresVideo ? <DialogueFields value={dialogueScript} onChange={setDialogueScript} /> : null}
       <View style={styles.switchRow}>
         <Text style={styles.switchLabel}>{t('admin.publish')}</Text>
         <Switch value={publish} onValueChange={setPublish} />

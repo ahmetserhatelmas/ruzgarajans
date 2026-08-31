@@ -56,6 +56,33 @@ function asBuffer(data: WebSocket.RawData) {
   return Buffer.from(data);
 }
 
+export type TtsWordMark = { at: number; dur: number; text: string };
+
+export type TtsResult = { audio: Buffer; words: TtsWordMark[] };
+
+function extractMetadata(data: WebSocket.RawData): TtsWordMark[] {
+  const buf = asBuffer(data);
+  const text = buf.toString("utf8");
+  if (!text.includes("Path:audio.metadata") && !text.includes("WordBoundary")) return [];
+  const start = text.indexOf("{");
+  if (start < 0) return [];
+  try {
+    const parsed = JSON.parse(text.slice(start)) as {
+      Metadata?: { Type?: string; Data?: { Offset?: number; Duration?: number; text?: { Text?: string } } }[];
+    };
+    return (parsed.Metadata ?? [])
+      .filter((item) => item.Type === "WordBoundary")
+      .map((item) => ({
+        at: (item.Data?.Offset ?? 0) / 10_000_000,
+        dur: (item.Data?.Duration ?? 0) / 10_000_000,
+        text: String(item.Data?.text?.Text ?? ""),
+      }))
+      .filter((word) => word.text);
+  } catch {
+    return [];
+  }
+}
+
 function extractAudio(data: WebSocket.RawData) {
   const buf = asBuffer(data);
   const separator = buf.indexOf(Buffer.from("\r\n\r\n"));
@@ -89,7 +116,7 @@ async function connectOnce(text: string, voice: "female" | "male", rate: number,
   const url = `${WSS}?Ocp-Apim-Subscription-Key=${TOKEN}&ConnectionId=${id}&Sec-MS-GEC=${gec}&Sec-MS-GEC-Version=${VERSION}`;
   const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="tr-TR"><voice name="${name}"><prosody rate="${rateAttr}">${escapeXml(text)}</prosody></voice></speak>`;
 
-  return new Promise<Buffer>((resolve, reject) => {
+  return new Promise<TtsResult>((resolve, reject) => {
     const ws = new WebSocket(url, {
       headers: {
         ...HEADERS,
@@ -98,6 +125,7 @@ async function connectOnce(text: string, voice: "female" | "male", rate: number,
       },
     });
     const chunks: Buffer[] = [];
+    const words: TtsWordMark[] = [];
     let settled = false;
     let serverDate: string | undefined;
 
@@ -114,7 +142,7 @@ async function connectOnce(text: string, voice: "female" | "male", rate: number,
         reject(new Error("Ses üretilemedi."));
         return;
       }
-      resolve(Buffer.concat(chunks));
+      resolve({ audio: Buffer.concat(chunks), words });
     };
 
     const timer = setTimeout(() => {
@@ -139,7 +167,7 @@ async function connectOnce(text: string, voice: "female" | "male", rate: number,
           context: {
             synthesis: {
               audio: {
-                metadataoptions: { sentenceBoundaryEnabled: "false", wordBoundaryEnabled: "false" },
+                metadataoptions: { sentenceBoundaryEnabled: "false", wordBoundaryEnabled: "true" },
                 outputFormat: "audio-24khz-48kbitrate-mono-mp3",
               },
             },
@@ -154,6 +182,7 @@ async function connectOnce(text: string, voice: "female" | "male", rate: number,
     ws.on("message", (data) => {
       const audio = extractAudio(data);
       if (audio) chunks.push(audio);
+      words.push(...extractMetadata(data));
       if (asBuffer(data).toString("utf8").includes("Path:turn.end")) {
         finish();
       }
@@ -222,12 +251,31 @@ export function splitTtsText(text: string, maxBytes = 2400) {
   return chunks.length ? chunks : [text.trim()].filter(Boolean);
 }
 
-export async function synthesizeTurkish(text: string, voice: "female" | "male", rate: number) {
+function estimateMp3Sec(buf: Buffer) {
+  return (buf.length * 8) / 48_000;
+}
+
+export async function synthesizeTurkishTimed(
+  text: string,
+  voice: "female" | "male",
+  rate: number,
+): Promise<TtsResult> {
   const chunks = splitTtsText(text);
   const audio: Buffer[] = [];
+  const words: TtsWordMark[] = [];
+  let shift = 0;
   for (const chunk of chunks) {
-    audio.push(await synthesizeChunk(chunk, voice, rate));
+    const part = await synthesizeChunk(chunk, voice, rate);
+    audio.push(part.audio);
+    for (const word of part.words) {
+      words.push({ ...word, at: word.at + shift });
+    }
+    shift += estimateMp3Sec(part.audio);
   }
   if (!audio.length) throw new Error("Ses üretilemedi.");
-  return Buffer.concat(audio);
+  return { audio: Buffer.concat(audio), words };
+}
+
+export async function synthesizeTurkish(text: string, voice: "female" | "male", rate: number) {
+  return (await synthesizeTurkishTimed(text, voice, rate)).audio;
 }

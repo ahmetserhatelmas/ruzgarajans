@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { synthesizeTurkish } from "@/lib/edge-tts";
+import { synthesizeTurkishTimed } from "@/lib/edge-tts";
 import { stringifyDialogueScript, type DialogueScript } from "@/lib/dialogue-script";
 
 export async function attachDialogueAudio(
@@ -15,7 +15,7 @@ export async function attachDialogueAudio(
       continue;
     }
     try {
-      const audio = await synthesizeTurkish(line.text, script.voice, script.rate);
+      const { audio, words } = await synthesizeTurkishTimed(line.text, script.voice, script.rate);
       const path = `${castId}/${i}-${Date.now()}.mp3`;
       const { error } = await supabase.storage.from("dialogue-audio").upload(path, audio, {
         contentType: "audio/mpeg",
@@ -23,7 +23,11 @@ export async function attachDialogueAudio(
       });
       if (error) throw error;
       const { data } = supabase.storage.from("dialogue-audio").getPublicUrl(path);
-      next.lines[i] = { ...line, audioUrl: data.publicUrl };
+      next.lines[i] = {
+        ...line,
+        audioUrl: data.publicUrl,
+        words: words.map(({ at, text }) => ({ at, text })),
+      };
     } catch (error) {
       console.error("dialogue audio failed", error);
     }
