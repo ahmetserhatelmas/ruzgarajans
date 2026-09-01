@@ -33,7 +33,7 @@ export function ActorOptionCast({
             <select
               name="cast_id"
               required
-              className="h-10 min-w-[220px] flex-1 rounded-md border border-input bg-background px-3 text-sm"
+              className="h-10 min-w-0 w-full flex-1 rounded-md border border-input bg-background px-3 text-sm"
               defaultValue=""
             >
               <option value="" disabled>

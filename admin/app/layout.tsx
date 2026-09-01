@@ -19,13 +19,18 @@ export const metadata: Metadata = {
   description: "Oyuncu, cast ve başvuru yönetim paneli",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="tr"
       className={`${display.variable} ${sans.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-background font-sans text-foreground">
+      <body className="min-h-full overflow-x-hidden bg-background font-sans text-foreground">
         {children}
         <Toaster />
       </body>

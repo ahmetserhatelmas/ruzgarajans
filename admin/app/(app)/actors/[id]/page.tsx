@@ -99,21 +99,21 @@ export default async function ActorDetailPage({
   });
 
   const field = (k: string, v?: React.ReactNode) => (
-    <div className="grid grid-cols-3 gap-2 border-b border-border py-2 text-sm">
+    <div className="grid grid-cols-1 gap-1 border-b border-border py-2 text-sm sm:grid-cols-3 sm:gap-2">
       <dt className="text-muted-foreground">{k}</dt>
-      <dd className="col-span-2">{v || "—"}</dd>
+      <dd className="sm:col-span-2 break-words">{v || "—"}</dd>
     </div>
   );
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start gap-5">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:gap-5">
         {chestSrc ? (
           <a
             href={chestSrc}
             target="_blank"
             rel="noreferrer"
-            className="relative block aspect-[3/4] w-36 shrink-0 overflow-hidden rounded-xl bg-muted ring-1 ring-foreground/10 sm:w-40"
+            className="relative block aspect-[3/4] w-28 shrink-0 overflow-hidden rounded-xl bg-muted ring-1 ring-foreground/10 sm:w-40"
           >
             <Image
               src={chestSrc}
@@ -124,7 +124,7 @@ export default async function ActorDetailPage({
             />
           </a>
         ) : (
-          <div className="flex aspect-[3/4] w-36 shrink-0 items-center justify-center rounded-xl bg-muted text-center text-xs text-muted-foreground ring-1 ring-foreground/10 sm:w-40">
+          <div className="flex aspect-[3/4] w-28 shrink-0 items-center justify-center rounded-xl bg-muted text-center text-xs text-muted-foreground ring-1 ring-foreground/10 sm:w-40">
             Göğüs plan yok
           </div>
         )}

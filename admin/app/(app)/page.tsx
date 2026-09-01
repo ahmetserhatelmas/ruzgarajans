@@ -12,10 +12,10 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
   const { profile } = await getAdminProfile();
-  const { error } = await searchParams;
+  const { error, ok } = await searchParams;
   const [actors, casts, applications] = await Promise.all([
     fetchActorRows(),
     fetchCasts(),
@@ -70,6 +70,11 @@ export default async function DashboardPage({
       {error === "forbidden" ? (
         <p className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
           Bu bölüme yetkin yok.
+        </p>
+      ) : null}
+      {ok ? (
+        <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {decodeURIComponent(ok)}
         </p>
       ) : null}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

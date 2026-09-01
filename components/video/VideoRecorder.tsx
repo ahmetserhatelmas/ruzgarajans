@@ -202,6 +202,10 @@ export function VideoRecorder({
   const [facing, setFacing] = useState<CameraType>('front');
   const playerRef = useRef<AudioPlayer | null>(null);
   const cancelledRef = useRef(false);
+  const mountedRef = useRef(true);
+  const recordingRef = useRef(false);
+  const holdCameraRef = useRef(false);
+  const assistTimersRef = useRef<ReturnType<typeof setInterval>[]>([]);
   const isSimulator = !Device.isDevice;
   const [showDialogue, setShowDialogue] = useState(true);
   const [previewing, setPreviewing] = useState(false);
@@ -210,30 +214,61 @@ export function VideoRecorder({
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const [screenOn, setScreenOn] = useState(true);
 
-  const stopDialogueAssist = () => {
-    Speech.stop();
+  const clearAssistTimers = () => {
+    for (const id of assistTimersRef.current) clearInterval(id);
+    assistTimersRef.current = [];
+  };
+
+  const trackTimer = (id: ReturnType<typeof setInterval>) => {
+    assistTimersRef.current.push(id);
+    return id;
+  };
+
+  const releasePlayerSoon = (player: AudioPlayer | null) => {
+    if (!player) return;
     try {
-      playerRef.current?.pause();
-      playerRef.current?.release();
+      player.pause();
     } catch {
-      // ignore cleanup errors
+      // ignore
     }
+    setTimeout(() => {
+      try {
+        player.release();
+      } catch {
+        // ignore
+      }
+    }, 180);
+  };
+
+  const stopDialogueAssist = () => {
+    clearAssistTimers();
+    try {
+      Speech.stop();
+    } catch {
+      // ignore
+    }
+    const player = playerRef.current;
     playerRef.current = null;
+    releasePlayerSoon(player);
   };
 
   const hushAll = () => {
     cancelledRef.current = true;
     stopDialogueAssist();
-    try {
-      cameraRef.current?.stopRecording();
-    } catch {
-      // already stopped
+    if (recordingRef.current) {
+      try {
+        cameraRef.current?.stopRecording();
+      } catch {
+        // already stopped
+      }
     }
   };
 
   useEffect(() => {
+    mountedRef.current = true;
     void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.DEFAULT);
     return () => {
+      mountedRef.current = false;
       hushAll();
       void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
     };
@@ -251,12 +286,15 @@ export function VideoRecorder({
   );
 
   useEffect(() => {
-    if (countdown !== null || recording) return;
+    if (countdown !== null || recording || holdCameraRef.current) return;
     if (!isLandscape) {
       setCameraBox(null);
       return;
     }
-    const timer = setTimeout(() => setCameraBox({ w: width, h: height }), 80);
+    const timer = setTimeout(() => {
+      if (holdCameraRef.current || recordingRef.current) return;
+      setCameraBox({ w: width, h: height });
+    }, 80);
     return () => clearTimeout(timer);
   }, [isLandscape, width, height, countdown, recording]);
 
@@ -279,17 +317,26 @@ export function VideoRecorder({
     opts: { language: string; voice?: string; rate: number; pitch: number }
   ) =>
     new Promise<void>((resolve) => {
+      if (cancelledRef.current) {
+        resolve();
+        return;
+      }
       const words = wordsOf(text);
       let usedBoundary = false;
+      let settled = false;
       const started = Date.now();
       const estimatedMs = Math.max(800, words.join(' ').length * (72 / Math.max(0.25, opts.rate)));
-      const tick = setInterval(() => {
-        if (usedBoundary || cancelledRef.current) return;
-        const progress = (Date.now() - started) / estimatedMs;
-        setHighlightIndex(wordIndexAtProgress(text, progress));
-      }, 50);
+      const tick = trackTimer(
+        setInterval(() => {
+          if (usedBoundary || cancelledRef.current || !mountedRef.current) return;
+          const progress = (Date.now() - started) / estimatedMs;
+          setHighlightIndex(wordIndexAtProgress(text, progress));
+        }, 50)
+      );
 
       const finish = () => {
+        if (settled) return;
+        settled = true;
         clearInterval(tick);
         resolve();
       };
@@ -300,8 +347,11 @@ export function VideoRecorder({
         rate: opts.rate,
         pitch: opts.pitch,
         ...(Platform.OS === 'ios' ? { useApplicationAudioSession: false } : {}),
-        onStart: () => setHighlightIndex(0),
+        onStart: () => {
+          if (mountedRef.current && !cancelledRef.current) setHighlightIndex(0);
+        },
         onBoundary: (ev: { charIndex?: number } | undefined) => {
+          if (cancelledRef.current || !mountedRef.current) return;
           usedBoundary = true;
           const index = typeof ev?.charIndex === 'number' ? ev.charIndex : 0;
           setHighlightIndex(wordIndexAt(text, index));
@@ -314,42 +364,71 @@ export function VideoRecorder({
 
   const playRemoteAudio = (uri: string, text: string, marks?: DialogueWordMark[]) =>
     new Promise<void>((resolve) => {
-      try {
-        playerRef.current?.pause();
-        playerRef.current?.release();
-      } catch {
-        // ignore
+      if (cancelledRef.current) {
+        resolve();
+        return;
       }
-      const player = createAudioPlayer({ uri });
+      const prev = playerRef.current;
+      playerRef.current = null;
+      releasePlayerSoon(prev);
+      let player: AudioPlayer;
+      try {
+        player = createAudioPlayer({ uri });
+      } catch {
+        resolve();
+        return;
+      }
       playerRef.current = player;
       const words = wordsOf(text);
       const aligned = alignTtsMarks(text, marks ?? []);
-      player.play();
+      try {
+        player.play();
+      } catch {
+        resolve();
+        return;
+      }
       const started = Date.now();
-      const tick = setInterval(() => {
-        let duration = Number(player.duration ?? 0);
-        let current = Number(player.currentTime ?? 0);
-        if (duration > 100) {
-          duration /= 1000;
-          current /= 1000;
-        }
-        if (aligned.length) {
-          setHighlightIndex(wordIndexAtTime(aligned, current + 0.06));
-        } else if (duration > 0) {
-          const lookahead = Math.min(0.28, 0.12 + duration * 0.02);
-          setHighlightIndex(wordIndexAtProgress(text, (current + lookahead) / duration));
-        } else {
-          const estimatedMs = Math.max(800, words.join(' ').length * 72);
-          setHighlightIndex(wordIndexAtProgress(text, (Date.now() - started) / estimatedMs));
-        }
-        const finished =
-          (duration > 0 && current >= duration - 0.08) ||
-          (duration <= 0 && Date.now() - started > Math.max(4000, words.length * 420));
-        if (cancelledRef.current || finished) {
-          clearInterval(tick);
-          resolve();
-        }
-      }, 40);
+      const tick = trackTimer(
+        setInterval(() => {
+          if (cancelledRef.current || playerRef.current !== player) {
+            clearInterval(tick);
+            resolve();
+            return;
+          }
+          let duration = 0;
+          let current = 0;
+          try {
+            duration = Number(player.duration ?? 0);
+            current = Number(player.currentTime ?? 0);
+          } catch {
+            clearInterval(tick);
+            resolve();
+            return;
+          }
+          if (duration > 100) {
+            duration /= 1000;
+            current /= 1000;
+          }
+          if (mountedRef.current) {
+            if (aligned.length) {
+              setHighlightIndex(wordIndexAtTime(aligned, current + 0.06));
+            } else if (duration > 0) {
+              const lookahead = Math.min(0.28, 0.12 + duration * 0.02);
+              setHighlightIndex(wordIndexAtProgress(text, (current + lookahead) / duration));
+            } else {
+              const estimatedMs = Math.max(800, words.join(' ').length * 72);
+              setHighlightIndex(wordIndexAtProgress(text, (Date.now() - started) / estimatedMs));
+            }
+          }
+          const finished =
+            (duration > 0 && current >= duration - 0.08) ||
+            (duration <= 0 && Date.now() - started > Math.max(4000, words.length * 420));
+          if (finished) {
+            clearInterval(tick);
+            resolve();
+          }
+        }, 40)
+      );
     });
 
   const playParsedScript = async (script: DialogueScript) => {
@@ -399,7 +478,7 @@ export function VideoRecorder({
     try {
       await playParsedScript(parseDialogueScript(dialogueScript));
     } finally {
-      setPreviewing(false);
+      if (mountedRef.current) setPreviewing(false);
       stopDialogueAssist();
     }
   };
@@ -480,12 +559,14 @@ export function VideoRecorder({
       return;
     }
 
+    recordingRef.current = true;
     setRecording(true);
     void startDialogueAssist();
 
+    let clipUri: string | null = null;
     try {
       const result = await cameraRef.current.recordAsync({ maxDuration });
-      if (result?.uri) setUri(result.uri);
+      clipUri = result?.uri ?? null;
     } catch (e: any) {
       const message = String(e?.message ?? e ?? '');
       if (message.includes('SimulatorNotSupported') || message.includes('simulator')) {
@@ -493,23 +574,41 @@ export function VideoRecorder({
           { text: t('common.cancel'), style: 'cancel' },
           { text: t('video.pickVideo'), onPress: () => void pickFromLibrary() },
         ]);
-      } else {
+      } else if (!cancelledRef.current && mountedRef.current) {
         Alert.alert(t('common.error'), message || t('common.error'));
       }
     } finally {
-      setRecording(false);
+      recordingRef.current = false;
+      cancelledRef.current = true;
+      holdCameraRef.current = true;
+      if (mountedRef.current) {
+        setRecording(false);
+        setCueLabel(null);
+        setCueText('');
+        setHighlightIndex(-1);
+      }
       stopDialogueAssist();
-      setCueLabel(null);
-      setCueText('');
-      setHighlightIndex(-1);
+      // Unmounting CameraView in the same tick as stopRecording crashes iOS.
+      await sleep(280);
+      if (mountedRef.current && clipUri) setUri(clipUri);
+      holdCameraRef.current = false;
     }
   };
 
   const stop = () => {
+    if (!recordingRef.current) return;
+    cancelledRef.current = true;
+    clearAssistTimers();
+    try {
+      Speech.stop();
+    } catch {
+      // ignore
+    }
     try {
       cameraRef.current?.stopRecording();
     } catch {
-      setRecording(false);
+      recordingRef.current = false;
+      if (mountedRef.current) setRecording(false);
       stopDialogueAssist();
     }
   };
@@ -659,6 +758,7 @@ export function VideoRecorder({
                     setPreviewing(false);
                     setCueLabel(null);
                     setCueText('');
+                    setHighlightIndex(-1);
                     return;
                   }
                   void previewScript();

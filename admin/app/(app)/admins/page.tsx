@@ -6,7 +6,12 @@ import {
   ADMIN_PERM_LABELS,
   requireAdminPerm,
 } from "@/lib/permissions";
-import { removeAdminRoleAction, setAdminRoleAction, updateAdminPermsAction } from "@/lib/actions";
+import {
+  removeAdminRoleAction,
+  setAdminPasswordAction,
+  setAdminRoleAction,
+  updateAdminPermsAction,
+} from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +33,7 @@ export default async function AdminsPage({
     <div className="space-y-6">
       <PageHeader
         title="Yöneticiler"
-        description="Kişi önce mobil uygulamadan üye olsun. Sonra e-postasını yaz; bölümlere ek olarak indirme ve üyelik onayını ayrı seç."
+        description="Yeni yönetici için e-posta ve şifre yaz. Kendi şifreni soldaki Şifre sayfasından değiştir."
       />
 
       <Card>
@@ -48,10 +53,32 @@ export default async function AdminsPage({
           ) : null}
           <form action={setAdminRoleAction} className="space-y-4">
             <input
+              name="full_name"
+              type="text"
+              placeholder="Ad soyad"
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            />
+            <input
               name="email"
               type="email"
               required
               placeholder="yonetici@ornek.com"
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            />
+            <input
+              name="password"
+              type="password"
+              minLength={8}
+              autoComplete="new-password"
+              placeholder="Şifre (yeni hesapta zorunlu)"
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            />
+            <input
+              name="password_confirm"
+              type="password"
+              minLength={8}
+              autoComplete="new-password"
+              placeholder="Şifre tekrar"
               className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             />
             <label className="flex items-center gap-2 text-sm font-medium">
@@ -84,55 +111,75 @@ export default async function AdminsPage({
         </CardHeader>
         <CardContent className="space-y-4">
           {admins.map((admin) => (
-            <form
-              key={admin.id}
-              action={updateAdminPermsAction}
-              className="space-y-3 rounded-lg border border-border p-3"
-            >
-              <input type="hidden" name="user_id" value={admin.id} />
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium">{admin.full_name || "—"}</p>
-                  <p className="text-sm text-muted-foreground">{admin.email}</p>
-                  {admin.is_super_admin ? (
-                    <p className="mt-1 text-xs font-medium text-primary">Tam yetkili</p>
-                  ) : null}
-                </div>
-                <Button formAction={removeAdminRoleAction} type="submit" variant="outline" size="sm">
-                  Yetkiyi al
-                </Button>
-              </div>
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <input type="checkbox" name="full" defaultChecked={Boolean(admin.is_super_admin)} />
-                Tam yetki
-              </label>
-              {ADMIN_PERM_GROUPS.map((group) => (
-                <div key={group.title} className="space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {group.title}
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {group.perms.map((perm) => (
-                      <label key={perm} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          name="perm"
-                          value={perm}
-                          defaultChecked={
-                            Boolean(admin.is_super_admin) ||
-                            (admin.admin_permissions ?? []).includes(perm)
-                          }
-                        />
-                        {ADMIN_PERM_LABELS[perm]}
-                      </label>
-                    ))}
+            <div key={admin.id} className="space-y-3 rounded-lg border border-border p-3">
+              <form action={updateAdminPermsAction} className="space-y-3">
+                <input type="hidden" name="user_id" value={admin.id} />
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{admin.full_name || "—"}</p>
+                    <p className="text-sm text-muted-foreground">{admin.email}</p>
+                    {admin.is_super_admin ? (
+                      <p className="mt-1 text-xs font-medium text-primary">Tam yetkili</p>
+                    ) : null}
                   </div>
+                  <Button formAction={removeAdminRoleAction} type="submit" variant="outline" size="sm">
+                    Yetkiyi al
+                  </Button>
                 </div>
-              ))}
-              <Button type="submit" size="sm">
-                Yetkileri kaydet
-              </Button>
-            </form>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input type="checkbox" name="full" defaultChecked={Boolean(admin.is_super_admin)} />
+                  Tam yetki
+                </label>
+                {ADMIN_PERM_GROUPS.map((group) => (
+                  <div key={group.title} className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {group.title}
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {group.perms.map((perm) => (
+                        <label key={perm} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            name="perm"
+                            value={perm}
+                            defaultChecked={
+                              Boolean(admin.is_super_admin) ||
+                              (admin.admin_permissions ?? []).includes(perm)
+                            }
+                          />
+                          {ADMIN_PERM_LABELS[perm]}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <Button type="submit" size="sm">
+                  Yetkileri kaydet
+                </Button>
+              </form>
+              <form action={setAdminPasswordAction} className="grid gap-2 border-t border-border pt-3 sm:grid-cols-[1fr_1fr_auto]">
+                <input type="hidden" name="user_id" value={admin.id} />
+                <input
+                  name="password"
+                  type="password"
+                  minLength={8}
+                  autoComplete="new-password"
+                  placeholder="Yeni şifre"
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                />
+                <input
+                  name="password_confirm"
+                  type="password"
+                  minLength={8}
+                  autoComplete="new-password"
+                  placeholder="Şifre tekrar"
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                />
+                <Button type="submit" variant="outline" size="sm" className="h-10">
+                  Şifre belirle
+                </Button>
+              </form>
+            </div>
           ))}
         </CardContent>
       </Card>

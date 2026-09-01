@@ -1,4 +1,4 @@
-import { signInAction } from "@/lib/actions";
+import { requestPasswordResetAction, signInAction } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,15 +6,18 @@ import { Label } from "@/components/ui/label";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, ok } = await searchParams;
   const message =
     error === "admin"
       ? "Bu panel yalnızca admin hesapları içindir."
-      : error
-        ? decodeURIComponent(error)
-        : null;
+      : error === "reset"
+        ? "Şifre linki geçersiz veya süresi doldu. Yeni link iste."
+        : error
+          ? decodeURIComponent(error)
+          : null;
+  const success = ok ? decodeURIComponent(ok) : null;
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
@@ -31,14 +34,19 @@ export default async function LoginPage({
         <div className="mt-3 h-px w-16 bg-primary" />
         <h1 className="mt-5 text-xl font-semibold text-foreground">Admin girişi</h1>
         <p className="mt-1 mb-8 text-sm leading-6 text-muted-foreground">
-          Mobil uygulamadaki admin hesabınla giriş yap.
+          E-posta ve şifrenle giriş yap. Şifren yoksa belirleme linki iste.
         </p>
+        {success ? (
+          <p className="mb-5 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            {success}
+          </p>
+        ) : null}
         {message ? (
           <p className="mb-5 rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {message}
           </p>
         ) : null}
-        <form action={signInAction} className="grid gap-5">
+        <form className="grid gap-5">
           <div className="grid gap-2">
             <Label htmlFor="email" className="text-muted-foreground">
               E-posta
@@ -60,13 +68,15 @@ export default async function LoginPage({
               id="password"
               name="password"
               type="password"
-              required
               autoComplete="current-password"
               className="h-11 bg-muted px-3"
             />
           </div>
-          <Button type="submit" size="lg" className="h-11 w-full text-base">
+          <Button formAction={signInAction} type="submit" size="lg" className="h-11 w-full text-base">
             Giriş yap
+          </Button>
+          <Button formAction={requestPasswordResetAction} type="submit" variant="outline" className="h-11 w-full">
+            Şifre belirleme linki gönder
           </Button>
         </form>
       </div>

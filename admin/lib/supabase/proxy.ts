@@ -30,10 +30,12 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isLogin = path === "/login";
+  const isLogin = path === "/login" || path.startsWith("/login/");
+  const isAuth = path.startsWith("/auth/");
   const isPublicShare = path.startsWith("/p/");
+  const isPasswordUpdate = path === "/login/update-password";
 
-  if (isPublicShare) {
+  if (isPublicShare || isAuth) {
     return supabaseResponse;
   }
 
@@ -43,7 +45,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user) {
+  if (user && !isPasswordUpdate) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")

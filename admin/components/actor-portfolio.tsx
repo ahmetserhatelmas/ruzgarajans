@@ -27,9 +27,9 @@ import type { SharedActorPayload } from "@/lib/types";
 
 function field(k: string, v?: React.ReactNode) {
   return (
-    <div className="grid grid-cols-3 gap-2 border-b border-border py-2 text-sm">
+    <div className="grid grid-cols-1 gap-1 border-b border-border py-2 text-sm sm:grid-cols-3 sm:gap-2">
       <dt className="text-muted-foreground">{k}</dt>
-      <dd className="col-span-2">{v || "—"}</dd>
+      <dd className="sm:col-span-2 break-words">{v || "—"}</dd>
     </div>
   );
 }

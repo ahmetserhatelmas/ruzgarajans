@@ -22,13 +22,15 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   ]);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col md:flex-row">
       <Sidebar
         email={profile?.email ?? user?.email}
         pendingCount={count ?? 0}
         profile={profile as { role: "actor" | "admin" | "cast_director"; is_super_admin?: boolean; admin_permissions?: string[] } | null}
       />
-      <main className="min-w-0 flex-1 p-8 print:p-0">{children}</main>
+      <main className="min-w-0 flex-1 overflow-x-hidden p-4 pb-10 md:p-8 print:p-0">
+        {children}
+      </main>
     </div>
   );
 }

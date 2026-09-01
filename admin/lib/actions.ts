@@ -3,6 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  createAuthUser,
+  parseNewPassword,
+  setAuthPassword,
+  siteUrl,
+} from "@/lib/supabase/admin";
 import { notifyMatchingActors, notifyOptionedActor } from "@/lib/notify-cast";
 import { attachDialogueAudio } from "@/lib/dialogue-audio";
 import { parseDialogueScript } from "@/lib/dialogue-script";
@@ -15,6 +21,9 @@ import { cookies } from "next/headers";
 export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  if (!password) {
+    redirect(`/login?error=${encodeURIComponent("Şifre yaz veya aşağıdaki linkle yeni şifre belirle.")}`);
+  }
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) redirect(`/login?error=${encodeURIComponent(error.message)}`);
@@ -42,6 +51,40 @@ export async function signOutAction() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
+}
+
+export async function requestPasswordResetAction(formData: FormData) {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) {
+    redirect(`/login?error=${encodeURIComponent("E-posta gerekli.")}`);
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl()}/auth/callback?next=/login/update-password`,
+  });
+  if (error) redirect(`/login?error=${encodeURIComponent(error.message)}`);
+  redirect(`/login?ok=${encodeURIComponent("Şifre belirleme linki e-postana gönderildi.")}`);
+}
+
+export async function updateOwnPasswordAction(formData: FormData) {
+  const next = String(formData.get("next") ?? "/account");
+  const parsed = parseNewPassword(formData, true);
+  if (parsed.error) {
+    redirect(`${next}?error=${encodeURIComponent(parsed.error)}`);
+  }
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  const { error } = await supabase.auth.updateUser({ password: parsed.password });
+  if (error) {
+    redirect(`${next}?error=${encodeURIComponent(error.message)}`);
+  }
+  if (next.startsWith("/login")) {
+    redirect("/?ok=" + encodeURIComponent("Şifre kaydedildi."));
+  }
+  redirect(`${next}?ok=${encodeURIComponent("Şifre kaydedildi.")}`);
 }
 
 export async function deleteActorsAction(ids: string[]) {
@@ -672,10 +715,18 @@ export async function setAdminRoleAction(formData: FormData) {
   await requireAdminPerm("admins");
   const supabase = await createClient();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const fullName = String(formData.get("full_name") ?? "").trim();
   const { full, perms } = parseAdminPerms(formData);
+  const parsed = parseNewPassword(formData, false);
 
   if (!email) {
     redirect(`/admins?error=${encodeURIComponent("E-posta gerekli.")}`);
+  }
+  if (parsed.error) {
+    redirect(`/admins?error=${encodeURIComponent(parsed.error)}`);
+  }
+  if (!full && perms.length === 0) {
+    redirect(`/admins?error=${encodeURIComponent("En az bir yetki seç veya tam yetki ver.")}`);
   }
 
   const { data: profile, error: findError } = await supabase
@@ -686,18 +737,38 @@ export async function setAdminRoleAction(formData: FormData) {
   if (findError) {
     redirect(`/admins?error=${encodeURIComponent("Kullanıcı aranırken bir hata oluştu.")}`);
   }
-  if (!profile) {
-    redirect(
-      `/admins?error=${encodeURIComponent(
-        "Bu e-posta ile kayıtlı kullanıcı yok. Önce uygulamadan üye olsun.",
-      )}`,
-    );
-  }
-  if (profile.role === "admin") {
+
+  let userId = profile?.id;
+  if (!userId) {
+    if (!parsed.password) {
+      redirect(
+        `/admins?error=${encodeURIComponent(
+          "Bu e-posta kayıtlı değil. Yeni yönetici için şifre yaz.",
+        )}`,
+      );
+    }
+    const created = await createAuthUser(email, parsed.password, fullName);
+    if (created.error || !created.userId) {
+      redirect(`/admins?error=${encodeURIComponent(created.error || "Kullanıcı oluşturulamadı.")}`);
+    }
+    userId = created.userId;
+  } else if (profile?.role === "admin") {
     redirect(`/admins?error=${encodeURIComponent("Bu kişi zaten yönetici.")}`);
-  }
-  if (!full && perms.length === 0) {
-    redirect(`/admins?error=${encodeURIComponent("En az bir yetki seç veya tam yetki ver.")}`);
+  } else if (parsed.password) {
+    const {
+      data: { user: actor },
+    } = await supabase.auth.getUser();
+    if (actor?.id === userId) {
+      const { error: ownError } = await supabase.auth.updateUser({ password: parsed.password });
+      if (ownError) {
+        redirect(`/admins?error=${encodeURIComponent(ownError.message)}`);
+      }
+    } else {
+      const updated = await setAuthPassword(userId, parsed.password);
+      if (updated.error) {
+        redirect(`/admins?error=${encodeURIComponent(updated.error)}`);
+      }
+    }
   }
 
   const { error } = await supabase
@@ -706,13 +777,53 @@ export async function setAdminRoleAction(formData: FormData) {
       role: "admin",
       is_super_admin: full,
       admin_permissions: full ? [] : perms,
+      ...(fullName ? { full_name: fullName } : {}),
     })
-    .eq("id", profile.id);
+    .eq("id", userId);
   if (error) {
     redirect(`/admins?error=${encodeURIComponent("Yetki verilemedi.")}`);
   }
   revalidatePath("/admins");
   redirect("/admins?ok=" + encodeURIComponent("Yönetici yetkisi verildi."));
+}
+
+export async function setAdminPasswordAction(formData: FormData) {
+  const { supabase, user } = await requireAdminPerm("admins");
+  const id = String(formData.get("user_id") ?? "");
+  const parsed = parseNewPassword(formData, true);
+  if (!id) redirect(`/admins?error=${encodeURIComponent("Yönetici seçilmedi.")}`);
+  if (parsed.error) {
+    redirect(`/admins?error=${encodeURIComponent(parsed.error)}`);
+  }
+
+  if (user?.id === id) {
+    const { error } = await supabase.auth.updateUser({ password: parsed.password });
+    if (error) redirect(`/admins?error=${encodeURIComponent(error.message)}`);
+    revalidatePath("/admins");
+    redirect("/admins?ok=" + encodeURIComponent("Şifre kaydedildi."));
+  }
+
+  const updated = await setAuthPassword(id, parsed.password);
+  if (updated.error) {
+    redirect(`/admins?error=${encodeURIComponent(updated.error)}`);
+  }
+  if (updated.missingServiceRole) {
+    const { data: target } = await supabase.from("profiles").select("email").eq("id", id).maybeSingle();
+    if (!target?.email) {
+      redirect(`/admins?error=${encodeURIComponent("Bu yöneticinin e-postası yok.")}`);
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(target.email, {
+      redirectTo: `${siteUrl()}/auth/callback?next=/login/update-password`,
+    });
+    if (error) redirect(`/admins?error=${encodeURIComponent(error.message)}`);
+    revalidatePath("/admins");
+    redirect(
+      "/admins?ok=" +
+        encodeURIComponent("Şifre maili gönderildi. Kendi şifren için soldaki Şifre sayfasını kullan."),
+    );
+  }
+  revalidatePath("/admins");
+  redirect("/admins?ok=" + encodeURIComponent("Şifre kaydedildi."));
 }
 
 export async function updateAdminPermsAction(formData: FormData) {
