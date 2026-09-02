@@ -8,6 +8,7 @@ import { TextField } from '@/components/ui/TextField';
 import { Button } from '@/components/ui/Button';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import { useAuth } from '@/contexts/AuthContext';
+import { authErrorKey } from '@/lib/authErrors';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function RegisterScreen() {
@@ -26,7 +27,7 @@ export default function RegisterScreen() {
       await signUp({ email, password, fullName, phone });
       router.replace('/');
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), t(authErrorKey(e)));
     } finally {
       setLoading(false);
     }

@@ -16,6 +16,7 @@ import { ADMIN_PERMS, requireAdminPerm, type AdminPerm } from "@/lib/permissions
 import { fetchSharedActor, fetchSharedApplication } from "@/lib/share";
 import { hashSharePin, isSharePin, parseShareInput, shareUnlockCookieName } from "@/lib/share-pin";
 import type { ActorStatus, ApplicationStatus, CastListing, GenderPref } from "@/lib/types";
+import { authErrorTr } from "@/lib/auth-errors";
 import { cookies } from "next/headers";
 
 export async function signInAction(formData: FormData) {
@@ -26,7 +27,7 @@ export async function signInAction(formData: FormData) {
   }
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) redirect(`/login?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/login?error=${encodeURIComponent(authErrorTr(error))}`);
 
   const {
     data: { user },
@@ -62,7 +63,7 @@ export async function requestPasswordResetAction(formData: FormData) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${siteUrl()}/auth/callback?next=/login/update-password`,
   });
-  if (error) redirect(`/login?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/login?error=${encodeURIComponent(authErrorTr(error))}`);
   redirect(`/login?ok=${encodeURIComponent("Şifre belirleme linki e-postana gönderildi.")}`);
 }
 
@@ -787,6 +788,43 @@ export async function setAdminRoleAction(formData: FormData) {
   redirect("/admins?ok=" + encodeURIComponent("Yönetici yetkisi verildi."));
 }
 
+export async function promoteExistingAdminAction(formData: FormData) {
+  await requireAdminPerm("admins");
+  const supabase = await createClient();
+  const id = String(formData.get("user_id") ?? "").trim();
+  const { full, perms } = parseAdminPerms(formData);
+  if (!id) redirect(`/admins?error=${encodeURIComponent("Kişi seçilmedi.")}`);
+  if (!full && perms.length === 0) {
+    redirect(`/admins?error=${encodeURIComponent("En az bir yetki seç veya tam yetki ver.")}`);
+  }
+
+  const { data: profile, error: findError } = await supabase
+    .from("profiles")
+    .select("id, role")
+    .eq("id", id)
+    .maybeSingle();
+  if (findError || !profile) {
+    redirect(`/admins?error=${encodeURIComponent("Kayıtlı kişi bulunamadı.")}`);
+  }
+  if (profile.role === "admin") {
+    redirect(`/admins?error=${encodeURIComponent("Bu kişi zaten yönetici.")}`);
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      role: "admin",
+      is_super_admin: full,
+      admin_permissions: full ? [] : perms,
+    })
+    .eq("id", id);
+  if (error) {
+    redirect(`/admins?error=${encodeURIComponent("Yetki verilemedi.")}`);
+  }
+  revalidatePath("/admins");
+  redirect("/admins?ok=" + encodeURIComponent("Yönetici yetkisi verildi."));
+}
+
 export async function setAdminPasswordAction(formData: FormData) {
   const { supabase, user } = await requireAdminPerm("admins");
   const id = String(formData.get("user_id") ?? "");
@@ -804,26 +842,18 @@ export async function setAdminPasswordAction(formData: FormData) {
   }
 
   const updated = await setAuthPassword(id, parsed.password);
+  if (updated.missingServiceRole) {
+    redirect(
+      `/admins?error=${encodeURIComponent(
+        "Şifre doğrudan kaydedilemedi. SUPABASE_SERVICE_ROLE_KEY eksik.",
+      )}`,
+    );
+  }
   if (updated.error) {
     redirect(`/admins?error=${encodeURIComponent(updated.error)}`);
   }
-  if (updated.missingServiceRole) {
-    const { data: target } = await supabase.from("profiles").select("email").eq("id", id).maybeSingle();
-    if (!target?.email) {
-      redirect(`/admins?error=${encodeURIComponent("Bu yöneticinin e-postası yok.")}`);
-    }
-    const { error } = await supabase.auth.resetPasswordForEmail(target.email, {
-      redirectTo: `${siteUrl()}/auth/callback?next=/login/update-password`,
-    });
-    if (error) redirect(`/admins?error=${encodeURIComponent(error.message)}`);
-    revalidatePath("/admins");
-    redirect(
-      "/admins?ok=" +
-        encodeURIComponent("Şifre maili gönderildi. Kendi şifren için soldaki Şifre sayfasını kullan."),
-    );
-  }
   revalidatePath("/admins");
-  redirect("/admins?ok=" + encodeURIComponent("Şifre kaydedildi."));
+  redirect("/admins?ok=" + encodeURIComponent("Şifre kaydedildi. Mail gönderilmedi."));
 }
 
 export async function updateAdminPermsAction(formData: FormData) {

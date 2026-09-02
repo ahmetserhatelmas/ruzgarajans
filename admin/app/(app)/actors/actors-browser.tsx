@@ -303,83 +303,6 @@ export function ActorsBrowser({
         <p className="text-sm text-destructive">En az bir oyuncu seç.</p>
       ) : null}
 
-      <SharePacksList
-        shares={shares}
-        urls={shareUrls}
-        names={shareNames}
-        highlightToken={sharedToken}
-      />
-
-      <form
-        action={createActorShareAction}
-        className="grid gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10"
-      >
-        {selected.map((id) => (
-          <input key={id} type="hidden" name="actor_ids" value={id} />
-        ))}
-        <p className="text-sm text-muted-foreground">
-          Birden fazla oyuncu seç, tek 4 haneli şifre koy. Aynı linkte hepsi açılır.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-[12rem_11rem_auto] sm:items-end">
-          <label className="grid gap-1 text-sm">
-            <span className="text-muted-foreground">4 haneli şifre</span>
-            <input
-              name="pin"
-              inputMode="numeric"
-              autoComplete="off"
-              maxLength={4}
-              pattern="\d{4}"
-              required
-              placeholder="6060"
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              className="h-10 w-full rounded-md border border-input bg-background px-4 text-center text-lg tracking-[0.3em] [text-indent:0.3em]"
-            />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-muted-foreground">Süre</span>
-            <select
-              name="ttl"
-              defaultValue="1d"
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="1d">1 gün</option>
-              <option value="7d">7 gün</option>
-              <option value="forever">Süresiz</option>
-            </select>
-          </label>
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" className="h-10" disabled={selected.length === 0}>
-              {selected.length ? `${selected.length} profili şifreli linkle paylaş` : "Oyuncu seç"}
-            </Button>
-            {canExport ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10"
-                disabled={selected.length === 0 || exportingSelected}
-                onClick={() => void exportSelectedExcel()}
-              >
-                {exportingSelected
-                  ? "Excel hazırlanıyor…"
-                  : selected.length
-                    ? `${selected.length} kişiyi Excel indir`
-                    : "Excel için seç"}
-              </Button>
-            ) : null}
-            <Button
-              type="button"
-              variant="destructive"
-              className="h-10"
-              disabled={selected.length === 0 || deleting}
-              onClick={() => setConfirmDelete(true)}
-            >
-              {selected.length ? `${selected.length} kişiyi sil` : "Silmek için seç"}
-            </Button>
-          </div>
-        </div>
-      </form>
-
       <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
         <Table>
           <TableHeader>
@@ -491,6 +414,83 @@ export function ActorsBrowser({
           </p>
         ) : null}
       </div>
+
+      <form
+        action={createActorShareAction}
+        className="grid gap-3 rounded-xl bg-card p-4 ring-1 ring-foreground/10"
+      >
+        {selected.map((id) => (
+          <input key={id} type="hidden" name="actor_ids" value={id} />
+        ))}
+        <p className="text-sm text-muted-foreground">
+          Birden fazla oyuncu seç, tek 4 haneli şifre koy. Aynı linkte hepsi açılır.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-[12rem_11rem_auto] sm:items-end">
+          <label className="grid gap-1 text-sm">
+            <span className="text-muted-foreground">4 haneli şifre</span>
+            <input
+              name="pin"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={4}
+              pattern="\d{4}"
+              required
+              placeholder="6060"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              className="h-10 w-full rounded-md border border-input bg-background px-4 text-center text-lg tracking-[0.3em] [text-indent:0.3em]"
+            />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="text-muted-foreground">Süre</span>
+            <select
+              name="ttl"
+              defaultValue="1d"
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="1d">1 gün</option>
+              <option value="7d">7 gün</option>
+              <option value="forever">Süresiz</option>
+            </select>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" className="h-10" disabled={selected.length === 0}>
+              {selected.length ? `${selected.length} profili şifreli linkle paylaş` : "Oyuncu seç"}
+            </Button>
+            {canExport ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10"
+                disabled={selected.length === 0 || exportingSelected}
+                onClick={() => void exportSelectedExcel()}
+              >
+                {exportingSelected
+                  ? "Excel hazırlanıyor…"
+                  : selected.length
+                    ? `${selected.length} kişiyi Excel indir`
+                    : "Excel için seç"}
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="destructive"
+              className="h-10"
+              disabled={selected.length === 0 || deleting}
+              onClick={() => setConfirmDelete(true)}
+            >
+              {selected.length ? `${selected.length} kişiyi sil` : "Silmek için seç"}
+            </Button>
+          </div>
+        </div>
+      </form>
+
+      <SharePacksList
+        shares={shares}
+        urls={shareUrls}
+        names={shareNames}
+        highlightToken={sharedToken}
+      />
 
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent showCloseButton={!deleting}>

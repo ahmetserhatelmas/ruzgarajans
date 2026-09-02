@@ -61,7 +61,7 @@ export function Sidebar({
 
   const nav = (
     <>
-      <div className="px-5 py-6">
+      <div className="shrink-0 px-5 py-6">
         <img
           src="/brand-logo.png"
           alt="Rüzgar Oyunculuk"
@@ -70,7 +70,7 @@ export function Sidebar({
         <p className="font-heading text-2xl tracking-tight">Rüzgar Oyunculuk</p>
         <p className="mt-1 text-xs text-muted-foreground">Admin paneli</p>
       </div>
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3">
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3">
         {LINKS.filter((link) => {
           if (!link.perm) return true;
           if (link.perm === "admins") return isSuperAdmin(profile);
@@ -100,7 +100,7 @@ export function Sidebar({
           );
         })}
       </nav>
-      <div className="border-t border-sidebar-border p-4">
+      <div className="shrink-0 border-t border-sidebar-border p-4">
         <p className="mb-2 truncate text-xs text-muted-foreground">{email}</p>
         <form action={signOutAction}>
           <Button type="submit" variant="outline" className="w-full">
@@ -138,11 +138,11 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[min(18rem,88vw)] flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-200 print:hidden md:static md:z-0 md:w-64 md:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex h-dvh w-[min(18rem,88vw)] flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-transform duration-200 print:hidden md:w-64 md:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
-        <div className="flex justify-end p-3 md:hidden">
+        <div className="flex shrink-0 justify-end p-3 md:hidden">
           <Button
             type="button"
             variant="ghost"
@@ -155,6 +155,7 @@ export function Sidebar({
         </div>
         {nav}
       </aside>
+      <div className="hidden shrink-0 print:hidden md:block md:w-64" aria-hidden />
     </>
   );
 }

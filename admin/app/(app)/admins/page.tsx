@@ -7,6 +7,7 @@ import {
   requireAdminPerm,
 } from "@/lib/permissions";
 import {
+  promoteExistingAdminAction,
   removeAdminRoleAction,
   setAdminPasswordAction,
   setAdminRoleAction,
@@ -15,42 +16,124 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const ROLE_LABEL: Record<string, string> = {
+  actor: "Oyuncu",
+  cast_director: "Cast direktörü",
+};
+
+function sanitizeSearch(value: string) {
+  return value.replace(/[%_,.()]/g, " ").replace(/\s+/g, " ").trim();
+}
+
 export default async function AdminsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; ok?: string }>;
+  searchParams: Promise<{ error?: string; ok?: string; q?: string }>;
 }) {
   const { supabase } = await requireAdminPerm("admins");
-  const { error, ok } = await searchParams;
-  const { data } = await supabase
-    .from("profiles")
-    .select("id, full_name, email, is_super_admin, admin_permissions")
-    .eq("role", "admin")
-    .order("full_name");
+  const { error, ok, q } = await searchParams;
+  const query = sanitizeSearch(q ?? "");
+  const [{ data }, search] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, email, is_super_admin, admin_permissions")
+      .eq("role", "admin")
+      .order("full_name"),
+    query.length >= 2
+      ? supabase
+          .from("profiles")
+          .select("id, full_name, email, role")
+          .neq("role", "admin")
+          .or(`email.ilike.%${query}%,full_name.ilike.%${query}%`)
+          .order("full_name")
+          .limit(20)
+      : Promise.resolve({ data: [] as { id: string; full_name: string | null; email: string | null; role: string }[] }),
+  ]);
   const admins = data ?? [];
+  const matches = search.data ?? [];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Yöneticiler"
-        description="Yeni yönetici için e-posta ve şifre yaz. Kendi şifreni soldaki Şifre sayfasından değiştir."
+        description="Kayıtlı bir kişiyi e-posta veya isimle ara ve admin yap. Yeni hesap için aşağıya e-posta ve şifre yaz. Kendi şifreni soldaki Şifre sayfasından değiştir."
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>Yönetici ekle</CardTitle>
+          <CardTitle>Kayıtlı kişiyi ara</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           {error ? (
-            <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </p>
+            <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
           ) : null}
           {ok ? (
-            <p className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-              {ok}
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{ok}</p>
+          ) : null}
+          <form className="flex flex-col gap-2 sm:flex-row">
+            <input
+              name="q"
+              type="search"
+              defaultValue={query}
+              placeholder="E-posta veya ad soyad"
+              className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+            />
+            <Button type="submit" variant="outline">
+              Ara
+            </Button>
+          </form>
+          {query.length > 0 && query.length < 2 ? (
+            <p className="text-sm text-muted-foreground">En az 2 karakter yaz.</p>
+          ) : null}
+          {query.length >= 2 && matches.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Kayıtlı kişi bulunamadı. Yeni yönetici için aşağıdaki formu kullan.
             </p>
           ) : null}
+          {matches.map((person) => (
+            <form
+              key={person.id}
+              action={promoteExistingAdminAction}
+              className="space-y-3 rounded-lg border border-border p-3"
+            >
+              <input type="hidden" name="user_id" value={person.id} />
+              <div>
+                <p className="font-medium">{person.full_name || "—"}</p>
+                <p className="text-sm text-muted-foreground">{person.email}</p>
+                <p className="mt-1 text-xs font-medium text-primary">
+                  {ROLE_LABEL[person.role] ?? person.role}
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" name="full" />
+                Tam yetki — her şeyi görür ve diğer yöneticileri yönetir
+              </label>
+              {ADMIN_PERM_GROUPS.map((group) => (
+                <div key={group.title} className="space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {group.title}
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {group.perms.map((perm) => (
+                      <label key={perm} className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="perm" value={perm} defaultChecked />
+                        {ADMIN_PERM_LABELS[perm]}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <Button type="submit">Yetkiyi ver</Button>
+            </form>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Yeni yönetici oluştur</CardTitle>
+        </CardHeader>
+        <CardContent>
           <form action={setAdminRoleAction} className="space-y-4">
             <input
               name="full_name"

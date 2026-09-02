@@ -42,6 +42,12 @@ export default {
       'Your application is being reviewed by Rüzgar Oyunculuk. Once approved you can browse cast listings.',
     rejectedTitle: 'Application declined',
     rejectedBody: 'Your membership was not approved. Contact us on WhatsApp for support.',
+    invalidCredentials: 'Wrong password.',
+    emailNotConfirmed: 'Please confirm your email first.',
+    alreadyRegistered: 'This email is already registered.',
+    weakPassword: 'Password must be at least 6 characters.',
+    tooManyAttempts: 'Too many attempts. Try again shortly.',
+    loginFailed: 'Could not sign in.',
   },
   access: {
     needsFormTitle: 'Complete the registration form',

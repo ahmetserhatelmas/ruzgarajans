@@ -1,4 +1,5 @@
 import { requestPasswordResetAction, signInAction } from "@/lib/actions";
+import { authErrorTr } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,14 +10,15 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
   const { error, ok } = await searchParams;
+  const decoded = error ? decodeURIComponent(error) : "";
   const message =
     error === "admin"
       ? "Bu panel yalnızca admin hesapları içindir."
       : error === "reset"
         ? "Şifre linki geçersiz veya süresi doldu. Yeni link iste."
-        : error
-          ? decodeURIComponent(error)
-          : null;
+        : /invalid login|invalid credentials|email not confirmed|too many requests/i.test(decoded)
+          ? authErrorTr({ message: decoded })
+          : decoded || null;
   const success = ok ? decodeURIComponent(ok) : null;
 
   return (

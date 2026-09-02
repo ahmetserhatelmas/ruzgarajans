@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { isSharePin, shareUnlockCookieName } from "@/lib/share-pin";
@@ -11,14 +12,18 @@ import type {
 
 const PRODUCTION_SITE_URL = "https://ruzgarajans.vercel.app";
 
-export async function sharePublicUrl(token: string) {
+const shareOrigin = cache(async () => {
   const configured = (process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   const isLocal = !host || host.includes("localhost") || host.startsWith("127.0.0.1");
   const proto = h.get("x-forwarded-proto") ?? "https";
   const origin = configured || (isLocal ? PRODUCTION_SITE_URL : `${proto}://${host}`);
-  return `${origin.replace(/\/$/, "")}/p/${token}`;
+  return origin.replace(/\/$/, "");
+});
+
+export async function sharePublicUrl(token: string) {
+  return `${await shareOrigin()}/p/${token}`;
 }
 
 export async function purgeExpiredActorShares() {
@@ -32,7 +37,6 @@ export async function purgeExpiredActorShares() {
 
 export async function fetchActorShares(actorId: string) {
   const supabase = await createClient();
-  await purgeExpiredActorShares();
   const { data, error } = await supabase
     .from("actor_shares")
     .select("*")
@@ -47,7 +51,6 @@ export async function fetchActorShares(actorId: string) {
 
 export async function fetchActiveActorShares() {
   const supabase = await createClient();
-  await purgeExpiredActorShares();
   const { data, error } = await supabase
     .from("actor_shares")
     .select("*")
@@ -116,7 +119,6 @@ export async function purgeExpiredApplicationShares() {
 
 export async function fetchApplicationShares(applicationId: string) {
   const supabase = await createClient();
-  await purgeExpiredApplicationShares();
   const { data, error } = await supabase
     .from("application_shares")
     .select("*")
@@ -131,7 +133,6 @@ export async function fetchApplicationShares(applicationId: string) {
 
 export async function fetchActiveApplicationShares() {
   const supabase = await createClient();
-  await purgeExpiredApplicationShares();
   const { data, error } = await supabase
     .from("application_shares")
     .select("*")

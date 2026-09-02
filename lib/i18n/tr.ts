@@ -42,6 +42,12 @@ export default {
       'Başvurun Rüzgar Oyunculuk tarafından inceleniyor. Onaylandığında cast ilanlarına erişebilirsin.',
     rejectedTitle: 'Başvuru reddedildi',
     rejectedBody: 'Üyeliğin onaylanmadı. Destek için WhatsApp üzerinden yazabilirsin.',
+    invalidCredentials: 'Şifre yanlış.',
+    emailNotConfirmed: 'E-posta henüz onaylanmadı.',
+    alreadyRegistered: 'Bu e-posta zaten kayıtlı.',
+    weakPassword: 'Şifre en az 6 karakter olmalı.',
+    tooManyAttempts: 'Çok fazla deneme. Biraz sonra tekrar dene.',
+    loginFailed: 'Giriş yapılamadı.',
   },
   access: {
     needsFormTitle: 'Kayıt formunu tamamla',

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { ageFromBirth } from "@/lib/labels";
 import type {
@@ -15,31 +16,31 @@ import type {
   Video,
 } from "@/lib/types";
 
-export async function requireAdmin() {
+export { getAdminProfile as requireAdmin } from "@/lib/permissions";
+
+export const fetchPendingActorCount = cache(async () => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { supabase, user: null, profile: null };
-
-  const { data: profile } = await supabase
+  const { count } = await supabase
     .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  return { supabase, user, profile: profile as Profile | null };
-}
+    .select("id", { count: "exact", head: true })
+    .eq("role", "actor")
+    .eq("actor_status", "pending");
+  return count ?? 0;
+});
 
 export async function fetchActorRows(): Promise<ActorRow[]> {
   const supabase = await createClient();
   const [{ data: profiles }, { data: actors }, { data: photos }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("*")
+      .select("id, email, full_name, phone, actor_status, avatar_url, cover_url, created_at")
       .eq("role", "actor")
       .order("created_at", { ascending: false }),
-    supabase.from("actor_profiles").select("*"),
+    supabase
+      .from("actor_profiles")
+      .select(
+        "user_id, gender, national_id, city, birth_date, height_cm, hair_color, eye_color, sports, dances, nationality, languages, registration_completed_at, intro_video_playback_url, mimic_video_playback_url",
+      ),
     supabase.from("gallery_photos").select("user_id, kind, public_url"),
   ]);
 
@@ -133,12 +134,39 @@ export async function fetchCasts() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("cast_listings")
-    .select("*, applications(id, status)")
+    .select(
+      "id, project_name, role_name, shoot_location, age_min, age_max, gender, deadline, option_date, payment_due_date, budget_amount, budget_currency, is_published, cover_image_url, created_at, applications(count)",
+    )
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as (CastListing & {
-    applications: { id: string; status: string }[];
-  })[];
+  return ((data ?? []) as (CastListing & { applications?: { count?: number }[] })[]).map((row) => {
+    const count = Number(row.applications?.[0]?.count ?? 0);
+    return { ...row, applications: [], application_count: count };
+  });
+}
+
+export async function fetchDashboardStats() {
+  const supabase = await createClient();
+  const [{ data: profiles }, { data: actors }, { data: kinds }, { data: casts }, { data: apps }] =
+    await Promise.all([
+      supabase.from("profiles").select("id, actor_status, avatar_url, cover_url").eq("role", "actor"),
+      supabase
+        .from("actor_profiles")
+        .select("user_id, registration_completed_at, intro_video_playback_url, mimic_video_playback_url"),
+      supabase.from("gallery_photos").select("user_id, kind"),
+      supabase.from("cast_listings").select("id, is_published"),
+      supabase.from("applications").select("id, status"),
+    ]);
+  return {
+    profiles: (profiles ?? []) as Pick<Profile, "id" | "actor_status" | "avatar_url" | "cover_url">[],
+    actors: (actors ?? []) as Pick<
+      ActorProfile,
+      "user_id" | "registration_completed_at" | "intro_video_playback_url" | "mimic_video_playback_url"
+    >[],
+    kinds: (kinds ?? []) as { user_id: string; kind: string | null }[],
+    casts: (casts ?? []) as Pick<CastListing, "id" | "is_published">[],
+    applications: (apps ?? []) as Pick<Application, "id" | "status">[],
+  };
 }
 
 export async function fetchCastDetail(id: string) {

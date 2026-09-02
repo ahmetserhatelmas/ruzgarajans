@@ -107,7 +107,9 @@ export default async function CastsPage({
                 <TableCell>{formatDate(c.option_date)}</TableCell>
                 <TableCell>{formatDate(c.payment_due_date)}</TableCell>
                 <TableCell>{formatMoney(c.budget_amount, c.budget_currency)}</TableCell>
-                <TableCell>{c.applications?.length ?? 0}</TableCell>
+                <TableCell>
+                  {(c as { application_count?: number }).application_count ?? c.applications?.length ?? 0}
+                </TableCell>
                 <TableCell>
                   <Badge variant={c.is_published ? "default" : "secondary"}>
                     {c.is_published ? "Yayında" : "Taslak"}

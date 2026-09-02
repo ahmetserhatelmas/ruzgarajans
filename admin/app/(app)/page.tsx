@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
-import { fetchActorRows, fetchApplications, fetchCasts } from "@/lib/queries";
+import { fetchDashboardStats } from "@/lib/queries";
 import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
 import { APP_STATUS } from "@/lib/labels";
-import type { ApplicationStatus } from "@/lib/types";
+import type { ActorProfile, ApplicationStatus, Profile } from "@/lib/types";
 import { canAdmin, getAdminProfile } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -16,28 +16,38 @@ export default async function DashboardPage({
 }) {
   const { profile } = await getAdminProfile();
   const { error, ok } = await searchParams;
-  const [actors, casts, applications] = await Promise.all([
-    fetchActorRows(),
-    fetchCasts(),
-    fetchApplications(),
-  ]);
-
-  const pending = actors.filter((a) => a.profile.actor_status === "pending").length;
-  const approved = actors.filter((a) => a.profile.actor_status === "approved").length;
-  const rejected = actors.filter((a) => a.profile.actor_status === "rejected").length;
-  const noForm = actors.filter((a) => !hasCompletedForm(a.actor)).length;
-  const noMedia = actors.filter(
-    (a) => !hasRequiredMedia(a.profile, a.actor, a.photoKinds)
+  const statsData = await fetchDashboardStats();
+  const actorById = new Map(statsData.actors.map((a) => [a.user_id, a]));
+  const kindsByUser = new Map<string, string[]>();
+  for (const photo of statsData.kinds) {
+    if (!photo.kind) continue;
+    const list = kindsByUser.get(photo.user_id) ?? [];
+    list.push(photo.kind);
+    kindsByUser.set(photo.user_id, list);
+  }
+  const pending = statsData.profiles.filter((a) => a.actor_status === "pending").length;
+  const approved = statsData.profiles.filter((a) => a.actor_status === "approved").length;
+  const rejected = statsData.profiles.filter((a) => a.actor_status === "rejected").length;
+  const noForm = statsData.profiles.filter(
+    (a) => !hasCompletedForm((actorById.get(a.id) as ActorProfile | undefined) ?? null),
   ).length;
-  const published = casts.filter((c) => c.is_published).length;
+  const noMedia = statsData.profiles.filter(
+    (a) =>
+      !hasRequiredMedia(
+        a as Profile,
+        (actorById.get(a.id) as ActorProfile | undefined) ?? null,
+        kindsByUser.get(a.id) ?? [],
+      ),
+  ).length;
+  const published = statsData.casts.filter((c) => c.is_published).length;
 
   const byStatus = (Object.keys(APP_STATUS) as ApplicationStatus[]).map((status) => ({
     status,
-    count: applications.filter((a) => a.status === status).length,
+    count: statsData.applications.filter((a) => a.status === status).length,
   }));
 
   const stats = [
-    canAdmin(profile, "actors") ? { label: "Oyuncu", value: actors.length, href: "/actors" } : null,
+    canAdmin(profile, "actors") ? { label: "Oyuncu", value: statsData.profiles.length, href: "/actors" } : null,
     canAdmin(profile, "actors")
       ? { label: "Onay bekleyen", value: pending, href: "/actors?status=pending" }
       : null,
@@ -57,7 +67,7 @@ export default async function DashboardPage({
       ? { label: "Yayındaki ilan", value: published, href: "/casts?published=yes" }
       : null,
     canAdmin(profile, "applications")
-      ? { label: "Toplam başvuru", value: applications.length, href: "/applications" }
+      ? { label: "Toplam başvuru", value: statsData.applications.length, href: "/applications" }
       : null,
   ].filter((s): s is { label: string; value: number; href: string } => Boolean(s));
 
