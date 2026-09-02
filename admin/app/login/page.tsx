@@ -1,4 +1,4 @@
-import { requestPasswordResetAction, signInAction } from "@/lib/actions";
+import { signInAction } from "@/lib/actions";
 import { authErrorTr } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ export default async function LoginPage({
     error === "admin"
       ? "Bu panel yalnızca admin hesapları içindir."
       : error === "reset"
-        ? "Şifre linki geçersiz veya süresi doldu. Yeni link iste."
+        ? "Şifre linki geçersiz veya süresi doldu."
         : /invalid login|invalid credentials|email not confirmed|too many requests/i.test(decoded)
           ? authErrorTr({ message: decoded })
           : decoded || null;
@@ -36,7 +36,7 @@ export default async function LoginPage({
         <div className="mt-3 h-px w-16 bg-primary" />
         <h1 className="mt-5 text-xl font-semibold text-foreground">Admin girişi</h1>
         <p className="mt-1 mb-8 text-sm leading-6 text-muted-foreground">
-          E-posta ve şifrenle giriş yap. Şifren yoksa belirleme linki iste.
+          E-posta ve şifrenle giriş yap.
         </p>
         {success ? (
           <p className="mb-5 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
@@ -70,15 +70,13 @@ export default async function LoginPage({
               id="password"
               name="password"
               type="password"
+              required
               autoComplete="current-password"
               className="h-11 bg-muted px-3"
             />
           </div>
           <Button formAction={signInAction} type="submit" size="lg" className="h-11 w-full text-base">
             Giriş yap
-          </Button>
-          <Button formAction={requestPasswordResetAction} type="submit" variant="outline" className="h-11 w-full">
-            Şifre belirleme linki gönder
           </Button>
         </form>
       </div>
