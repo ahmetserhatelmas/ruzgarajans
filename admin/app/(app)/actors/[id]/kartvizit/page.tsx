@@ -15,7 +15,7 @@ export async function generateMetadata({
   const { id } = await params;
   const { profile } = await fetchActorDetail(id);
   const name = profile?.full_name?.trim() || "Oyuncu";
-  return { title: `${name} · Kartvizit` };
+  return { title: `${name} · Setcard` };
 }
 
 export default async function ActorKartvizitPage({
@@ -43,7 +43,7 @@ export default async function ActorKartvizitPage({
 
       <div className="no-print flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-heading text-3xl tracking-tight">Kartvizit</h1>
+          <h1 className="font-heading text-3xl tracking-tight">Setcard</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             PDF indir yazdır penceresini açar. Hedef olarak “PDF olarak kaydet”
             seçin.

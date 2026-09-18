@@ -423,6 +423,12 @@ export default {
     notifications: 'Bildirimler',
     support: 'Destek',
     account: 'Hesap',
+    deleteAccount: 'Hesabı sil',
+    deleteAccountTitle: 'Hesabı sil',
+    deleteAccountBody:
+      'Hesabın, profilin, fotoğrafların ve başvuruların kalıcı olarak silinir. Bu işlem geri alınamaz.',
+    deleteAccountConfirm: 'Evet, sil',
+    deleteFailed: 'Hesap silinemedi.',
   },
   video: {
     recording: 'Kayıt',
@@ -472,15 +478,15 @@ export default {
     avatar: 'Profil fotoğrafı',
     cover: 'Kapak fotoğrafı',
     avatarRequired: 'Profil fotoğrafı zorunlu.',
-    cardPhotosTitle: 'Kartvizit fotoğrafları',
+    cardPhotosTitle: 'Setcard fotoğrafları',
     cardPhotosHint:
-      'Bu üç fotoğraf kartvizitte kullanılır: boydan, model pozu ve göğüs plan. Beğendiğin fotoğraf 1’i yüklersen dördüncü kare olarak eklenir; yüklemezsen kartvizitte yine bu üçü kalır.',
-    cardPhotoBadge: 'Kartvizit',
-    favoriteOnCardBadge: 'kartvizite eklenecek',
+      'Bu üç fotoğraf setcard’da kullanılır: boydan, model pozu ve göğüs plan. Beğendiğin fotoğraf 1’i yüklersen dördüncü kare olarak eklenir; yüklemezsen setcard’da yine bu üçü kalır.',
+    cardPhotoBadge: 'Setcard',
+    favoriteOnCardBadge: 'setcard’a eklenecek',
     otherPhotosTitle: 'Diğer fotoğraflar',
     favoritePhotosTitle: 'Beğendiğin fotoğraflar',
     favoritePhotosHint:
-      'Beğendiğin fotoğraf 1 kartvizite eklenir (yüklersen). Yüklemezsen kartvizitte yine 3 fotoğraf olur. Fotoğraf 2 yalnızca portföy içindir. İkisi de zorunlu değil.',
+      'Beğendiğin fotoğraf 1 setcard’a eklenir (yüklersen). Yüklemezsen setcard’da yine 3 fotoğraf olur. Fotoğraf 2 yalnızca portföy içindir. İkisi de zorunlu değil.',
     photos: {
       full_body: 'Boydan düz fotoğraf',
       chest: 'Göğüs plan yakın fotoğraf',

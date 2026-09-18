@@ -4,6 +4,7 @@ import { buildXlsxBytes, type SheetImage } from "@/lib/export-table-xlsx";
 import type { ActorRow } from "@/lib/types";
 
 export const SELECTED_ACTOR_EXCEL_HEADERS = [
+  "Göğüs plan",
   "İsim soyisim",
   "Yaş",
   "Cinsiyet",
@@ -11,10 +12,9 @@ export const SELECTED_ACTOR_EXCEL_HEADERS = [
   "Adres",
   "Telefon",
   "WhatsApp",
-  "Göğüs plan",
 ];
 
-const PHOTO_COL = 7;
+const PHOTO_COL = 0;
 
 function bodyInfo(actor: ActorRow["actor"]) {
   if (!actor) return "";
@@ -55,6 +55,7 @@ function imageExt(bytes: Uint8Array): "jpeg" | "png" | null {
 
 export async function buildSelectedActorsXlsx(rows: ActorRow[]): Promise<Uint8Array> {
   const data = rows.map((row) => [
+    "",
     row.profile.full_name || "",
     ageFromBirth(row.actor?.birth_date)?.toString() ?? "",
     label(GENDER, row.actor?.gender),
@@ -62,7 +63,6 @@ export async function buildSelectedActorsXlsx(rows: ActorRow[]): Promise<Uint8Ar
     row.actor?.address || "",
     row.profile.phone || "",
     row.actor?.whatsapp || "",
-    "",
   ]);
 
   const images: SheetImage[] = [];

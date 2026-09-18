@@ -54,7 +54,7 @@ export const PHOTO_KIND: Record<string, string> = {
   profile_left: "Sol profil",
   model_pose: "Model pozu",
   hands: "El",
-  favorite_1: "Beğendiğin 1 (kartvizit)",
+  favorite_1: "Beğendiğin 1 (setcard)",
   favorite_2: "Beğenilen 2",
 };
 

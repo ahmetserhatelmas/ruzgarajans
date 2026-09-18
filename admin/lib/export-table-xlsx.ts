@@ -34,7 +34,14 @@ function sheetXml(
 
   const cols = headers
     .map((_, i) => {
-      const width = i === imageCol ? 18 : i === 0 || i === 3 || i === 4 ? 28 : 16;
+      const width =
+        i === imageCol
+          ? 18
+          : headers[i] === "İsim soyisim" ||
+              headers[i] === "Beden bilgileri" ||
+              headers[i] === "Adres"
+            ? 28
+            : 16;
       return `<col min="${i + 1}" max="${i + 1}" width="${width}" customWidth="1"/>`;
     })
     .join("");

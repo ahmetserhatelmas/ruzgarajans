@@ -10,6 +10,7 @@ export const ADMIN_PERMS = [
   'export_actors',
   'export_applications',
   'actor_approvals',
+  'delete_accounts',
 ] as const;
 
 export type AdminPerm = (typeof ADMIN_PERMS)[number];

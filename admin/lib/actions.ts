@@ -89,7 +89,7 @@ export async function updateOwnPasswordAction(formData: FormData) {
 }
 
 export async function deleteActorsAction(ids: string[]) {
-  await requireAdminPerm("actors");
+  await requireAdminPerm("delete_accounts");
   const unique = [...new Set(ids)].filter((id) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id),
   );

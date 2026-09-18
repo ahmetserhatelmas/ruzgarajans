@@ -10,6 +10,7 @@ export const ADMIN_PERMS = [
   "export_actors",
   "export_applications",
   "actor_approvals",
+  "delete_accounts",
 ] as const;
 
 export type AdminPerm = (typeof ADMIN_PERMS)[number];
@@ -24,6 +25,7 @@ export const ADMIN_PERM_LABELS: Record<AdminPerm, string> = {
   export_actors: "Oyuncu profili indirme",
   export_applications: "Başvuru indirme",
   actor_approvals: "Üyelik onayları",
+  delete_accounts: "Hesap silme",
 };
 
 export const ADMIN_PERM_GROUPS: { title: string; perms: AdminPerm[] }[] = [
@@ -33,7 +35,7 @@ export const ADMIN_PERM_GROUPS: { title: string; perms: AdminPerm[] }[] = [
   },
   {
     title: "İşlemler",
-    perms: ["export_actors", "export_applications", "actor_approvals"],
+    perms: ["export_actors", "export_applications", "actor_approvals", "delete_accounts"],
   },
 ];
 

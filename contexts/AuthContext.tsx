@@ -29,6 +29,7 @@ type AuthContextValue = {
     phone?: string;
   }) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   updateLocale: (locale: 'tr' | 'en') => Promise<void>;
 };
 
@@ -146,6 +147,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    const { error } = await supabase.rpc('delete_own_account');
+    if (error) throw error;
+    await signOut();
+  }, [signOut]);
+
   const updateLocale = useCallback(
     async (locale: 'tr' | 'en') => {
       if (!session?.user) return;
@@ -172,6 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signUp,
       signOut,
+      deleteAccount,
       updateLocale,
     }),
     [
@@ -184,6 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signUp,
       signOut,
+      deleteAccount,
       updateLocale,
     ]
   );

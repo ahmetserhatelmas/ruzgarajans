@@ -11,9 +11,10 @@ import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function SettingsScreen() {
   const { t, i18n } = useTranslation();
-  const { signOut, updateLocale } = useAuth();
+  const { signOut, deleteAccount, updateLocale } = useAuth();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const changeLang = async (lng: 'tr' | 'en') => {
     await setAppLanguage(lng);
@@ -30,6 +31,29 @@ export default function SettingsScreen() {
     } finally {
       setLoggingOut(false);
     }
+  };
+
+  const onDeleteAccount = () => {
+    Alert.alert(t('settings.deleteAccountTitle'), t('settings.deleteAccountBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('settings.deleteAccountConfirm'),
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              setDeleting(true);
+              await deleteAccount();
+              router.replace('/(auth)/login');
+            } catch {
+              Alert.alert(t('common.error'), t('settings.deleteFailed'));
+            } finally {
+              setDeleting(false);
+            }
+          })();
+        },
+      },
+    ]);
   };
 
   return (
@@ -50,7 +74,16 @@ export default function SettingsScreen() {
         label={t('common.logout')}
         variant="secondary"
         loading={loggingOut}
+        disabled={deleting}
         onPress={() => void onLogout()}
+      />
+      <Button
+        label={t('settings.deleteAccount')}
+        variant="danger"
+        loading={deleting}
+        disabled={loggingOut}
+        onPress={onDeleteAccount}
+        style={styles.deleteBtn}
       />
     </Screen>
   );
@@ -108,4 +141,5 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   chipTextActive: { color: Colors.textOnDark },
+  deleteBtn: { marginTop: Spacing.sm },
 });

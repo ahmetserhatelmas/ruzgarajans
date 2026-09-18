@@ -423,6 +423,12 @@ export default {
     notifications: 'Notifications',
     support: 'Support',
     account: 'Account',
+    deleteAccount: 'Delete account',
+    deleteAccountTitle: 'Delete account',
+    deleteAccountBody:
+      'Your account, profile, photos, and applications will be permanently deleted. This cannot be undone.',
+    deleteAccountConfirm: 'Yes, delete',
+    deleteFailed: 'Could not delete the account.',
   },
   video: {
     recording: 'Recording',
@@ -472,15 +478,15 @@ export default {
     avatar: 'Profile photo',
     cover: 'Cover photo',
     avatarRequired: 'Profile photo is required.',
-    cardPhotosTitle: 'Comp card photos',
+    cardPhotosTitle: 'Setcard photos',
     cardPhotosHint:
-      'These three photos go on the comp card: full-length, model pose, and chest-up. If you also upload favorite photo 1, it is added as a fourth frame; if not, the card still has these three.',
-    cardPhotoBadge: 'Comp card',
-    favoriteOnCardBadge: 'goes on the comp card',
+      'These three photos go on the setcard: full-length, model pose, and chest-up. If you also upload favorite photo 1, it is added as a fourth frame; if not, the card still has these three.',
+    cardPhotoBadge: 'Setcard',
+    favoriteOnCardBadge: 'goes on the setcard',
     otherPhotosTitle: 'Other photos',
     favoritePhotosTitle: 'Photos you like',
     favoritePhotosHint:
-      'Favorite photo 1 is added to the comp card if you upload it. If you skip it, the card still has 3 photos. Photo 2 is portfolio only. Both are optional.',
+      'Favorite photo 1 is added to the setcard if you upload it. If you skip it, the card still has 3 photos. Photo 2 is portfolio only. Both are optional.',
     photos: {
       full_body: 'Full-length photo',
       chest: 'Chest-up close photo',

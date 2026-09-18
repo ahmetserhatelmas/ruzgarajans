@@ -33,6 +33,7 @@ export default async function ActorsPage() {
           shareNames={shareNames}
           canExport={canAdmin(profile, "export_actors")}
           canApprove={canAdmin(profile, "actor_approvals")}
+          canDelete={canAdmin(profile, "delete_accounts")}
         />
       </Suspense>
     </div>

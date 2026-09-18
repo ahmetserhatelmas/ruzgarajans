@@ -21,7 +21,7 @@ export function ShareActorFile({ item }: { item: SharedActorPayload }) {
       <div>
         <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-heading text-2xl">Kartvizit</h2>
+            <h2 className="font-heading text-2xl">Setcard</h2>
             <p className="mt-1 text-sm text-muted-foreground">{name}</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -29,7 +29,7 @@ export function ShareActorFile({ item }: { item: SharedActorPayload }) {
               Geri
             </Button>
             <Button type="button" onClick={() => window.print()}>
-              Kartviziti yazdır / PDF
+              Setcard yazdır / PDF
             </Button>
           </div>
         </div>
@@ -65,7 +65,7 @@ export function ShareActorFile({ item }: { item: SharedActorPayload }) {
               ) : null}
             </div>
             <Button type="button" onClick={() => setKartvizit(true)}>
-              Kartvizit
+              Setcard
             </Button>
           </div>
         </div>

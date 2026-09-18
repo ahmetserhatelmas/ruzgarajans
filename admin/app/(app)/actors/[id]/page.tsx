@@ -41,6 +41,7 @@ import { REQUIRED_PHOTO_KINDS } from "@/lib/types";
 import { BrandedVideo } from "@/components/branded-video";
 import { displayImageUrl } from "@/lib/media";
 import { canAdmin, requireAdminPerm } from "@/lib/permissions";
+import { DeleteActorButton } from "@/components/delete-actor-button";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,7 @@ export default async function ActorDetailPage({
   const canExportActor = canAdmin(admin, "export_actors");
   const canExportApplication = canAdmin(admin, "export_applications");
   const canApproveActor = canAdmin(admin, "actor_approvals");
+  const canDeleteActor = canAdmin(admin, "delete_accounts");
   const canIntroduce = canAdmin(admin, "casts");
   const [{ profile, actor, photos, applications, videos, introductions, options }, shares, directors, casts] =
     await Promise.all([
@@ -140,7 +142,7 @@ export default async function ActorDetailPage({
                   </Button>
                 ) : null}
                 <Button asChild variant="outline">
-                  <Link href={`/actors/${profile.id}/kartvizit`}>Kartvizit</Link>
+                  <Link href={`/actors/${profile.id}/kartvizit`}>Setcard</Link>
                 </Button>
                 <form action={startConversationAction.bind(null, profile.id)}>
                   <Button type="submit" variant="outline">
@@ -158,6 +160,9 @@ export default async function ActorDetailPage({
                       Reddet
                     </Button>
                   </form>
+                ) : null}
+                {canDeleteActor ? (
+                  <DeleteActorButton actorId={profile.id} name={profile.full_name || "Bu oyuncu"} />
                 ) : null}
               </div>
             }

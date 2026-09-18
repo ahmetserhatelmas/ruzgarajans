@@ -54,6 +54,7 @@ export function ActorsBrowser({
   shareNames = {},
   canExport = false,
   canApprove = false,
+  canDelete = false,
 }: {
   rows: ActorRow[];
   shares?: ActorShare[];
@@ -61,6 +62,7 @@ export function ActorsBrowser({
   shareNames?: Record<string, string>;
   canExport?: boolean;
   canApprove?: boolean;
+  canDelete?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -289,11 +291,23 @@ export function ActorsBrowser({
           {filtered.length} oyuncu
           {selected.length ? ` · ${selected.length} seçili` : ""}
         </p>
-        {canExport ? (
-          <Button type="button" variant="outline" disabled={filtered.length === 0} onClick={exportExcel}>
-            Excel indir
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {canExport ? (
+            <Button type="button" variant="outline" disabled={filtered.length === 0} onClick={exportExcel}>
+              Excel indir
+            </Button>
+          ) : null}
+          {canDelete ? (
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={selected.length === 0 || deleting}
+              onClick={() => setConfirmDelete(true)}
+            >
+              {selected.length ? `${selected.length} hesabı sil` : "Silmek için seç"}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {shareError === "pin" ? (
@@ -360,15 +374,17 @@ export function ActorsBrowser({
                     : "Excel için seç"}
               </Button>
             ) : null}
-            <Button
-              type="button"
-              variant="destructive"
-              className="h-10"
-              disabled={selected.length === 0 || deleting}
-              onClick={() => setConfirmDelete(true)}
-            >
-              {selected.length ? `${selected.length} kişiyi sil` : "Silmek için seç"}
-            </Button>
+            {canDelete ? (
+              <Button
+                type="button"
+                variant="destructive"
+                className="h-10"
+                disabled={selected.length === 0 || deleting}
+                onClick={() => setConfirmDelete(true)}
+              >
+                {selected.length ? `${selected.length} hesabı sil` : "Silmek için seç"}
+              </Button>
+            ) : null}
           </div>
         </div>
       </form>
@@ -495,9 +511,10 @@ export function ActorsBrowser({
       <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <DialogContent showCloseButton={!deleting}>
           <DialogHeader>
-            <DialogTitle>Oyuncu profillerini sil</DialogTitle>
+            <DialogTitle>Hesapları sil</DialogTitle>
             <DialogDescription>
-              {selected.length} kişiyi silmek istiyorsunuz. Emin misiniz? Bu işlem geri alınamaz.
+              {selected.length} hesabı kalıcı olarak silmek istiyorsunuz. Profil, fotoğraf ve
+              başvurular da gider. Bu işlem geri alınamaz.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
