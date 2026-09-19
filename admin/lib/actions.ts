@@ -9,6 +9,7 @@ import {
   setAuthPassword,
   siteUrl,
 } from "@/lib/supabase/admin";
+import { removeUserMediaFiles } from "@/lib/storage-delete";
 import { notifyMatchingActors, notifyOptionedActor } from "@/lib/notify-cast";
 import { attachDialogueAudio } from "@/lib/dialogue-audio";
 import { parseDialogueScript } from "@/lib/dialogue-script";
@@ -95,6 +96,7 @@ export async function deleteActorsAction(ids: string[]) {
   );
   if (!unique.length) return { ok: false as const, count: 0, error: "Oyuncu seç." };
   const supabase = await createClient();
+  await removeUserMediaFiles(supabase, unique);
   const { data, error } = await supabase.rpc("admin_delete_actors", { p_ids: unique });
   if (error) return { ok: false as const, count: 0, error: error.message };
   revalidatePath("/actors");

@@ -39,7 +39,7 @@ export async function fetchActorRows(): Promise<ActorRow[]> {
     supabase
       .from("actor_profiles")
       .select(
-        "user_id, gender, national_id, city, birth_date, height_cm, hair_color, eye_color, sports, dances, nationality, languages, registration_completed_at, intro_video_playback_url, mimic_video_playback_url",
+        "user_id, gender, national_id, city, birth_date, height_cm, hair_color, eye_color, sports, dances, nationality, languages, experience, registration_completed_at, intro_video_playback_url, mimic_video_playback_url",
       ),
     supabase.from("gallery_photos").select("user_id, kind, public_url"),
   ]);

@@ -79,13 +79,15 @@ export default function HomeScreen() {
         <RegistrationSteps />
       )}
 
-      <Pressable
-        style={({ pressed }) => [styles.introCard, pressed && { opacity: 0.93 }]}
-        onPress={() => router.push('/record/intro')}
-      >
-        <Text style={styles.introTitle}>{t('home.introCta')}</Text>
-        <Text style={styles.introHint}>{t('home.introHint')}</Text>
-      </Pressable>
+      {actorProfile?.intro_video_playback_url ? null : (
+        <Pressable
+          style={({ pressed }) => [styles.introCard, pressed && { opacity: 0.93 }]}
+          onPress={() => router.push('/record/intro')}
+        >
+          <Text style={styles.introTitle}>{t('home.introCta')}</Text>
+          <Text style={styles.introHint}>{t('home.introHint')}</Text>
+        </Pressable>
+      )}
 
       <View style={styles.section}>
         <View style={styles.sectionHead}>

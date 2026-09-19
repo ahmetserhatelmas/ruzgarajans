@@ -11,6 +11,7 @@ import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import type { ActorProfile, Profile } from '@/types/database';
 import { fetchGalleryPhotos, type GalleryPhoto } from '@/services/gallery';
 import i18n from '@/lib/i18n';
+import { removeUserMediaFiles } from '@/lib/storageDelete';
 
 type AuthContextValue = {
   session: Session | null;
@@ -148,10 +149,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteAccount = useCallback(async () => {
+    const uid = session?.user?.id;
+    if (uid) {
+      await removeUserMediaFiles(supabase, [uid]);
+    }
     const { error } = await supabase.rpc('delete_own_account');
     if (error) throw error;
     await signOut();
-  }, [signOut]);
+  }, [session?.user?.id, signOut]);
 
   const updateLocale = useCallback(
     async (locale: 'tr' | 'en') => {
