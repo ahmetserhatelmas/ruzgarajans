@@ -27,7 +27,6 @@ import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { VideoLogoMark } from '@/components/video/VideoLogoMark';
-import { takeVideo } from '@/lib/pickMedia';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import {
   alignTtsMarks,
@@ -580,15 +579,6 @@ export function VideoRecorder({
     }
   };
 
-  const takeNow = async () => {
-    try {
-      const asset = await takeVideo(maxDuration);
-      if (asset?.uri) setUri(asset.uri);
-    } catch (e: any) {
-      Alert.alert(t('common.error'), localizedError(t, e));
-    }
-  };
-
   const runCountdown = async () => {
     if (!countdownEnabled) return;
     for (const n of [3, 2, 1]) {
@@ -699,11 +689,6 @@ export function VideoRecorder({
             await requestMic();
           }}
         />
-        <Button
-          label={t('media.takeNow')}
-          variant="secondary"
-          onPress={() => void takeNow()}
-        />
         {allowLibrary ? (
           <Button
             label={t('media.pickFromGallery')}
@@ -731,19 +716,6 @@ export function VideoRecorder({
         <Ionicons name="phone-landscape-outline" size={64} color={Colors.gold} />
         <Text style={styles.landscapeTitle}>{t('video.landscapeRequired')}</Text>
         <Text style={styles.landscapeBody}>{t('video.landscapeRequiredBody')}</Text>
-        <Button
-          label={t('media.takeNow')}
-          style={styles.recBtn}
-          onPress={() => void takeNow()}
-        />
-        {allowLibrary ? (
-          <Button
-            label={t('media.pickFromGallery')}
-            variant="secondary"
-            style={styles.recBtn}
-            onPress={() => void pickFromLibrary()}
-          />
-        ) : null}
       </View>
     );
   }

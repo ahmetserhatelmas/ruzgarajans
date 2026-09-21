@@ -150,6 +150,19 @@ export async function fetchVideosForCast(castId: string): Promise<Video[]> {
   return (data ?? []) as Video[];
 }
 
+export async function fetchMyAuditionVideos(userId: string, castId: string): Promise<Video[]> {
+  const { data, error } = await supabase
+    .from('videos')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('cast_id', castId)
+    .eq('kind', 'audition')
+    .in('status', ['ready', 'uploading'])
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Video[];
+}
+
 /** Audition videos for admin applications list (ready only). */
 export async function fetchAuditionVideosAdmin(): Promise<Video[]> {
   const { data, error } = await supabase

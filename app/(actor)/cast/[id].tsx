@@ -1,6 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Alert, Image, StyleSheet, Switch, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  Image,
+  Keyboard,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useTranslation } from 'react-i18next';
 import { localizedError } from '@/lib/authErrors';
 import { Screen } from '@/components/ui/Screen';
@@ -11,7 +21,7 @@ import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard'
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
 import { pickFromLibrary } from '@/lib/pickMedia';
-import { recordAndUploadVideo } from '@/services/videos';
+import { fetchMyAuditionVideos, recordAndUploadVideo } from '@/services/videos';
 import {
   applyToCast,
   fetchCastById,
@@ -20,10 +30,10 @@ import {
   fetchOptionForCast,
   respondToCastOption,
 } from '@/services/casts';
-import type { Application, CastListing, CastOption } from '@/types/database';
+import type { Application, CastListing, CastOption, Video } from '@/types/database';
 import { countryLabel } from '@/constants/countries';
 import { languageLabel } from '@/constants/languages';
-import { Colors, Fonts, Spacing } from '@/constants/theme';
+import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function CastDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -43,22 +53,53 @@ export default function CastDetailScreen() {
   const [declineOpen, setDeclineOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
   const [auditionUploading, setAuditionUploading] = useState(false);
+  const [auditionVideo, setAuditionVideo] = useState<Video | null>(null);
+  const [pendingUri, setPendingUri] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const applyY = useRef(0);
+
+  const revealApply = () => {
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, applyY.current - 12),
+      animated: true,
+    });
+  };
 
   useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      setTimeout(revealApply, 50);
+    });
+    return () => show.remove();
+  }, []);
+
+  const loadCast = useCallback(() => {
     if (!id || !user || !castOk) return;
+    let active = true;
     (async () => {
-      const [c, apps, intro, opt] = await Promise.all([
+      const [c, apps, intro, opt, vids] = await Promise.all([
         fetchCastById(id),
         fetchMyApplications(user.id),
         fetchIntroductionForCast(id, user.id),
         fetchOptionForCast(id, user.id),
+        fetchMyAuditionVideos(user.id, id),
       ]);
+      if (!active) return;
       setCast(c);
       setApp(apps.find((a) => a.cast_id === id) ?? null);
       setIntroduced(intro);
       setOption(opt);
+      setAuditionVideo(vids.find((v) => v.status === 'ready') ?? vids[0] ?? null);
     })().catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, [id, user, castOk]);
+
+  useFocusEffect(
+    useCallback(() => {
+      return loadCast();
+    }, [loadCast])
+  );
 
   if (!castOk) {
     return (
@@ -111,6 +152,38 @@ export default function CastDetailScreen() {
     }
   };
 
+  const pickAudition = async () => {
+    try {
+      const asset = await pickFromLibrary('videos');
+      if (!asset) return;
+      setPendingUri(asset.uri);
+    } catch (e: any) {
+      Alert.alert(t('common.error'), localizedError(t, e));
+    }
+  };
+
+  const sendPending = async () => {
+    if (!user || !app || !pendingUri || !cast) return;
+    try {
+      setAuditionUploading(true);
+      const row = await recordAndUploadVideo({
+        localUri: pendingUri,
+        userId: user.id,
+        kind: 'audition',
+        castId: cast.id,
+        applicationId: app.id,
+        title: cast.project_name ?? 'Audition',
+      });
+      setAuditionVideo(row);
+      setPendingUri(null);
+      Alert.alert(t('cast.videoSentAlert'));
+    } catch (e: any) {
+      Alert.alert(t('common.error'), localizedError(t, e));
+    } finally {
+      setAuditionUploading(false);
+    }
+  };
+
   if (!cast) {
     return (
       <Screen>
@@ -120,7 +193,7 @@ export default function CastDetailScreen() {
   }
 
   return (
-    <Screen scroll>
+    <Screen scroll ref={scrollRef}>
       <BackHeader fallbackHref="/(actor)/cast" />
       <View style={styles.hero}>
         {cast.cover_image_url ? (
@@ -251,11 +324,27 @@ export default function CastDetailScreen() {
       </View>
 
       {app ? (
-        <Text style={styles.status}>
-          {t('cast.status')}: {t(`status.${app.status}` as any)}
-        </Text>
+        <View style={styles.statusBox}>
+          <Text style={styles.status}>
+            {t('cast.status')}: {t(`status.${app.status}` as any)}
+          </Text>
+          {cast.requires_video !== false ? (
+            <Text style={auditionVideo?.status === 'ready' ? styles.status : styles.statusMuted}>
+              {t('cast.videoLabel')}:{' '}
+              {auditionVideo?.status === 'ready'
+                ? t('cast.videoSent')
+                : t('cast.videoNotSent')}
+            </Text>
+          ) : null}
+        </View>
       ) : (
-        <View style={styles.applyBox}>
+        <View
+          collapsable={false}
+          style={styles.applyBox}
+          onLayout={(e) => {
+            applyY.current = e.nativeEvent.layout.y;
+          }}
+        >
           {cast.allow_budget_counter ? (
             <>
               <View style={styles.switchRow}>
@@ -270,12 +359,19 @@ export default function CastDetailScreen() {
                     keyboardType="numeric"
                     value={counter}
                     onChangeText={setCounter}
+                    onFocus={() => setTimeout(revealApply, 80)}
                   />
                 </>
               ) : null}
             </>
           ) : null}
-          <TextField label="Not" value={note} onChangeText={setNote} multiline />
+          <TextField
+            label="Not"
+            value={note}
+            onChangeText={setNote}
+            multiline
+            onFocus={() => setTimeout(revealApply, 80)}
+          />
           <Button label={t('cast.apply')} onPress={onApply} loading={loading} />
         </View>
       )}
@@ -284,52 +380,85 @@ export default function CastDetailScreen() {
         <View style={styles.auditionBox}>
           <Text style={styles.hint}>{t('cast.auditionHint')}</Text>
           {!app ? <Text style={styles.hint}>{t('cast.auditionNeedApply')}</Text> : null}
-          <Button
-            label={t('media.takeNow')}
-            variant={app ? 'primary' : 'secondary'}
-            disabled={!app}
-            onPress={() =>
-              router.push({
-                pathname: '/record/audition',
-                params: {
-                  castId: cast.id,
-                  ...(app?.id ? { applicationId: app.id } : {}),
-                },
-              })
-            }
-          />
-          <Button
-            label={t('media.pickFromGallery')}
-            variant="secondary"
-            disabled={!app || auditionUploading}
-            loading={auditionUploading}
-            onPress={() => {
-              if (!user || !app) return;
-              void (async () => {
-                try {
-                  const asset = await pickFromLibrary('videos');
-                  if (!asset) return;
-                  setAuditionUploading(true);
-                  await recordAndUploadVideo({
-                    localUri: asset.uri,
-                    userId: user.id,
-                    kind: 'audition',
-                    castId: cast.id,
-                    applicationId: app.id,
-                    title: cast.project_name ?? 'Audition',
-                  });
-                  Alert.alert(t('common.success'));
-                } catch (e: any) {
-                  Alert.alert(t('common.error'), localizedError(t, e));
-                } finally {
-                  setAuditionUploading(false);
+          {pendingUri ? (
+            <>
+              <Text style={styles.hint}>{t('cast.previewPickHint')}</Text>
+              <PickedPreview uri={pendingUri} />
+              <Button
+                label={t('cast.sendVideo')}
+                onPress={() => void sendPending()}
+                loading={auditionUploading}
+                disabled={!app || auditionUploading}
+              />
+              <Button
+                label={t('cast.pickAnother')}
+                variant="secondary"
+                disabled={auditionUploading}
+                onPress={() => void pickAudition()}
+              />
+              <Button
+                label={t('common.cancel')}
+                variant="ghost"
+                disabled={auditionUploading}
+                onPress={() => setPendingUri(null)}
+              />
+            </>
+          ) : (
+            <>
+              <Button
+                label={t('media.takeNow')}
+                variant={app ? 'primary' : 'secondary'}
+                disabled={!app}
+                onPress={() =>
+                  router.push({
+                    pathname: '/record/audition',
+                    params: {
+                      castId: cast.id,
+                      ...(app?.id ? { applicationId: app.id } : {}),
+                    },
+                  })
                 }
-              })();
-            }}
-          />
+              />
+              <Button
+                label={t('media.pickFromGallery')}
+                variant="secondary"
+                disabled={!app}
+                onPress={() => void pickAudition()}
+              />
+            </>
+          )}
         </View>
       ) : null}
     </Screen>
+  );
+}
+
+function PickedPreview({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = false;
+    p.play();
+  });
+
+  useEffect(() => {
+    return () => {
+      try {
+        player.pause();
+      } catch {
+        // ignore
+      }
+    };
+  }, [player]);
+
+  return (
+    <View style={styles.preview}>
+      <VideoView
+        style={StyleSheet.absoluteFill}
+        player={player}
+        nativeControls
+        contentFit="contain"
+        fullscreenOptions={{ enable: true }}
+      />
+    </View>
   );
 }
 
@@ -431,16 +560,28 @@ const styles = StyleSheet.create({
   },
   switchLabel: { fontFamily: Fonts.bodyMedium, color: Colors.text },
   hint: { fontFamily: Fonts.body, color: Colors.textMuted, fontSize: 13 },
+  statusBox: { gap: 4, marginBottom: Spacing.md },
   status: {
     fontFamily: Fonts.bodyBold,
     fontSize: 16,
     color: Colors.success,
-    marginBottom: Spacing.md,
+  },
+  statusMuted: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 16,
+    color: Colors.textMuted,
   },
   muted: { fontFamily: Fonts.body, color: Colors.textMuted, marginTop: Spacing.xl },
   auditionBox: {
     marginTop: Spacing.lg,
     marginBottom: Spacing.xxl,
     gap: Spacing.sm,
+  },
+  preview: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: Colors.ink,
+    borderRadius: Radius.md,
+    overflow: 'hidden',
   },
 });

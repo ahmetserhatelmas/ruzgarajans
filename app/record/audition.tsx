@@ -59,7 +59,7 @@ function AuditionRecordContent() {
         onProgress: setUploadProgress,
       });
       setUploadProgress(100);
-      Alert.alert(t('common.success'));
+      Alert.alert(t('cast.videoSentAlert'));
       router.back();
     } catch (e: any) {
       Alert.alert(t('common.error'), localizedError(t, e));

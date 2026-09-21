@@ -130,6 +130,13 @@ export default {
     optionChipYes: 'Opsiyon: evet',
     optionChipNo: 'Opsiyon: hayır',
     optionSaved: 'Cevabınız iletildi',
+    videoLabel: 'Video',
+    videoSent: 'Gönderildi',
+    videoNotSent: 'Henüz yok',
+    videoSentAlert: 'Oyun videonuz gönderildi.',
+    previewPickHint: 'Seçtiğiniz videoyu izleyebilirsiniz. Uygunsa gönderebilirsiniz.',
+    sendVideo: 'Gönderin',
+    pickAnother: 'Başka video seçin',
   },
   profile: {
     title: 'Portföyüm',

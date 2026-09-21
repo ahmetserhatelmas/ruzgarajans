@@ -130,41 +130,59 @@
 }
 
 .kartvizit-frame {
-  overflow: auto;
+  overflow: hidden;
+  width: 100%;
   background: #f4eef8;
-  padding: 16px;
+  padding: 12px;
   border-radius: 12px;
 }
 
 .kartvizit-sheet {
-  position: relative;
-  width: 297mm;
-  height: 210mm;
+  width: 100%;
+  aspect-ratio: 297 / 210;
+  height: auto;
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  padding: 12pt 10mm 9mm calc(8pt + 201pt + 5mm);
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.1fr) minmax(0, 0.95fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 1.6%;
+  padding: 2%;
+  overflow: hidden;
   background: #fff;
   color: #111;
   font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   box-shadow: 0 8px 28px rgb(18 20 24 / 12%);
 }
 
+.kartvizit-sheet > * {
+  min-width: 0;
+  min-height: 0;
+}
+
+.kartvizit-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .kartvizit-header {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 5mm;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4mm;
   align-items: start;
-  min-height: 22mm;
-  margin-bottom: 5mm;
+  flex-shrink: 0;
+  margin-bottom: 3%;
 }
 
 .kartvizit-name {
-  margin: 2mm 0 0;
-  text-align: center;
-  font-size: 22pt;
+  margin: 1mm 0 0;
+  text-align: left;
+  font-size: clamp(14px, 2vw, 22px);
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   line-height: 1.15;
   text-transform: uppercase;
 }
@@ -222,73 +240,39 @@
   background: #6b2d91;
 }
 
-.kartvizit-body {
+.kartvizit-photos {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 94mm);
-  gap: 5mm;
-  align-items: start;
-  flex: 1;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 3%;
+  min-width: 0;
   min-height: 0;
+  height: 100%;
 }
 
-.kartvizit-photos {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4mm;
-  width: 100%;
-  max-width: 94mm;
-  min-width: 0;
-  overflow: hidden;
+.kartvizit-photos.has-favorite {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1.15fr) minmax(0, 1fr);
+}
+
+.kartvizit-photos.has-favorite .kartvizit-pose {
+  grid-column: 1 / -1;
 }
 
 .kartvizit-slot {
   overflow: hidden;
   width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   background: #f2f2f2;
-}
-
-.kartvizit-slot.kartvizit-pose {
-  width: 88mm;
-  max-width: 100%;
-  aspect-ratio: 3 / 4;
-  height: auto;
-}
-
-.kartvizit-slot.kartvizit-chest {
-  width: 72mm;
-  max-width: 100%;
-  aspect-ratio: 3 / 4;
-  height: auto;
-}
-
-.kartvizit-photos.has-favorite {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4mm;
-  width: 94mm;
-  max-width: 100%;
-}
-
-.kartvizit-photos.has-favorite .kartvizit-slot.kartvizit-pose {
-  grid-column: 1 / -1;
-  width: 100%;
-  max-width: 80mm;
-  justify-self: center;
-}
-
-.kartvizit-photos.has-favorite .kartvizit-slot.kartvizit-chest,
-.kartvizit-slot.kartvizit-favorite {
-  width: 100%;
-  max-width: none;
-  aspect-ratio: 3 / 4;
-  height: auto;
 }
 
 .kartvizit-slot img {
   display: block;
   width: 100%;
   height: 100%;
+  max-width: none;
+  max-height: none;
   object-fit: cover;
   object-position: center 18%;
 }
@@ -297,25 +281,18 @@
   background: transparent;
 }
 
-.kartvizit-slot.kartvizit-full {
-  position: absolute;
-  top: 12pt;
-  left: 8pt;
-  width: 201pt;
-  height: 524pt;
-}
-
 .kartvizit-slot.kartvizit-full img {
-  object-fit: cover;
   object-position: center top;
 }
 
 .kartvizit-fields {
   margin: 0;
   min-width: 0;
+  min-height: 0;
+  flex: 1;
   overflow: hidden;
-  font-size: 9.5pt;
-  line-height: 1.35;
+  font-size: clamp(10px, 1.05vw, 13px);
+  line-height: 1.32;
 }
 
 .kartvizit-fields > div {
@@ -351,6 +328,20 @@
   }
 
   .kartvizit-sheet {
+    width: 297mm;
+    height: 210mm;
+    aspect-ratio: auto;
+    gap: 5mm;
+    padding: 6mm;
+    overflow: hidden;
     box-shadow: none;
+  }
+
+  .kartvizit-name {
+    font-size: 18pt;
+  }
+
+  .kartvizit-fields {
+    font-size: 9pt;
   }
 }

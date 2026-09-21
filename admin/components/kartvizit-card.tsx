@@ -30,23 +30,23 @@ export function KartvizitCard({
   return (
     <article className="kartvizit-sheet">
       <PhotoSlot src={photos.fullBody} className="kartvizit-full" />
-      <header className="kartvizit-header">
-        <h1 className="kartvizit-name">{name}</h1>
-        <div className="kartvizit-logo" aria-hidden>
-          <span className="kartvizit-dots">
-            <i />
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
-          <strong>RÜZGAR</strong>
-          <span>OYUNCULUK &amp; MENAJERLİK</span>
-          <span>PRODÜKSİYON</span>
-        </div>
-      </header>
 
-      <div className="kartvizit-body">
+      <div className="kartvizit-main">
+        <header className="kartvizit-header">
+          <h1 className="kartvizit-name">{name}</h1>
+          <div className="kartvizit-logo" aria-hidden>
+            <span className="kartvizit-dots">
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+            </span>
+            <strong>RÜZGAR</strong>
+            <span>OYUNCULUK &amp; MENAJERLİK</span>
+            <span>PRODÜKSİYON</span>
+          </div>
+        </header>
         <dl className="kartvizit-fields">
           {fields.map((field) => (
             <div key={field.label}>
@@ -55,13 +55,12 @@ export function KartvizitCard({
             </div>
           ))}
         </dl>
-        <div className={photos.favorite ? "kartvizit-photos has-favorite" : "kartvizit-photos"}>
-          <PhotoSlot src={photos.pose} className="kartvizit-pose" />
-          <PhotoSlot src={photos.chest} className="kartvizit-chest" />
-          {photos.favorite ? (
-            <PhotoSlot src={photos.favorite} className="kartvizit-favorite" />
-          ) : null}
-        </div>
+      </div>
+
+      <div className={photos.favorite ? "kartvizit-photos has-favorite" : "kartvizit-photos"}>
+        <PhotoSlot src={photos.pose} className="kartvizit-pose" />
+        <PhotoSlot src={photos.chest} className="kartvizit-chest" />
+        {photos.favorite ? <PhotoSlot src={photos.favorite} className="kartvizit-favorite" /> : null}
       </div>
     </article>
   );

@@ -130,6 +130,13 @@ export default {
     optionChipYes: 'Option: yes',
     optionChipNo: 'Option: no',
     optionSaved: 'Your answer was sent',
+    videoLabel: 'Video',
+    videoSent: 'Sent',
+    videoNotSent: 'Not sent yet',
+    videoSentAlert: 'Your audition video was sent.',
+    previewPickHint: 'You can watch the video you picked. If it looks right, you can send it.',
+    sendVideo: 'Send',
+    pickAnother: 'Choose another video',
   },
   profile: {
     title: 'My portfolio',
