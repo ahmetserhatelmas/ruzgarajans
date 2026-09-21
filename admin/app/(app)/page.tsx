@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
-import { fetchDashboardStats } from "@/lib/queries";
+import { fetchAdminAlerts, fetchDashboardStats } from "@/lib/queries";
 import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
 import { APP_STATUS } from "@/lib/labels";
 import type { ActorProfile, ApplicationStatus, Profile } from "@/lib/types";
@@ -16,7 +16,11 @@ export default async function DashboardPage({
 }) {
   const { profile } = await getAdminProfile();
   const { error, ok } = await searchParams;
-  const statsData = await fetchDashboardStats();
+  const [statsData, alerts] = await Promise.all([
+    fetchDashboardStats(),
+    canAdmin(profile, "applications") ? fetchAdminAlerts(8) : Promise.resolve([]),
+  ]);
+  const unreadAlerts = alerts.filter((alert) => !alert.read_at);
   const actorById = new Map(statsData.actors.map((a) => [a.user_id, a]));
   const kindsByUser = new Map<string, string[]>();
   for (const photo of statsData.kinds) {
@@ -87,6 +91,30 @@ export default async function DashboardPage({
           {decodeURIComponent(ok)}
         </p>
       ) : null}
+      {unreadAlerts.length ? (
+        <div className="mb-6 space-y-2 rounded-xl bg-primary/5 p-4 ring-1 ring-primary/20">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-medium">Yeni bildirimler</p>
+            <Link href="/alerts" className="text-sm text-primary hover:underline">
+              Tümünü gör
+            </Link>
+          </div>
+          <ul className="space-y-2">
+            {unreadAlerts.slice(0, 5).map((alert) => (
+              <li key={alert.id}>
+                <Link
+                  href={alert.application_id ? `/applications/${alert.application_id}` : "/alerts"}
+                  className="block text-sm hover:underline"
+                >
+                  <span className="font-medium">{alert.title}</span>
+                  <span className="text-muted-foreground"> · {alert.body}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s) => (
           <Link key={s.label} href={s.href}>

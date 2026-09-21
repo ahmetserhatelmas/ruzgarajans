@@ -82,16 +82,39 @@ export async function fetchOptionForCast(
 export async function respondToCastOption(
   castId: string,
   actorId: string,
-  status: 'accepted' | 'declined'
+  status: 'accepted' | 'declined',
+  declineReason?: string | null
 ): Promise<CastOption> {
-  const { data, error } = await supabase
-    .from('cast_options')
-    .update({ status, responded_at: new Date().toISOString() })
-    .eq('cast_id', castId)
-    .eq('actor_id', actorId)
-    .eq('status', 'pending')
-    .select('*')
-    .maybeSingle();
+  const payload = {
+    status,
+    responded_at: new Date().toISOString(),
+    decline_reason:
+      status === 'declined' ? declineReason?.trim() || null : null,
+  };
+  const query = () =>
+    supabase
+      .from('cast_options')
+      .update(payload)
+      .eq('cast_id', castId)
+      .eq('actor_id', actorId)
+      .eq('status', 'pending')
+      .select('*')
+      .maybeSingle();
+
+  let { data, error } = await query();
+  if (error && payload.decline_reason !== undefined) {
+    const { decline_reason: _reason, ...withoutReason } = payload;
+    const retry = await supabase
+      .from('cast_options')
+      .update(withoutReason)
+      .eq('cast_id', castId)
+      .eq('actor_id', actorId)
+      .eq('status', 'pending')
+      .select('*')
+      .maybeSingle();
+    data = retry.data;
+    error = retry.error;
+  }
   if (error) throw error;
   if (!data) throw new Error('option_already_answered');
   return data as CastOption;

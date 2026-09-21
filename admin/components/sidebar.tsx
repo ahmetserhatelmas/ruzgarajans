@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bell,
   Clapperboard,
   FileText,
   KeyRound,
@@ -24,6 +25,7 @@ import type { Profile } from "@/lib/types";
 
 const LINKS: { href: string; label: string; icon: typeof Users; perm?: AdminPerm | "admins" }[] = [
   { href: "/", label: "Özet", icon: LayoutDashboard },
+  { href: "/alerts", label: "Bildirimler", icon: Bell, perm: "applications" },
   { href: "/actors", label: "Oyuncular", icon: Users, perm: "actors" },
   { href: "/casts", label: "Cast ilanları", icon: Clapperboard, perm: "casts" },
   { href: "/applications", label: "Başvurular", icon: FileText, perm: "applications" },
@@ -37,10 +39,12 @@ const LINKS: { href: string; label: string; icon: typeof Users; perm?: AdminPerm
 export function Sidebar({
   email,
   pendingCount,
+  alertCount = 0,
   profile,
 }: {
   email?: string | null;
   pendingCount: number;
+  alertCount?: number;
   profile: Pick<Profile, "role" | "is_super_admin" | "admin_permissions"> | null;
 }) {
   const pathname = usePathname();
@@ -94,6 +98,11 @@ export function Sidebar({
               {link.href === "/actors" && pendingCount > 0 ? (
                 <span className="rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-white">
                   {pendingCount > 99 ? "99+" : pendingCount}
+                </span>
+              ) : null}
+              {link.href === "/alerts" && alertCount > 0 ? (
+                <span className="rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-white">
+                  {alertCount > 99 ? "99+" : alertCount}
                 </span>
               ) : null}
             </Link>

@@ -60,6 +60,7 @@ export type ActorProfile = {
   registration_date: string | null;
   profession: string | null;
   instagram: string | null;
+  facebook: string | null;
   tshirt_size: string | null;
   pants_size: string | null;
   suit_size: string | null;
@@ -146,6 +147,18 @@ export type CastIntroduction = {
   created_at: string;
 };
 
+export type AdminAlert = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  application_id: string | null;
+  actor_id: string | null;
+  cast_id: string | null;
+  read_at: string | null;
+  created_at: string;
+};
+
 export type CastOptionStatus = "pending" | "accepted" | "declined";
 
 export type CastOption = {
@@ -154,6 +167,7 @@ export type CastOption = {
   actor_id: string;
   created_by: string;
   status: CastOptionStatus;
+  decline_reason: string | null;
   responded_at: string | null;
   created_at: string;
 };

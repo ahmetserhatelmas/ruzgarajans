@@ -61,8 +61,8 @@ export function NotificationObserver() {
                 ? 'Sizi bu projeye opsiyonlamak istiyoruz'
                 : 'We want to option you for this project',
               body: tr
-                ? 'İlanı inceleyin. Uygun görüyor musunuz?'
-                : 'Review the listing. Are you available?',
+                ? 'İlanı incelemenizi rica ederiz. Uygun görüyor musunuz?'
+                : 'When you have a moment, could you review the listing?',
               subtitle: 'Rüzgar Oyunculuk',
               data: { castId: row.cast_id, url: `/(actor)/cast/${row.cast_id}` },
               sound: 'default',

@@ -211,6 +211,7 @@ export default async function ActorDetailPage({
               {field("Şehir", actor?.city)}
               {field("Adres", actor?.address)}
               {field("Instagram", actor?.instagram)}
+              {field("Facebook", actor?.facebook)}
               {field("Kayıt tarihi", formatDate(actor?.registration_date))}
             </dl>
           </CardContent>

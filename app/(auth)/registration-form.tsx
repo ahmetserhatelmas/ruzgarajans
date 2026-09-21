@@ -97,6 +97,7 @@ export default function RegistrationFormScreen() {
   const [education, setEducation] = useState(actorProfile?.education ?? '');
   const [profession, setProfession] = useState(actorProfile?.profession ?? '');
   const [instagram, setInstagram] = useState(actorProfile?.instagram ?? '');
+  const [facebook, setFacebook] = useState(actorProfile?.facebook ?? '');
 
   const [height, setHeight] = useState(actorProfile?.height_cm?.toString() ?? '');
   const [weight, setWeight] = useState(actorProfile?.weight_kg?.toString() ?? '');
@@ -183,6 +184,7 @@ export default function RegistrationFormScreen() {
       education,
       profession,
       instagram,
+      facebook,
       height,
       weight,
       hair,
@@ -242,6 +244,7 @@ export default function RegistrationFormScreen() {
       education,
       profession,
       instagram,
+      facebook,
       height,
       weight,
       hair,
@@ -369,6 +372,7 @@ export default function RegistrationFormScreen() {
         setEducation(saved.education);
         setProfession(saved.profession);
         setInstagram(saved.instagram);
+        setFacebook(saved.facebook ?? '');
         setHeight(saved.height);
         setWeight(saved.weight);
         setHair(saved.hair);
@@ -532,6 +536,7 @@ export default function RegistrationFormScreen() {
         education: education || null,
         profession: profession || null,
         instagram: instagram.trim() || null,
+        facebook: facebook.trim() || null,
         height_cm: Number(height),
         weight_kg: Number(weight),
         hair_color: hair.trim(),
@@ -792,6 +797,12 @@ export default function RegistrationFormScreen() {
         label={t('regForm.fields.instagram')}
         value={instagram}
         onChangeText={setInstagram}
+        autoCapitalize="none"
+      />
+      <TextField
+        label={t('regForm.fields.facebook')}
+        value={facebook}
+        onChangeText={setFacebook}
         autoCapitalize="none"
       />
 

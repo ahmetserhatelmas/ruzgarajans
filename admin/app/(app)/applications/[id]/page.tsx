@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppStatusBadge, ActorStatusBadge } from "@/components/status-badge";
-import { fetchApplicationDetail } from "@/lib/queries";
+import { fetchApplicationDetail, markAdminAlertsForApplication } from "@/lib/queries";
 import { APP_STATUS, formatDate, formatMoney, GENDER, HAIR, EYES, label } from "@/lib/labels";
 import { deleteApplicationAction, setApplicationStatusAction } from "@/lib/actions";
 import type { ApplicationStatus } from "@/lib/types";
@@ -12,6 +12,7 @@ import { BrandedVideo } from "@/components/branded-video";
 import { canAdmin, requireAdminPerm } from "@/lib/permissions";
 import { ShareApplicationPanel } from "@/components/share-application-panel";
 import { fetchApplicationShares, fetchDirectors, sharePublicUrl } from "@/lib/share";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,14 @@ export default async function ApplicationDetailPage({
     fetchDirectors(),
   ]);
   if (!app || !actor) notFound();
+  await markAdminAlertsForApplication(id);
+  const supabase = await createClient();
+  const { data: intro } = await supabase
+    .from("cast_introductions")
+    .select("id")
+    .eq("cast_id", app.cast_id)
+    .eq("actor_id", app.actor_id)
+    .maybeSingle();
   const shareUrls: Record<string, string> = {};
   await Promise.all(
     shares.map(async (item) => {
@@ -80,6 +89,12 @@ export default async function ApplicationDetailPage({
           </div>
         }
       />
+
+      {intro ? (
+        <p className="rounded-xl bg-primary/5 px-3 py-2 text-sm text-primary ring-1 ring-primary/20">
+          Bu oyuncu bu ilan için tanıtıldıktan sonra kendi başvurdu.
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <AppStatusBadge status={app.status} />

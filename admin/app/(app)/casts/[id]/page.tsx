@@ -134,16 +134,21 @@ export default async function CastDetailPage({
             options.map((row) => (
               <div
                 key={row.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"
+                className="space-y-1 rounded-lg border border-border px-3 py-2 text-sm"
               >
-                <Link href={`/actors/${row.actor_id}`} className="min-w-0 hover:underline">
-                  {row.profiles?.full_name || row.profiles?.email}
-                </Link>
-                <OptionButton
-                  castId={cast.id}
-                  actorId={row.actor_id}
-                  status={row.status}
-                />
+                <div className="flex items-center justify-between gap-3">
+                  <Link href={`/actors/${row.actor_id}`} className="min-w-0 hover:underline">
+                    {row.profiles?.full_name || row.profiles?.email}
+                  </Link>
+                  <OptionButton
+                    castId={cast.id}
+                    actorId={row.actor_id}
+                    status={row.status}
+                  />
+                </div>
+                {row.status === "declined" && row.decline_reason ? (
+                  <p className="text-xs text-muted-foreground">Neden: {row.decline_reason}</p>
+                ) : null}
               </div>
             ))
           )}

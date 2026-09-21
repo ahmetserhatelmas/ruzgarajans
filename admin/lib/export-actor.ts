@@ -228,6 +228,7 @@ export async function buildActorExportZip(input: ExportInput): Promise<Buffer> {
     row("Şehir", text(actor?.city)),
     row("Adres", text(actor?.address)),
     row("Instagram", text(actor?.instagram)),
+    row("Facebook", text(actor?.facebook)),
     row("Kayıt tarihi", formatDate(actor?.registration_date)),
   ].join("");
 

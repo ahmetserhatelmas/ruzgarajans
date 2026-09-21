@@ -26,6 +26,7 @@ type Props = {
   deleteTitle?: string;
   deleteBody?: string;
   onChange?: () => void;
+  onPickLibrary?: () => void;
   onDelete?: () => Promise<void> | void;
 };
 
@@ -39,6 +40,7 @@ export function IntroVideoCard({
   deleteTitle,
   deleteBody,
   onChange,
+  onPickLibrary,
   onDelete,
 }: Props) {
   const { t } = useTranslation();
@@ -55,7 +57,14 @@ export function IntroVideoCard({
       <View style={styles.empty}>
         <Text style={styles.emptyText}>{emptyText ?? t('profile.noIntroVideo')}</Text>
         {canManage && onChange ? (
-          <Button label={t('media.record')} onPress={onChange} />
+          <Button label={t('media.takeNow')} onPress={onChange} />
+        ) : null}
+        {canManage && onPickLibrary ? (
+          <Button
+            label={t('media.pickFromGallery')}
+            variant="secondary"
+            onPress={onPickLibrary}
+          />
         ) : null}
       </View>
     );
@@ -110,10 +119,18 @@ export function IntroVideoCard({
         {canManage ? (
           <>
             <Button
-              label={changeLabel ?? t('profile.changeIntro')}
+              label={changeLabel ?? t('media.takeNow')}
               onPress={onChange}
               style={styles.actionBtn}
             />
+            {onPickLibrary ? (
+              <Button
+                label={t('media.pickFromGallery')}
+                variant="secondary"
+                onPress={onPickLibrary}
+                style={styles.actionBtn}
+              />
+            ) : null}
             <Button
               label={t('common.delete')}
               variant="danger"

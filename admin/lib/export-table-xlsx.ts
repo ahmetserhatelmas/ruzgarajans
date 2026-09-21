@@ -40,7 +40,9 @@ function sheetXml(
           : headers[i] === "İsim soyisim" ||
               headers[i] === "Beden bilgileri" ||
               headers[i] === "Adres" ||
-              headers[i] === "Oyunculuk deneyimi"
+              headers[i] === "Oyunculuk deneyimi" ||
+              headers[i] === "Instagram" ||
+              headers[i] === "Facebook"
             ? 28
             : 16;
       return `<col min="${i + 1}" max="${i + 1}" width="${width}" customWidth="1"/>`;

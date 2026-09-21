@@ -9,6 +9,8 @@ import { TextField } from '@/components/ui/TextField';
 import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
+import { pickFromLibrary } from '@/lib/pickMedia';
+import { recordAndUploadVideo } from '@/services/videos';
 import {
   applyToCast,
   fetchCastById,
@@ -37,6 +39,9 @@ export default function CastDetailScreen() {
   const [introduced, setIntroduced] = useState(false);
   const [option, setOption] = useState<CastOption | null>(null);
   const [optionLoading, setOptionLoading] = useState(false);
+  const [declineOpen, setDeclineOpen] = useState(false);
+  const [declineReason, setDeclineReason] = useState('');
+  const [auditionUploading, setAuditionUploading] = useState(false);
 
   useEffect(() => {
     if (!id || !user || !castOk) return;
@@ -68,8 +73,15 @@ export default function CastDetailScreen() {
     if (!user || !cast) return;
     try {
       setOptionLoading(true);
-      const next = await respondToCastOption(cast.id, user.id, status);
+      const next = await respondToCastOption(
+        cast.id,
+        user.id,
+        status,
+        status === 'declined' ? declineReason : null
+      );
       setOption(next);
+      setDeclineOpen(false);
+      setDeclineReason('');
       Alert.alert(t('common.success'), t('cast.optionSaved'));
     } catch (e: any) {
       Alert.alert(t('common.error'), e?.message ?? t('common.error'));
@@ -133,7 +145,7 @@ export default function CastDetailScreen() {
                 ? t('cast.optionAccepted')
                 : t('cast.optionDeclined')}
           </Text>
-          {option.status === 'pending' ? (
+          {option.status === 'pending' && !declineOpen ? (
             <>
               <Text style={styles.introHint}>{t('cast.optionAskHint')}</Text>
               <View style={styles.optionRow}>
@@ -146,12 +158,48 @@ export default function CastDetailScreen() {
                 <Button
                   label={t('cast.optionNo')}
                   variant="secondary"
-                  onPress={() => void onOption('declined')}
+                  onPress={() => setDeclineOpen(true)}
                   disabled={optionLoading}
                   style={styles.optionBtn}
                 />
               </View>
             </>
+          ) : null}
+          {option.status === 'pending' && declineOpen ? (
+            <>
+              <Text style={styles.introHint}>{t('cast.optionNoReasonHint')}</Text>
+              <TextField
+                label={t('cast.optionNoReason')}
+                value={declineReason}
+                onChangeText={setDeclineReason}
+                multiline
+                style={styles.reasonInput}
+              />
+              <View style={styles.optionRow}>
+                <Button
+                  label={t('cast.optionNoSend')}
+                  variant="secondary"
+                  onPress={() => void onOption('declined')}
+                  loading={optionLoading}
+                  style={styles.optionBtn}
+                />
+                <Button
+                  label={t('cast.optionNoCancel')}
+                  variant="ghost"
+                  onPress={() => {
+                    setDeclineOpen(false);
+                    setDeclineReason('');
+                  }}
+                  disabled={optionLoading}
+                  style={styles.optionBtn}
+                />
+              </View>
+            </>
+          ) : null}
+          {option.status === 'declined' && option.decline_reason ? (
+            <Text style={styles.introHint}>
+              {t('cast.optionDeclineReason', { reason: option.decline_reason })}
+            </Text>
           ) : null}
         </View>
       ) : null}
@@ -236,7 +284,7 @@ export default function CastDetailScreen() {
           <Text style={styles.hint}>{t('cast.auditionHint')}</Text>
           {!app ? <Text style={styles.hint}>{t('cast.auditionNeedApply')}</Text> : null}
           <Button
-            label={t('cast.audition')}
+            label={t('media.takeNow')}
             variant={app ? 'primary' : 'secondary'}
             disabled={!app}
             onPress={() =>
@@ -248,6 +296,35 @@ export default function CastDetailScreen() {
                 },
               })
             }
+          />
+          <Button
+            label={t('media.pickFromGallery')}
+            variant="secondary"
+            disabled={!app || auditionUploading}
+            loading={auditionUploading}
+            onPress={() => {
+              if (!user || !app) return;
+              void (async () => {
+                try {
+                  const asset = await pickFromLibrary('videos');
+                  if (!asset) return;
+                  setAuditionUploading(true);
+                  await recordAndUploadVideo({
+                    localUri: asset.uri,
+                    userId: user.id,
+                    kind: 'audition',
+                    castId: cast.id,
+                    applicationId: app.id,
+                    title: cast.project_name ?? 'Audition',
+                  });
+                  Alert.alert(t('common.success'));
+                } catch (e: any) {
+                  Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+                } finally {
+                  setAuditionUploading(false);
+                }
+              })();
+            }}
           />
         </View>
       ) : null}
@@ -330,6 +407,10 @@ const styles = StyleSheet.create({
   },
   optionBtn: {
     flex: 1,
+  },
+  reasonInput: {
+    minHeight: 88,
+    textAlignVertical: 'top',
   },
   meta: { gap: Spacing.sm, marginBottom: Spacing.lg },
   metaItem: {

@@ -26,6 +26,7 @@ import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { VideoLogoMark } from '@/components/video/VideoLogoMark';
+import { takeVideo } from '@/lib/pickMedia';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import {
   alignTtsMarks,
@@ -57,7 +58,7 @@ type Props = {
   /** Spoken guidance lines while recording (e.g. mimic cues) */
   guidanceLines?: string[] | null;
   hint?: string | null;
-  /** Allow picking a pre-recorded clip. Off for audition (Oyun Ver). */
+  /** Allow picking a pre-recorded clip from the gallery. */
   allowLibrary?: boolean;
 };
 
@@ -515,6 +516,15 @@ export function VideoRecorder({
     }
   };
 
+  const takeNow = async () => {
+    try {
+      const asset = await takeVideo(maxDuration);
+      if (asset?.uri) setUri(asset.uri);
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+    }
+  };
+
   const runCountdown = async () => {
     if (!countdownEnabled) return;
     for (const n of [3, 2, 1]) {
@@ -529,7 +539,7 @@ export function VideoRecorder({
     if (isSimulator) {
       Alert.alert(t('video.simulatorTitle'), t('video.simulatorBody'), [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('video.pickVideo'), onPress: () => void pickFromLibrary() },
+        { text: t('media.pickFromGallery'), onPress: () => void pickFromLibrary() },
       ]);
       return;
     }
@@ -572,7 +582,7 @@ export function VideoRecorder({
       if (message.includes('SimulatorNotSupported') || message.includes('simulator')) {
         Alert.alert(t('video.simulatorTitle'), t('video.simulatorBody'), [
           { text: t('common.cancel'), style: 'cancel' },
-          { text: t('video.pickVideo'), onPress: () => void pickFromLibrary() },
+          { text: t('media.pickFromGallery'), onPress: () => void pickFromLibrary() },
         ]);
       } else if (!cancelledRef.current && mountedRef.current) {
         Alert.alert(t('common.error'), message || t('common.error'));
@@ -624,9 +634,14 @@ export function VideoRecorder({
             await requestMic();
           }}
         />
+        <Button
+          label={t('media.takeNow')}
+          variant="secondary"
+          onPress={() => void takeNow()}
+        />
         {allowLibrary ? (
           <Button
-            label={t('video.pickVideo')}
+            label={t('media.pickFromGallery')}
             variant="secondary"
             onPress={() => void pickFromLibrary()}
           />
@@ -651,9 +666,14 @@ export function VideoRecorder({
         <Ionicons name="phone-landscape-outline" size={64} color={Colors.gold} />
         <Text style={styles.landscapeTitle}>{t('video.landscapeRequired')}</Text>
         <Text style={styles.landscapeBody}>{t('video.landscapeRequiredBody')}</Text>
+        <Button
+          label={t('media.takeNow')}
+          style={styles.recBtn}
+          onPress={() => void takeNow()}
+        />
         {allowLibrary ? (
           <Button
-            label={t('video.pickVideo')}
+            label={t('media.pickFromGallery')}
             variant="secondary"
             style={styles.recBtn}
             onPress={() => void pickFromLibrary()}
@@ -768,7 +788,7 @@ export function VideoRecorder({
             ) : null}
             {isSimulator ? (
               <Button
-                label={t('video.pickVideo')}
+                label={t('media.pickFromGallery')}
                 style={styles.recBtn}
                 onPress={() => void pickFromLibrary()}
               />
@@ -789,7 +809,7 @@ export function VideoRecorder({
             )}
             {allowLibrary && !busy ? (
               <Button
-                label={t('video.pickVideo')}
+                label={t('media.pickFromGallery')}
                 variant="secondary"
                 style={styles.recBtn}
                 onPress={() => void pickFromLibrary()}

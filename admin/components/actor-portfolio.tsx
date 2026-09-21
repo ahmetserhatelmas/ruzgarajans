@@ -74,6 +74,7 @@ export function ActorPortfolio({ data }: { data: SharedActorPayload }) {
               {field("Şehir", actor?.city)}
               {field("Adres", actor?.address)}
               {field("Instagram", actor?.instagram)}
+              {field("Facebook", actor?.facebook)}
             </dl>
           </CardContent>
         </Card>

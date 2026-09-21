@@ -19,6 +19,7 @@ export type RegistrationDraft = {
   education: string;
   profession: string;
   instagram: string;
+  facebook: string;
   height: string;
   weight: string;
   hair: string;
@@ -119,6 +120,7 @@ export async function persistRegistrationDraftRemote(userId: string, draft: Regi
     education: draft.education || null,
     profession: draft.profession || null,
     instagram: draft.instagram.trim() || null,
+    facebook: draft.facebook?.trim() || null,
     height_cm: numOrNull(draft.height),
     weight_kg: numOrNull(draft.weight),
     hair_color: draft.hair.trim() || null,

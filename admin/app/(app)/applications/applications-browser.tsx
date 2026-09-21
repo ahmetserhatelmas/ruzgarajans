@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createApplicationShareAction, deleteApplicationsAction } from "@/lib/actions";
 import { ShareApplicationPacks } from "@/components/share-application-packs";
+import { ShareLinkSubmitButton } from "@/components/share-link-submit-button";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,6 +43,7 @@ export function ApplicationsBrowser({
   sharedToken,
   shareError,
   canExport,
+  introducedApplyIds,
 }: {
   apps: ApplicationRow[];
   shares: ApplicationShare[];
@@ -50,6 +52,7 @@ export function ApplicationsBrowser({
   sharedToken?: string;
   shareError?: string;
   canExport?: boolean;
+  introducedApplyIds?: Set<string>;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
@@ -127,9 +130,10 @@ export function ApplicationsBrowser({
             </select>
           </label>
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={selected.length === 0}>
-              {selected.length ? `${selected.length} başvuruyu paylaş` : "Seçip paylaş"}
-            </Button>
+            <ShareLinkSubmitButton
+              disabled={selected.length === 0}
+              idleLabel={selected.length ? `${selected.length} başvuruyu paylaş` : "Seçip paylaş"}
+            />
             <Button
               type="button"
               variant="destructive"
@@ -177,6 +181,9 @@ export function ApplicationsBrowser({
                   <Link href={`/applications/${a.id}`} className="font-medium hover:underline">
                     {a.profiles?.full_name || a.profiles?.email}
                   </Link>
+                  {introducedApplyIds?.has(a.id) ? (
+                    <p className="mt-1 text-xs text-primary">Tanıtıldıktan sonra başvurdu</p>
+                  ) : null}
                 </TableCell>
                 <TableCell>
                   {a.cast_listings?.project_name} · {a.cast_listings?.role_name}

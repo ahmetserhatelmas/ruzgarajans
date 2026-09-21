@@ -1,7 +1,9 @@
 import { cache } from "react";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { ageFromBirth } from "@/lib/labels";
 import type {
+  AdminAlert,
   ActorProfile,
   ActorRow,
   Announcement,
@@ -28,21 +30,25 @@ export const fetchPendingActorCount = cache(async () => {
   return count ?? 0;
 });
 
+const ACTOR_ROW_SELECT =
+  "user_id, gender, national_id, city, birth_date, height_cm, weight_kg, body_size, tshirt_size, pants_size, suit_size, shoe_size, hair_color, eye_color, sports, dances, nationality, languages, address, whatsapp, instagram, facebook, experience, registration_completed_at, intro_video_playback_url, mimic_video_playback_url";
+
+const ACTOR_ROW_SELECT_NO_FACEBOOK = ACTOR_ROW_SELECT.replace(" instagram, facebook,", " instagram,");
+
 export async function fetchActorRows(): Promise<ActorRow[]> {
   const supabase = await createClient();
-  const [{ data: profiles }, { data: actors }, { data: photos }] = await Promise.all([
+  const [{ data: profiles }, actorsRes, { data: photos }] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, email, full_name, phone, actor_status, avatar_url, cover_url, created_at")
       .eq("role", "actor")
       .order("created_at", { ascending: false }),
-    supabase
-      .from("actor_profiles")
-      .select(
-        "user_id, gender, national_id, city, birth_date, height_cm, hair_color, eye_color, sports, dances, nationality, languages, experience, registration_completed_at, intro_video_playback_url, mimic_video_playback_url",
-      ),
+    supabase.from("actor_profiles").select(ACTOR_ROW_SELECT),
     supabase.from("gallery_photos").select("user_id, kind, public_url"),
   ]);
+  const actors = actorsRes.error
+    ? (await supabase.from("actor_profiles").select(ACTOR_ROW_SELECT_NO_FACEBOOK)).data
+    : actorsRes.data;
 
   const actorMap = new Map(
     ((actors ?? []) as ActorProfile[]).map((a) => [a.user_id, a])
@@ -314,4 +320,38 @@ export function matchesCast(row: ActorRow, cast: CastListing) {
     if (!cast.languages.every((code) => spoken.has(code.toLowerCase()))) return false;
   }
   return true;
+}
+
+export const fetchUnreadAdminAlertCount = cache(async () => {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("admin_alerts")
+    .select("id", { count: "exact", head: true })
+    .is("read_at", null);
+  if (error) return 0;
+  return count ?? 0;
+});
+
+export async function fetchAdminAlerts(limit = 50): Promise<AdminAlert[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("admin_alerts")
+    .select("id, type, title, body, application_id, actor_id, cast_id, read_at, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) return [];
+  return (data ?? []) as AdminAlert[];
+}
+
+export async function markAdminAlertsForApplication(applicationId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("admin_alerts")
+    .update({ read_at: new Date().toISOString() })
+    .eq("application_id", applicationId)
+    .is("read_at", null);
+  if (!error) {
+    revalidatePath("/alerts");
+    revalidatePath("/");
+  }
 }

@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { fetchApplications, fetchCasts } from "@/lib/queries";
+import { fetchAdminAlerts, fetchApplications, fetchCasts } from "@/lib/queries";
 import { APP_STATUS } from "@/lib/labels";
 import type { ApplicationStatus } from "@/lib/types";
 import { canAdmin, requireAdminPerm } from "@/lib/permissions";
@@ -19,11 +19,15 @@ export default async function ApplicationsPage({
   const { profile } = await requireAdminPerm("applications");
   const canExport = canAdmin(profile, "export_applications");
   const { q = "", status = "all", cast = "all", share, shared } = await searchParams;
-  const [apps, casts, shares] = await Promise.all([
+  const [apps, casts, shares, alerts] = await Promise.all([
     fetchApplications(),
     fetchCasts(),
     fetchActiveApplicationShares(),
+    fetchAdminAlerts(200),
   ]);
+  const introducedApplyIds = new Set(
+    alerts.filter((alert) => alert.application_id).map((alert) => alert.application_id as string),
+  );
   const shareUrls: Record<string, string> = {};
   await Promise.all(
     shares.map(async (item) => {
@@ -102,6 +106,7 @@ export default async function ApplicationsPage({
         sharedToken={shared}
         shareError={share}
         canExport={canExport}
+        introducedApplyIds={introducedApplyIds}
       />
     </div>
   );

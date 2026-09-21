@@ -12,6 +12,8 @@ export const SELECTED_ACTOR_EXCEL_HEADERS = [
   "Adres",
   "Telefon",
   "WhatsApp",
+  "Instagram",
+  "Facebook",
   "Oyunculuk deneyimi",
 ];
 
@@ -64,6 +66,8 @@ export async function buildSelectedActorsXlsx(rows: ActorRow[]): Promise<Uint8Ar
     row.actor?.address || "",
     row.profile.phone || "",
     row.actor?.whatsapp || "",
+    row.actor?.instagram || "",
+    row.actor?.facebook || "",
     row.actor?.experience || "",
   ]);
 

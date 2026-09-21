@@ -2,14 +2,15 @@ import { useState } from 'react';
 import { Alert, Image, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as ImagePicker from 'expo-image-picker';
 import { Screen } from '@/components/ui/Screen';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { TextField } from '@/components/ui/TextField';
 import { LanguageSkillsField } from '@/components/ui/LanguageSkillsField';
 import { Button } from '@/components/ui/Button';
+import { MediaSourceButtons } from '@/components/ui/MediaSourceButtons';
 import { parseLanguageSkills, serializeLanguageSkills } from '@/constants/languages';
 import { useAuth } from '@/contexts/AuthContext';
+import { pickFromLibrary, takePhoto } from '@/lib/pickMedia';
 import {
   clearProfileImage,
   updateActorProfile,
@@ -66,20 +67,17 @@ export default function EditProfileScreen() {
     );
   };
 
-  const uploadImage = async (role: 'avatar' | 'cover') => {
+  const saveImage = async (
+    role: 'avatar' | 'cover',
+    asset: { uri: string; mimeType?: string | null }
+  ) => {
     if (!user) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.85,
-      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
-    });
-    if (result.canceled || !result.assets[0]) return;
     try {
       setPhotoBusy(role);
       await uploadProfileImage({
         userId: user.id,
-        localUri: result.assets[0].uri,
-        mimeType: result.assets[0].mimeType,
+        localUri: asset.uri,
+        mimeType: asset.mimeType,
         role,
       });
       await refreshProfile();
@@ -135,11 +133,19 @@ export default function EditProfileScreen() {
           <View style={[styles.avatarPreview, styles.avatarEmpty]} />
         )}
         <View style={{ flex: 1, gap: Spacing.sm }}>
-          <Button
-            label={profile?.avatar_url ? t('media.changePhoto') : t('media.avatar')}
-            variant="secondary"
+          <Text style={styles.photoLabel}>{t('media.avatar')}</Text>
+          <MediaSourceButtons
             loading={photoBusy === 'avatar'}
-            onPress={() => void uploadImage('avatar')}
+            onTake={() => {
+              void takePhoto().then((asset) => {
+                if (asset) void saveImage('avatar', asset);
+              });
+            }}
+            onLibrary={() => {
+              void pickFromLibrary('images').then((asset) => {
+                if (asset) void saveImage('avatar', asset);
+              });
+            }}
           />
           {profile?.avatar_url ? (
             <Button
@@ -149,11 +155,19 @@ export default function EditProfileScreen() {
               onPress={() => removeImage('avatar')}
             />
           ) : null}
-          <Button
-            label={profile?.cover_url ? t('media.changePhoto') : t('media.cover')}
-            variant="secondary"
+          <Text style={styles.photoLabel}>{t('media.cover')}</Text>
+          <MediaSourceButtons
             loading={photoBusy === 'cover'}
-            onPress={() => void uploadImage('cover')}
+            onTake={() => {
+              void takePhoto().then((asset) => {
+                if (asset) void saveImage('cover', asset);
+              });
+            }}
+            onLibrary={() => {
+              void pickFromLibrary('images').then((asset) => {
+                if (asset) void saveImage('cover', asset);
+              });
+            }}
           />
           {profile?.cover_url ? (
             <Button
@@ -225,7 +239,12 @@ const styles = StyleSheet.create({
   photoRow: {
     flexDirection: 'row',
     gap: Spacing.md,
-    alignItems: 'center',
+    alignItems: 'flex-start',
+  },
+  photoLabel: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 13,
+    color: Colors.textMuted,
   },
   avatarPreview: {
     width: 88,

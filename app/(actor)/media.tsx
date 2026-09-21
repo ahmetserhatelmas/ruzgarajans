@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Image, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as ImagePicker from 'expo-image-picker';
 import { Screen } from '@/components/ui/Screen';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { Button } from '@/components/ui/Button';
+import { MediaSourceButtons } from '@/components/ui/MediaSourceButtons';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   ALL_PHOTO_KINDS,
@@ -20,9 +20,16 @@ import {
 } from '@/services/gallery';
 import { updateActorProfile } from '@/services/actors';
 import { hasRequiredGalleryMedia } from '@/lib/access';
-import { LANG_INTRO_MAX, pickLangIntroThen } from '@/lib/langIntro';
-import { clearProfileVideo, deleteOwnVideo, fetchLangIntroVideos, type ProfileVideoKind } from '@/services/videos';
-import type { Video } from '@/types/database';
+import { LANG_INTRO_KIND, LANG_INTRO_MAX, pickLangIntroThen } from '@/lib/langIntro';
+import {
+  clearProfileVideo,
+  deleteOwnVideo,
+  fetchLangIntroVideos,
+  recordAndUploadVideo,
+  type ProfileVideoKind,
+} from '@/services/videos';
+import type { Video, VideoKind } from '@/types/database';
+import { pickFromLibrary, takePhoto } from '@/lib/pickMedia';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 const CARD_PHOTO_KINDS: GalleryPhotoKind[] = [
@@ -75,6 +82,7 @@ export default function MediaScreen() {
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
   const [langVideos, setLangVideos] = useState<Video[]>([]);
   const [photoBusy, setPhotoBusy] = useState<GalleryPhotoKind | null>(null);
+  const [videoBusy, setVideoBusy] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const photoMap = useMemo(() => photosByKind(photos), [photos]);
@@ -92,21 +100,18 @@ export default function MediaScreen() {
     }, [user, refreshProfile])
   );
 
-  const pickPhoto = async (kind: GalleryPhotoKind) => {
+  const savePickedPhoto = async (
+    kind: GalleryPhotoKind,
+    asset: { uri: string; mimeType?: string | null }
+  ) => {
     if (!user) return;
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.85,
-        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
-      });
-      if (result.canceled || !result.assets[0]) return;
       setPhotoBusy(kind);
       const saved = await upsertGalleryPhoto({
         userId: user.id,
         kind,
-        localUri: result.assets[0].uri,
-        mimeType: result.assets[0].mimeType,
+        localUri: asset.uri,
+        mimeType: asset.mimeType,
       });
       setPhotos((prev) => {
         const rest = prev.filter((p) => p.kind !== kind);
@@ -117,6 +122,48 @@ export default function MediaScreen() {
       Alert.alert(t('common.error'), e?.message ?? t('common.error'));
     } finally {
       setPhotoBusy(null);
+    }
+  };
+
+  const takeNowPhoto = (kind: GalleryPhotoKind) => {
+    void takePhoto().then((asset) => {
+      if (asset) void savePickedPhoto(kind, asset);
+    });
+  };
+
+  const pickPhotoFromGallery = (kind: GalleryPhotoKind) => {
+    void pickFromLibrary('images').then((asset) => {
+      if (asset) void savePickedPhoto(kind, asset);
+    });
+  };
+
+  const pickProfileVideo = async (
+    kind: VideoKind,
+    title: string,
+    replaceVideoId?: string
+  ) => {
+    if (!user) return;
+    try {
+      const asset = await pickFromLibrary('videos');
+      if (!asset) return;
+      setVideoBusy(replaceVideoId ?? kind);
+      await recordAndUploadVideo({
+        localUri: asset.uri,
+        userId: user.id,
+        kind,
+        title,
+        replaceVideoId,
+      });
+      if (kind === 'lang_intro') {
+        const next = await fetchLangIntroVideos(user.id);
+        setLangVideos(next);
+      }
+      await refreshProfile();
+      Alert.alert(t('common.success'));
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+    } finally {
+      setVideoBusy(null);
     }
   };
 
@@ -209,11 +256,10 @@ export default function MediaScreen() {
               </Text>
             </View>
             {photo ? <PhotoPreview uri={photo.public_url} /> : null}
-            <Button
-              label={photo ? t('media.changePhoto') : t('media.uploadPhoto')}
-              variant="secondary"
+            <MediaSourceButtons
               loading={photoBusy === kind}
-              onPress={() => void pickPhoto(kind)}
+              onTake={() => takeNowPhoto(kind)}
+              onLibrary={() => pickPhotoFromGallery(kind)}
             />
             {photo ? (
               <Button
@@ -242,11 +288,10 @@ export default function MediaScreen() {
               </Text>
             </View>
             {photo ? <PhotoPreview uri={photo.public_url} /> : null}
-            <Button
-              label={photo ? t('media.changePhoto') : t('media.uploadPhoto')}
-              variant="secondary"
+            <MediaSourceButtons
               loading={photoBusy === kind}
-              onPress={() => void pickPhoto(kind)}
+              onTake={() => takeNowPhoto(kind)}
+              onLibrary={() => pickPhotoFromGallery(kind)}
             />
             {photo ? (
               <Button
@@ -277,11 +322,10 @@ export default function MediaScreen() {
               </Text>
             </View>
             {photo ? <PhotoPreview uri={photo.public_url} /> : null}
-            <Button
-              label={photo ? t('media.changePhoto') : t('media.uploadPhoto')}
-              variant="secondary"
+            <MediaSourceButtons
               loading={photoBusy === kind}
-              onPress={() => void pickPhoto(kind)}
+              onTake={() => takeNowPhoto(kind)}
+              onLibrary={() => pickPhotoFromGallery(kind)}
             />
             {photo ? (
               <Button
@@ -323,10 +367,18 @@ export default function MediaScreen() {
             </Text>
           </View>
           <Button
-            label={item.ready ? t('media.changePhoto') : t('media.record')}
+            label={t('media.takeNow')}
             variant={item.required && !item.ready ? 'primary' : 'secondary'}
             onPress={() =>
               router.push((item.kind === 'intro' ? '/record/intro' : `/record/${item.kind}`) as any)
+            }
+          />
+          <Button
+            label={t('media.pickFromGallery')}
+            variant="secondary"
+            loading={videoBusy === item.kind}
+            onPress={() =>
+              void pickProfileVideo(item.kind, t(`media.videos.${item.kind}`))
             }
           />
           {item.ready ? (
@@ -348,7 +400,7 @@ export default function MediaScreen() {
                     {video.title || t('media.videos.langIntroSlot', { n: index + 1 })}
                   </Text>
                   <Button
-                    label={t('media.changePhoto')}
+                    label={t('media.takeNow')}
                     variant="secondary"
                     onPress={() =>
                       pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
@@ -356,6 +408,24 @@ export default function MediaScreen() {
                           pathname: '/record/lang_intro',
                           params: { replaceId: video.id, ...(lang ? { lang } : {}) },
                         } as any);
+                      })
+                    }
+                  />
+                  <Button
+                    label={t('media.pickFromGallery')}
+                    variant="secondary"
+                    loading={videoBusy === video.id}
+                    onPress={() =>
+                      pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
+                        void pickProfileVideo(
+                          LANG_INTRO_KIND,
+                          lang
+                            ? t('media.videos.langIntroNamed', {
+                                language: lang,
+                              })
+                            : t('media.videos.langIntro'),
+                          video.id
+                        );
                       })
                     }
                   />
@@ -393,18 +463,37 @@ export default function MediaScreen() {
                 </View>
               ))}
               {langVideos.length < LANG_INTRO_MAX ? (
-                <Button
-                  label={t('media.videos.langIntroAdd')}
-                  variant="secondary"
-                  onPress={() =>
-                    pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
-                      router.push({
-                        pathname: '/record/lang_intro',
-                        params: lang ? { lang } : {},
-                      } as any);
-                    })
-                  }
-                />
+                <>
+                  <Button
+                    label={t('media.videos.langIntroAdd')}
+                    variant="secondary"
+                    onPress={() =>
+                      pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
+                        router.push({
+                          pathname: '/record/lang_intro',
+                          params: lang ? { lang } : {},
+                        } as any);
+                      })
+                    }
+                  />
+                  <Button
+                    label={t('media.pickFromGallery')}
+                    variant="secondary"
+                    loading={videoBusy === LANG_INTRO_KIND}
+                    onPress={() =>
+                      pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
+                        void pickProfileVideo(
+                          LANG_INTRO_KIND,
+                          lang
+                            ? t('media.videos.langIntroNamed', {
+                                language: lang,
+                              })
+                            : t('media.videos.langIntro')
+                        );
+                      })
+                    }
+                  />
+                </>
               ) : null}
             </View>
           ) : null}

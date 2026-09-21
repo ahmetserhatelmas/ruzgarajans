@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createActorShareAction, revokeActorShareAction } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
+import { ShareLinkSubmitButton } from "@/components/share-link-submit-button";
 import { sharePinLabel, shareRemainingLabel } from "@/lib/share-label";
 import type { ActorShare, Profile } from "@/lib/types";
 
@@ -89,9 +90,7 @@ export function ShareActorPanel({
             </select>
           </label>
         </div>
-        <Button type="submit" className="h-10 w-full sm:w-auto">
-          Link oluştur
-        </Button>
+        <ShareLinkSubmitButton className="h-10 w-full sm:w-auto" idleLabel="Link oluştur" />
       </form>
       {shares.length ? (
         <ul className="space-y-3">

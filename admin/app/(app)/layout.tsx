@@ -1,18 +1,22 @@
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { getAdminProfile } from "@/lib/permissions";
-import { fetchPendingActorCount } from "@/lib/queries";
+import { fetchPendingActorCount, fetchUnreadAdminAlertCount } from "@/lib/queries";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const { user, profile } = await getAdminProfile();
   if (!user || profile?.role !== "admin") redirect("/login?error=admin");
-  const pendingCount = await fetchPendingActorCount();
+  const [pendingCount, alertCount] = await Promise.all([
+    fetchPendingActorCount(),
+    fetchUnreadAdminAlertCount(),
+  ]);
 
   return (
     <div className="flex min-h-dvh flex-col md:flex-row">
       <Sidebar
         email={profile?.email ?? user?.email}
         pendingCount={pendingCount}
+        alertCount={alertCount}
         profile={profile}
       />
       <main className="min-w-0 flex-1 overflow-x-hidden p-4 pb-10 md:p-8 print:p-0">

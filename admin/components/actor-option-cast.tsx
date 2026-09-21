@@ -55,29 +55,34 @@ export function ActorOptionCast({
             {options.map((row) => (
               <div
                 key={row.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"
+                className="space-y-1 rounded-lg border border-border px-3 py-2 text-sm"
               >
-                <span className="min-w-0 truncate">
-                  {row.cast_listings?.project_name ?? "İlan"} · {row.cast_listings?.role_name ?? ""}
-                </span>
-                <div className="flex shrink-0 items-center gap-2">
-                  <OptionStatusBadge status={row.status} />
-                  {row.status === "pending" ? (
-                    <form action={removeCastOptionAction.bind(null, row.cast_id, actorId)}>
-                      <Button type="submit" size="sm" variant="outline">
-                        İptal
-                      </Button>
-                    </form>
-                  ) : (
-                    <form action={optionActorForCastFormAction}>
-                      <input type="hidden" name="actor_id" value={actorId} />
-                      <input type="hidden" name="cast_id" value={row.cast_id} />
-                      <Button type="submit" size="sm" variant="outline">
-                        Tekrar sor
-                      </Button>
-                    </form>
-                  )}
+                <div className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 truncate">
+                    {row.cast_listings?.project_name ?? "İlan"} · {row.cast_listings?.role_name ?? ""}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <OptionStatusBadge status={row.status} />
+                    {row.status === "pending" ? (
+                      <form action={removeCastOptionAction.bind(null, row.cast_id, actorId)}>
+                        <Button type="submit" size="sm" variant="outline">
+                          İptal
+                        </Button>
+                      </form>
+                    ) : (
+                      <form action={optionActorForCastFormAction}>
+                        <input type="hidden" name="actor_id" value={actorId} />
+                        <input type="hidden" name="cast_id" value={row.cast_id} />
+                        <Button type="submit" size="sm" variant="outline">
+                          Tekrar sor
+                        </Button>
+                      </form>
+                    )}
+                  </div>
                 </div>
+                {row.status === "declined" && row.decline_reason ? (
+                  <p className="text-xs text-muted-foreground">Neden: {row.decline_reason}</p>
+                ) : null}
               </div>
             ))}
           </div>

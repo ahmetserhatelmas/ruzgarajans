@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/ui/Screen';
@@ -9,7 +9,9 @@ import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard'
 import { RegistrationSteps } from '@/components/ui/RegistrationSteps';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
+import { pickFromLibrary } from '@/lib/pickMedia';
 import { fetchMyCastOptions, fetchMyIntroducedCastIds, fetchPublishedCasts } from '@/services/casts';
+import { recordAndUploadVideo } from '@/services/videos';
 import { supabase } from '@/lib/supabase';
 import type { Announcement, CastListing, CastOptionStatus } from '@/types/database';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
@@ -79,15 +81,43 @@ export default function HomeScreen() {
         <RegistrationSteps />
       )}
 
-      {actorProfile?.intro_video_playback_url ? null : (
-        <Pressable
-          style={({ pressed }) => [styles.introCard, pressed && { opacity: 0.93 }]}
-          onPress={() => router.push('/record/intro')}
-        >
-          <Text style={styles.introTitle}>{t('home.introCta')}</Text>
-          <Text style={styles.introHint}>{t('home.introHint')}</Text>
-        </Pressable>
-      )}
+      <Pressable
+        style={({ pressed }) => [styles.introCard, pressed && { opacity: 0.93 }]}
+        onPress={() => {
+          Alert.alert(t('home.introCta'), undefined, [
+            {
+              text: t('media.takeNow'),
+              onPress: () => router.push('/record/intro'),
+            },
+            {
+              text: t('media.pickFromGallery'),
+              onPress: () => {
+                if (!user) return;
+                void (async () => {
+                  try {
+                    const asset = await pickFromLibrary('videos', 30);
+                    if (!asset) return;
+                    await recordAndUploadVideo({
+                      localUri: asset.uri,
+                      userId: user.id,
+                      kind: 'intro',
+                      title: 'Tanıtım',
+                    });
+                    await refreshProfile();
+                    Alert.alert(t('common.success'));
+                  } catch (e: any) {
+                    Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+                  }
+                })();
+              },
+            },
+            { text: t('common.cancel'), style: 'cancel' },
+          ]);
+        }}
+      >
+        <Text style={styles.introTitle}>{t('home.introCta')}</Text>
+        <Text style={styles.introHint}>{t('home.introHint')}</Text>
+      </Pressable>
 
       <View style={styles.section}>
         <View style={styles.sectionHead}>

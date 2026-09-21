@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SharePacksList } from "@/components/share-packs-list";
+import { ShareLinkSubmitButton } from "@/components/share-link-submit-button";
 import type { ActorRow, ActorShare, ActorStatus } from "@/lib/types";
 import {
   Table,
@@ -150,6 +151,9 @@ export function ActorsBrowser({
       "Göz",
       "Uyruk",
       "Diller",
+      "Oyunculuk deneyimi",
+      "Instagram",
+      "Facebook",
       "Form",
       "Medya",
     ];
@@ -166,6 +170,9 @@ export function ActorsBrowser({
         label(EYES, row.actor?.eye_color),
         countryLabel(row.actor?.nationality),
         formatLanguages(row.actor?.languages),
+        row.actor?.experience || "",
+        row.actor?.instagram || "",
+        row.actor?.facebook || "",
         hasCompletedForm(row.actor) ? "Tamam" : "Eksik",
         mediaOk ? "Tamam" : "Eksik",
       ];
@@ -356,9 +363,13 @@ export function ActorsBrowser({
             </select>
           </label>
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" className="h-10" disabled={selected.length === 0}>
-              {selected.length ? `${selected.length} profili şifreli linkle paylaş` : "Oyuncu seç"}
-            </Button>
+            <ShareLinkSubmitButton
+              className="h-10"
+              disabled={selected.length === 0}
+              idleLabel={
+                selected.length ? `${selected.length} profili şifreli linkle paylaş` : "Oyuncu seç"
+              }
+            />
             {canExport ? (
               <Button
                 type="button"

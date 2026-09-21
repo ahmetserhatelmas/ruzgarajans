@@ -148,6 +148,27 @@ export async function deleteApplicationsAction(ids: string[]) {
   return { ok: true as const, count: unique.length };
 }
 
+export async function markAdminAlertReadAction(formData: FormData) {
+  const id = String(formData.get("alert_id") ?? "");
+  if (!UUID_RE.test(id)) redirect("/alerts");
+  await requireAdminPerm("applications");
+  const supabase = await createClient();
+  await supabase.from("admin_alerts").update({ read_at: new Date().toISOString() }).eq("id", id);
+  revalidatePath("/alerts");
+  revalidatePath("/");
+}
+
+export async function markAllAdminAlertsReadAction() {
+  await requireAdminPerm("applications");
+  const supabase = await createClient();
+  await supabase
+    .from("admin_alerts")
+    .update({ read_at: new Date().toISOString() })
+    .is("read_at", null);
+  revalidatePath("/alerts");
+  revalidatePath("/");
+}
+
 export async function upsertCastAction(formData: FormData) {
   await requireAdminPerm("casts");
   const supabase = await createClient();
@@ -363,10 +384,18 @@ export async function optionActorForCastAction(castId: string, actorId: string) 
   }
 
   if (existing) {
-    const { error } = await supabase
-      .from("cast_options")
-      .update({ status: "pending", responded_at: null, created_by: user.id })
-      .eq("id", existing.id);
+    const reset = {
+      status: "pending",
+      responded_at: null,
+      created_by: user.id,
+      decline_reason: null,
+    };
+    let { error } = await supabase.from("cast_options").update(reset).eq("id", existing.id);
+    if (error) {
+      const { decline_reason: _reason, ...withoutReason } = reset;
+      const retry = await supabase.from("cast_options").update(withoutReason).eq("id", existing.id);
+      error = retry.error;
+    }
     if (error) throw error;
   } else {
     const { error } = await supabase.from("cast_options").insert({

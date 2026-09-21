@@ -79,7 +79,6 @@ function AuditionRecordContent() {
         dialogueScript={cast?.dialogue_script}
         dialogueAudioUrl={cast?.dialogue_audio_url}
         countdownEnabled
-        allowLibrary={false}
       />
       <View
         style={[styles.head, { paddingTop: Math.max(insets.top, 8) }]}

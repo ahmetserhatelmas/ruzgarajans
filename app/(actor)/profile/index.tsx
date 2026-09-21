@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Image, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import * as ImagePicker from 'expo-image-picker';
 import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
+import { MediaSourceButtons } from '@/components/ui/MediaSourceButtons';
 import { IntroVideoCard } from '@/components/video/IntroVideoCard';
 import { useAuth } from '@/contexts/AuthContext';
-import { LANG_INTRO_MAX, pickLangIntroThen } from '@/lib/langIntro';
+import { LANG_INTRO_KIND, LANG_INTRO_MAX, pickLangIntroThen } from '@/lib/langIntro';
+import { pickFromLibrary, takePhoto } from '@/lib/pickMedia';
 import { anyOptionList, optionLabel } from '@/lib/optionLabel';
 import {
   ALL_PHOTO_KINDS,
@@ -20,9 +21,10 @@ import {
   clearProfileVideo,
   deleteOwnVideo,
   fetchLangIntroVideos,
+  recordAndUploadVideo,
   type ProfileVideoKind,
 } from '@/services/videos';
-import type { Video } from '@/types/database';
+import type { Video, VideoKind } from '@/types/database';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 const PROFILE_VIDEOS: {
@@ -85,28 +87,64 @@ export default function ProfileScreen() {
     }, [user, refreshProfile])
   );
 
-  const pickPhoto = async (kind: GalleryPhotoKind) => {
+  const savePickedPhoto = async (
+    kind: GalleryPhotoKind,
+    asset: { uri: string; mimeType?: string | null }
+  ) => {
     if (!user) return;
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.85,
-        preferredAssetRepresentationMode:
-          ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
-      });
-      if (result.canceled || !result.assets[0]) return;
       setPhotoBusy(kind);
       await upsertGalleryPhoto({
         userId: user.id,
         kind,
-        localUri: result.assets[0].uri,
-        mimeType: result.assets[0].mimeType,
+        localUri: asset.uri,
+        mimeType: asset.mimeType,
       });
       await refreshProfile();
     } catch (e: any) {
       Alert.alert(t('common.error'), e?.message ?? t('common.error'));
     } finally {
       setPhotoBusy(null);
+    }
+  };
+
+  const takeNowPhoto = (kind: GalleryPhotoKind) => {
+    void takePhoto().then((asset) => {
+      if (asset) void savePickedPhoto(kind, asset);
+    });
+  };
+
+  const pickPhotoFromGallery = (kind: GalleryPhotoKind) => {
+    void pickFromLibrary('images').then((asset) => {
+      if (asset) void savePickedPhoto(kind, asset);
+    });
+  };
+
+  const pickProfileVideo = async (
+    kind: VideoKind,
+    title: string,
+    replaceVideoId?: string
+  ) => {
+    if (!user) return;
+    try {
+      const asset = await pickFromLibrary('videos');
+      if (!asset) return;
+      setPhotoBusy(null);
+      await recordAndUploadVideo({
+        localUri: asset.uri,
+        userId: user.id,
+        kind,
+        title,
+        replaceVideoId,
+      });
+      if (kind === LANG_INTRO_KIND) {
+        const next = await fetchLangIntroVideos(user.id);
+        setLangVideos(next);
+      }
+      await refreshProfile();
+      Alert.alert(t('common.success'));
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
     }
   };
 
@@ -221,11 +259,10 @@ export default function ProfileScreen() {
               ) : (
                 <Text style={styles.missing}>{t('media.missing')}</Text>
               )}
-              <Button
-                label={photo ? t('media.changePhoto') : t('media.uploadPhoto')}
-                variant="secondary"
+              <MediaSourceButtons
                 loading={photoBusy === kind}
-                onPress={() => void pickPhoto(kind)}
+                onTake={() => takeNowPhoto(kind)}
+                onLibrary={() => pickPhotoFromGallery(kind)}
               />
               {photo ? (
                 <Button
@@ -251,9 +288,12 @@ export default function ProfileScreen() {
                 videoId={actorProfile?.[item.idKey]}
                 title={title}
                 canManage
-                changeLabel={t('media.changePhoto')}
+                changeLabel={t('media.takeNow')}
                 emptyText={t('profile.noVideo')}
                 onChange={() => router.push(item.route)}
+                onPickLibrary={() =>
+                  void pickProfileVideo(item.kind, title)
+                }
                 onDelete={async () => {
                   if (!user) return;
                   await clearProfileVideo(user.id, item.kind);
@@ -273,13 +313,24 @@ export default function ProfileScreen() {
                 videoId={video.cf_uid ?? video.id}
                 title={title}
                 canManage
-                changeLabel={t('media.changePhoto')}
+                changeLabel={t('media.takeNow')}
                 onChange={() =>
                   pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
                     router.push({
                       pathname: '/record/lang_intro',
                       params: { replaceId: video.id, ...(lang ? { lang } : {}) },
                     } as any);
+                  })
+                }
+                onPickLibrary={() =>
+                  pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
+                    void pickProfileVideo(
+                      LANG_INTRO_KIND,
+                      lang
+                        ? t('media.videos.langIntroNamed', { language: lang })
+                        : title,
+                      video.id
+                    );
                   })
                 }
                 onDelete={async () => {
@@ -293,18 +344,34 @@ export default function ProfileScreen() {
           );
         })}
         {langVideos.length < LANG_INTRO_MAX ? (
-          <Button
-            label={t('media.videos.langIntroAdd')}
-            variant="secondary"
-            onPress={() =>
-              pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
-                router.push({
-                  pathname: '/record/lang_intro',
-                  params: lang ? { lang } : {},
-                } as any);
-              })
-            }
-          />
+          <>
+            <Button
+              label={t('media.videos.langIntroAdd')}
+              variant="secondary"
+              onPress={() =>
+                pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
+                  router.push({
+                    pathname: '/record/lang_intro',
+                    params: lang ? { lang } : {},
+                  } as any);
+                })
+              }
+            />
+            <Button
+              label={t('media.pickFromGallery')}
+              variant="secondary"
+              onPress={() =>
+                pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
+                  void pickProfileVideo(
+                    LANG_INTRO_KIND,
+                    lang
+                      ? t('media.videos.langIntroNamed', { language: lang })
+                      : t('media.videos.langIntro')
+                  );
+                })
+              }
+            />
+          </>
         ) : null}
       </Section>
     </Screen>
