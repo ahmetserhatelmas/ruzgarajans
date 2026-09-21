@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
@@ -12,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { languageLabel } from '@/constants/languages';
 import { LANG_INTRO_KIND, offerLangIntroAfterLeave, pickLangIntroThen } from '@/lib/langIntro';
 import { fetchLangIntroVideos, recordAndUploadVideo } from '@/services/videos';
+import { fetchMimicGuidance, type MimicGuidance } from '@/services/appSettings';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 import type { VideoKind } from '@/types/database';
 
@@ -34,6 +36,20 @@ function RecordKindContent() {
   const isLandscape = width > height;
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [mimicGuide, setMimicGuide] = useState<MimicGuidance | null>(null);
+
+  useEffect(() => {
+    if (kind !== 'mimic') return;
+    let active = true;
+    void fetchMimicGuidance(i18n.language)
+      .then((guide) => {
+        if (active) setMimicGuide(guide);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [kind, i18n.language]);
 
   const config = useMemo(() => {
     switch (kind) {
@@ -56,9 +72,11 @@ function RecordKindContent() {
       case 'mimic':
         return {
           title: t('media.videos.mimic'),
-          maxDuration: 15,
+          maxDuration: 30,
           hint: t('media.videos.mimicHint'),
-          guidanceLines: t('media.mimicCueLines', { returnObjects: true }) as string[],
+          guidanceLines: (mimicGuide?.lines?.length
+            ? mimicGuide.lines
+            : (t('media.mimicCueLines', { returnObjects: true }) as string[])) as string[],
         };
       case 'showreel':
         return {
@@ -77,7 +95,7 @@ function RecordKindContent() {
       default:
         return null;
     }
-  }, [kind, lang, t, i18n.language]);
+  }, [kind, lang, t, i18n.language, mimicGuide]);
 
   if (!RECORDABLE.includes(kind) || !config) {
     return <Redirect href="/" />;
@@ -117,7 +135,7 @@ function RecordKindContent() {
       Alert.alert(t('common.success'));
       router.back();
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setUploading(false);
       setUploadProgress(null);
@@ -139,6 +157,8 @@ function RecordKindContent() {
         maxDuration={config.maxDuration}
         countdownEnabled
         guidanceLines={guidance}
+        guidanceRate={kind === 'mimic' ? (mimicGuide?.rate ?? 1) : undefined}
+        guidancePauseMs={kind === 'mimic' ? (mimicGuide?.pauseMs ?? 1500) : undefined}
         hint={config.hint}
       />
       <View

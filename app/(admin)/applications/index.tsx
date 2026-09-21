@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
@@ -97,7 +98,7 @@ export default function AdminApplicationsScreen() {
 
   const setStatus = async (id: string, status: ApplicationStatus) => {
     const { error } = await supabase.from('applications').update({ status }).eq('id', id);
-    if (error) Alert.alert(t('common.error'), error.message);
+    if (error) Alert.alert(t('common.error'), localizedError(t, error));
     else load();
   };
 

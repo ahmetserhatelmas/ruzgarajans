@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { Screen } from '@/components/ui/Screen';
 import { LinearGradient } from '@/components/ui/Atmosphere';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
@@ -9,6 +10,7 @@ import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard'
 import { RegistrationSteps } from '@/components/ui/RegistrationSteps';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
+import { appLang } from '@/lib/i18n';
 import { pickFromLibrary } from '@/lib/pickMedia';
 import { fetchMyCastOptions, fetchMyIntroducedCastIds, fetchPublishedCasts } from '@/services/casts';
 import { recordAndUploadVideo } from '@/services/videos';
@@ -106,7 +108,7 @@ export default function HomeScreen() {
                     await refreshProfile();
                     Alert.alert(t('common.success'));
                   } catch (e: any) {
-                    Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+                    Alert.alert(t('common.error'), localizedError(t, e));
                   }
                 })();
               },
@@ -164,10 +166,10 @@ export default function HomeScreen() {
           announcements.map((a) => (
             <View key={a.id} style={styles.announce}>
               <Text style={styles.announceTitle}>
-                {i18n.language === 'en' ? a.title_en : a.title_tr}
+                {appLang(i18n.language) === 'en' ? a.title_en : a.title_tr}
               </Text>
               <Text style={styles.announceBody} numberOfLines={3}>
-                {i18n.language === 'en' ? a.body_en : a.body_tr}
+                {appLang(i18n.language) === 'en' ? a.body_en : a.body_tr}
               </Text>
             </View>
           ))

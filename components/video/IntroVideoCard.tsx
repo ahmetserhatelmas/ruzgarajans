@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { Button } from '@/components/ui/Button';
 import { VideoLogoMark } from '@/components/video/VideoLogoMark';
 import { VideoPlayerModal } from '@/components/video/VideoPlayerModal';
@@ -85,7 +86,7 @@ export function IntroVideoCard({
             setDeleting(true);
             await onDelete();
           } catch (e: any) {
-            Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+            Alert.alert(t('common.error'), localizedError(t, e));
           } finally {
             setDeleting(false);
           }

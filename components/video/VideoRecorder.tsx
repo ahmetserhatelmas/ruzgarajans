@@ -21,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import * as Speech from 'expo-speech';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,6 +58,10 @@ type Props = {
   countdownEnabled?: boolean;
   /** Spoken guidance lines while recording (e.g. mimic cues) */
   guidanceLines?: string[] | null;
+  /** expo-speech rate; 1.0 is normal, lower is slower */
+  guidanceRate?: number;
+  /** Pause after each spoken cue, in milliseconds */
+  guidancePauseMs?: number;
   hint?: string | null;
   /** Allow picking a pre-recorded clip from the gallery. */
   allowLibrary?: boolean;
@@ -105,12 +110,21 @@ function DialogueWords({
   text,
   label,
   highlightIndex,
+  holdLeftMs,
+  holdTotalMs,
+  holdCaption,
 }: {
   text: string;
   label: string | null;
   highlightIndex: number;
+  holdLeftMs?: number;
+  holdTotalMs?: number;
+  holdCaption?: string | null;
 }) {
   const words = wordsOf(text);
+  const total = holdTotalMs && holdTotalMs > 0 ? holdTotalMs : 0;
+  const left = total ? Math.max(0, Math.min(total, holdLeftMs ?? 0)) : 0;
+  const pct = total ? (left / total) * 100 : 0;
   return (
     <View style={styles.dialogueCard} pointerEvents="none">
       {label ? <Text style={styles.dialogueWho}>{label}</Text> : null}
@@ -129,6 +143,14 @@ function DialogueWords({
           </Text>
         ))}
       </Text>
+      {total > 0 ? (
+        <View style={styles.holdWrap}>
+          <View style={styles.holdTrack}>
+            <View style={[styles.holdFill, { width: `${pct}%` }]} />
+          </View>
+          {holdCaption ? <Text style={styles.holdCaption}>{holdCaption}</Text> : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -183,6 +205,8 @@ export function VideoRecorder({
   maxDuration = 180,
   countdownEnabled = true,
   guidanceLines,
+  guidanceRate = 1,
+  guidancePauseMs = 1500,
   hint,
   allowLibrary = true,
 }: Props) {
@@ -213,6 +237,7 @@ export function VideoRecorder({
   const [cueLabel, setCueLabel] = useState<string | null>(null);
   const [cueText, setCueText] = useState('');
   const [highlightIndex, setHighlightIndex] = useState(-1);
+  const [cueHold, setCueHold] = useState<{ totalMs: number; leftMs: number } | null>(null);
   const [screenOn, setScreenOn] = useState(true);
 
   const clearAssistTimers = () => {
@@ -243,6 +268,7 @@ export function VideoRecorder({
 
   const stopDialogueAssist = () => {
     clearAssistTimers();
+    setCueHold(null);
     try {
       Speech.stop();
     } catch {
@@ -302,14 +328,20 @@ export function VideoRecorder({
   const speakLines = async (lines: string[]) => {
     const lang = i18n.language?.startsWith('en') ? 'en-US' : 'tr-TR';
     const voice = await pickVoice(lang, 'female');
+    const rate = Math.min(1.5, Math.max(0.25, guidanceRate));
+    const pause = Math.min(4000, Math.max(400, guidancePauseMs));
     for (const line of lines) {
       if (cancelledRef.current) return;
+      setCueText(line);
+      setHighlightIndex(0);
       await speakText(line, {
         language: lang,
         voice: voice.id,
-        rate: 0.65,
+        rate,
         pitch: 1,
       });
+      if (cancelledRef.current) return;
+      await sleep(pause);
     }
   };
 
@@ -412,7 +444,7 @@ export function VideoRecorder({
           }
           if (mountedRef.current) {
             if (aligned.length) {
-              setHighlightIndex(wordIndexAtTime(aligned, current + 0.06));
+              setHighlightIndex(wordIndexAtTime(aligned, current - 0.06));
             } else if (duration > 0) {
               const lookahead = Math.min(0.28, 0.12 + duration * 0.02);
               setHighlightIndex(wordIndexAtProgress(text, (current + lookahead) / duration));
@@ -426,6 +458,35 @@ export function VideoRecorder({
             (duration <= 0 && Date.now() - started > Math.max(4000, words.length * 420));
           if (finished) {
             clearInterval(tick);
+            resolve();
+          }
+        }, 40)
+      );
+    });
+
+  const sleepHold = (totalMs: number) =>
+    new Promise<void>((resolve) => {
+      const total = Math.max(0, Math.round(totalMs));
+      if (total <= 0 || cancelledRef.current) {
+        setCueHold(null);
+        resolve();
+        return;
+      }
+      const started = Date.now();
+      setCueHold({ totalMs: total, leftMs: total });
+      const tick = trackTimer(
+        setInterval(() => {
+          if (cancelledRef.current || !mountedRef.current) {
+            clearInterval(tick);
+            setCueHold(null);
+            resolve();
+            return;
+          }
+          const left = Math.max(0, total - (Date.now() - started));
+          setCueHold({ totalMs: total, leftMs: left });
+          if (left <= 0) {
+            clearInterval(tick);
+            setCueHold(null);
             resolve();
           }
         }, 40)
@@ -450,17 +511,19 @@ export function VideoRecorder({
       setHighlightIndex(line.speaker === 'ai' ? 0 : -1);
 
       if (line.speaker === 'ai') {
+        setCueHold(null);
         if (line.audioUrl) {
           await playRemoteAudio(line.audioUrl, line.text, line.words);
         } else {
           await speakText(line.text, { language: lang, voice: voice.id, rate, pitch });
         }
+        if (cancelledRef.current) return;
+        if (i < script.lines.length - 1) {
+          await sleep(lineAfterSec(line.holdSec) * 1000);
+        }
       } else {
-        await sleep(estimateActorHoldMs(line.text));
-      }
-      if (cancelledRef.current) return;
-      if (i < script.lines.length - 1) {
-        await sleep(lineAfterSec(line.holdSec) * 1000);
+        const afterMs = i < script.lines.length - 1 ? lineAfterSec(line.holdSec) * 1000 : 0;
+        await sleepHold(estimateActorHoldMs(line.text) + afterMs);
       }
     }
 
@@ -468,6 +531,7 @@ export function VideoRecorder({
       setCueLabel(null);
       setCueText('');
       setHighlightIndex(-1);
+      setCueHold(null);
     }
   };
 
@@ -487,7 +551,7 @@ export function VideoRecorder({
   const startDialogueAssist = async () => {
     if (guidanceLines?.length) {
       setCueLabel(t('video.mimicGuidance'));
-      setCueText(guidanceLines.join(' '));
+      setCueText(guidanceLines[0] ?? '');
       void speakLines(guidanceLines);
       return;
     }
@@ -512,7 +576,7 @@ export function VideoRecorder({
         setUri(result.assets[0].uri);
       }
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     }
   };
 
@@ -521,7 +585,7 @@ export function VideoRecorder({
       const asset = await takeVideo(maxDuration);
       if (asset?.uri) setUri(asset.uri);
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     }
   };
 
@@ -578,14 +642,14 @@ export function VideoRecorder({
       const result = await cameraRef.current.recordAsync({ maxDuration });
       clipUri = result?.uri ?? null;
     } catch (e: any) {
-      const message = String(e?.message ?? e ?? '');
-      if (message.includes('SimulatorNotSupported') || message.includes('simulator')) {
+      const raw = String(e?.message ?? e ?? '');
+      if (raw.includes('SimulatorNotSupported') || raw.toLowerCase().includes('simulator')) {
         Alert.alert(t('video.simulatorTitle'), t('video.simulatorBody'), [
           { text: t('common.cancel'), style: 'cancel' },
           { text: t('media.pickFromGallery'), onPress: () => void pickFromLibrary() },
         ]);
       } else if (!cancelledRef.current && mountedRef.current) {
-        Alert.alert(t('common.error'), message || t('common.error'));
+        Alert.alert(t('common.error'), localizedError(t, e));
       }
     } finally {
       recordingRef.current = false;
@@ -596,6 +660,7 @@ export function VideoRecorder({
         setCueLabel(null);
         setCueText('');
         setHighlightIndex(-1);
+        setCueHold(null);
       }
       stopDialogueAssist();
       // Unmounting CameraView in the same tick as stopRecording crashes iOS.
@@ -743,7 +808,20 @@ export function VideoRecorder({
             </Pressable>
           ) : null}
           {showDialogue && cueText ? (
-            <DialogueWords text={cueText} label={cueLabel} highlightIndex={highlightIndex} />
+            <DialogueWords
+              text={cueText}
+              label={cueLabel}
+              highlightIndex={highlightIndex}
+              holdLeftMs={cueHold?.leftMs}
+              holdTotalMs={cueHold?.totalMs}
+              holdCaption={
+                cueHold
+                  ? t('video.actorTimeLeft', {
+                      seconds: (cueHold.leftMs / 1000).toFixed(1),
+                    })
+                  : null
+              }
+            />
           ) : null}
           <VideoLogoMark />
         </View>
@@ -779,6 +857,7 @@ export function VideoRecorder({
                     setCueLabel(null);
                     setCueText('');
                     setHighlightIndex(-1);
+                    setCueHold(null);
                     return;
                   }
                   void previewScript();
@@ -975,6 +1054,27 @@ const styles = StyleSheet.create({
   dialogueWordOn: {
     color: '#FFFFFF',
     fontFamily: Fonts.bodyBold,
+  },
+  holdWrap: {
+    marginTop: 12,
+    gap: 6,
+  },
+  holdTrack: {
+    height: 6,
+    borderRadius: 99,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  holdFill: {
+    height: '100%',
+    borderRadius: 99,
+    backgroundColor: Colors.gold,
+  },
+  holdCaption: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: 12,
+    color: Colors.textOnDark,
+    opacity: 0.9,
   },
   simPlaceholder: {
     alignItems: 'center',

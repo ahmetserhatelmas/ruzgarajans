@@ -21,6 +21,7 @@ export async function initI18n(preferred?: string | null) {
     const device = Localization.getLocales()[0]?.languageCode;
     lng = device === 'en' ? 'en' : 'tr';
   }
+  lng = lng.toLowerCase().startsWith('en') ? 'en' : 'tr';
 
   if (!i18n.isInitialized) {
     await i18n.use(initReactI18next).init({
@@ -40,6 +41,10 @@ export async function initI18n(preferred?: string | null) {
 export async function setAppLanguage(lng: 'tr' | 'en') {
   await AsyncStorage.setItem(LANGUAGE_KEY, lng);
   await i18n.changeLanguage(lng);
+}
+
+export function appLang(lng?: string | null): 'tr' | 'en' {
+  return (lng ?? i18n.language ?? 'tr').toLowerCase().startsWith('en') ? 'en' : 'tr';
 }
 
 export default i18n;

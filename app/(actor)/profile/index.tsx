@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Image, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
 import { MediaSourceButtons } from '@/components/ui/MediaSourceButtons';
@@ -102,7 +103,7 @@ export default function ProfileScreen() {
       });
       await refreshProfile();
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setPhotoBusy(null);
     }
@@ -144,7 +145,7 @@ export default function ProfileScreen() {
       await refreshProfile();
       Alert.alert(t('common.success'));
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     }
   };
 
@@ -162,7 +163,7 @@ export default function ProfileScreen() {
               await deleteGalleryPhoto(user.id, kind);
               await refreshProfile();
             } catch (e: any) {
-              Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+              Alert.alert(t('common.error'), localizedError(t, e));
             } finally {
               setPhotoBusy(null);
             }

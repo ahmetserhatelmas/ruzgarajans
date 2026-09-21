@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -36,7 +37,7 @@ export function RegistrationSteps() {
       await refreshProfile();
       Alert.alert(t('common.success'), t('access.pendingBody'));
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setSending(false);
     }

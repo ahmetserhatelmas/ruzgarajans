@@ -1,15 +1,41 @@
-type AuthLike = { message?: string; code?: string } | null | undefined;
+type AuthLike =
+  | string
+  | {
+      message?: string;
+      msg?: string;
+      code?: string | number;
+      error_code?: string;
+      error?: string;
+      error_description?: string;
+    }
+  | null
+  | undefined;
 
 function hay(error: AuthLike) {
-  return `${error?.code ?? ""} ${error?.message ?? ""}`.toLowerCase();
+  if (error == null) return "";
+  if (typeof error === "string") return error.toLowerCase();
+  return [
+    error.code,
+    error.error_code,
+    error.message,
+    error.msg,
+    error.error,
+    error.error_description,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 }
 
 export function authErrorTr(error: AuthLike) {
   const text = hay(error);
   if (
     text.includes("invalid_credentials") ||
+    text.includes("invalid_grant") ||
     text.includes("invalid login") ||
-    text.includes("invalid credentials")
+    text.includes("invalid credentials") ||
+    text.includes("wrong password") ||
+    text.includes("email or password")
   ) {
     return "Şifre yanlış.";
   }
@@ -25,5 +51,8 @@ export function authErrorTr(error: AuthLike) {
   if (text.includes("over_request") || text.includes("too many") || text.includes("rate limit")) {
     return "Çok fazla deneme. Biraz sonra tekrar dene.";
   }
-  return "Giriş yapılamadı.";
+  if (/[a-z]/i.test(text) && /(invalid|failed|error|unauthorized)/i.test(text)) {
+    return "Giriş yapılamadı.";
+  }
+  return text.trim() || "Giriş yapılamadı.";
 }

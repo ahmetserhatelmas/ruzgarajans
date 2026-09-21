@@ -8,7 +8,7 @@ import { TextField } from '@/components/ui/TextField';
 import { Button } from '@/components/ui/Button';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import { useAuth } from '@/contexts/AuthContext';
-import { authErrorKey } from '@/lib/authErrors';
+import { localizedError } from '@/lib/authErrors';
 import { BrandMark } from '@/components/ui/BrandMark';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
@@ -32,7 +32,7 @@ export default function LoginScreen() {
       await signIn(cleanEmail, cleanPassword);
       router.replace('/');
     } catch (e: any) {
-      Alert.alert(t('common.error'), t(authErrorKey(e)));
+      Alert.alert(t('common.error'), localizedError(t, e, 'auth.invalidCredentials'));
     } finally {
       setLoading(false);
     }

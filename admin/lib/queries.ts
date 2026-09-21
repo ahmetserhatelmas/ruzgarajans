@@ -7,6 +7,7 @@ import type {
   ActorProfile,
   ActorRow,
   Announcement,
+  AppSettings,
   Application,
   CastIntroduction,
   CastOption,
@@ -354,4 +355,68 @@ export async function markAdminAlertsForApplication(applicationId: string) {
     revalidatePath("/alerts");
     revalidatePath("/");
   }
+}
+
+const DEFAULT_MIMIC_TR = [
+  "Kameraya bakabilir misiniz?",
+  "Gülümseyebilir misiniz?",
+  "Şaşırmış gibi yapabilir misiniz?",
+  "Kızgın bir ifade verebilir misiniz?",
+  "Üzgün bir ifade verebilir misiniz?",
+  "Tekrar gülümseyebilir misiniz?",
+];
+
+const DEFAULT_MIMIC_EN = [
+  "Could you look at the camera?",
+  "Could you smile?",
+  "Could you look surprised?",
+  "Could you show an angry face?",
+  "Could you show a sad face?",
+  "Could you smile again?",
+];
+
+export async function fetchAppSettings(): Promise<AppSettings | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("id, mimic_cues_tr, mimic_cues_en, mimic_speech_rate, mimic_pause_ms")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error) return null;
+  return (data as AppSettings | null) ?? null;
+}
+
+/** Push default cues + 1.00 speed if the live row is still the old slow default. */
+export async function activateMimicDefaults(): Promise<AppSettings | null> {
+  const current = await fetchAppSettings();
+  const rate = Number(current?.mimic_speech_rate);
+  const cuesTr = (current?.mimic_cues_tr ?? []).map((s) => String(s).trim()).filter(Boolean);
+  const needsRate = !current || !Number.isFinite(rate) || Math.abs(rate - 0.4) < 0.001;
+  const needsCues = !cuesTr.length;
+  if (!needsRate && !needsCues) return current;
+
+  const supabase = await createClient();
+  const payload = {
+    mimic_cues_tr: needsCues ? DEFAULT_MIMIC_TR : cuesTr,
+    mimic_cues_en: (current?.mimic_cues_en ?? []).filter(Boolean).length
+      ? current!.mimic_cues_en
+      : DEFAULT_MIMIC_EN,
+    mimic_speech_rate: needsRate ? 1 : rate,
+    mimic_pause_ms: current?.mimic_pause_ms ?? 1500,
+    updated_at: new Date().toISOString(),
+  };
+  const { data, error } = await supabase
+    .from("app_settings")
+    .update(payload)
+    .eq("id", 1)
+    .select("id, mimic_cues_tr, mimic_cues_en, mimic_speech_rate, mimic_pause_ms")
+    .maybeSingle();
+  if (!error && data) return data as AppSettings;
+  const inserted = await supabase
+    .from("app_settings")
+    .insert({ id: 1, ...payload })
+    .select("id, mimic_cues_tr, mimic_cues_en, mimic_speech_rate, mimic_pause_ms")
+    .maybeSingle();
+  if (inserted.error) return current;
+  return (inserted.data as AppSettings | null) ?? current;
 }

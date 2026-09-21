@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, StyleSheet, Switch, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { Screen } from '@/components/ui/Screen';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { TextField } from '@/components/ui/TextField';
@@ -68,7 +69,7 @@ export default function NewCastScreen() {
       });
       router.replace(`/(admin)/casts/${cast.id}`);
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message);
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { setAppLanguage } from '@/lib/i18n';
+import { appLang, setAppLanguage } from '@/lib/i18n';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
@@ -16,6 +16,7 @@ type Props = {
 export function LanguageSwitcher({ persistProfile = false }: Props) {
   const { i18n } = useTranslation();
   const { session, updateLocale } = useAuth();
+  const lang = appLang(i18n.language);
 
   const change = async (lng: 'tr' | 'en') => {
     await setAppLanguage(lng);
@@ -30,17 +31,17 @@ export function LanguageSwitcher({ persistProfile = false }: Props) {
       <View style={styles.row}>
         <Pressable
           onPress={() => void change('tr')}
-          style={[styles.chip, i18n.language === 'tr' && styles.chipActive]}
+          style={[styles.chip, lang === 'tr' && styles.chipActive]}
         >
-          <Text style={[styles.chipText, i18n.language === 'tr' && styles.chipTextActive]}>
+          <Text style={[styles.chipText, lang === 'tr' && styles.chipTextActive]}>
             Türkçe
           </Text>
         </Pressable>
         <Pressable
           onPress={() => void change('en')}
-          style={[styles.chip, i18n.language === 'en' && styles.chipActive]}
+          style={[styles.chip, lang === 'en' && styles.chipActive]}
         >
-          <Text style={[styles.chipText, i18n.language === 'en' && styles.chipTextActive]}>
+          <Text style={[styles.chipText, lang === 'en' && styles.chipTextActive]}>
             English
           </Text>
         </Pressable>

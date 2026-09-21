@@ -3,6 +3,7 @@ import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'r
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
@@ -51,7 +52,7 @@ function IntroRecordContent() {
           }),
       });
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setUploading(false);
       setUploadProgress(null);

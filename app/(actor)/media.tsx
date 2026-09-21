@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Image, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { Screen } from '@/components/ui/Screen';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { Button } from '@/components/ui/Button';
@@ -119,7 +120,7 @@ export default function MediaScreen() {
       });
       await refreshProfile();
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setPhotoBusy(null);
     }
@@ -161,7 +162,7 @@ export default function MediaScreen() {
       await refreshProfile();
       Alert.alert(t('common.success'));
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setVideoBusy(null);
     }
@@ -182,7 +183,7 @@ export default function MediaScreen() {
               setPhotos((prev) => prev.filter((p) => p.kind !== kind));
               await refreshProfile();
             } catch (e: any) {
-              Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+              Alert.alert(t('common.error'), localizedError(t, e));
             } finally {
               setPhotoBusy(null);
             }
@@ -205,7 +206,7 @@ export default function MediaScreen() {
               await clearProfileVideo(user.id, kind);
               await refreshProfile();
             } catch (e: any) {
-              Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+              Alert.alert(t('common.error'), localizedError(t, e));
             }
           })();
         },
@@ -229,7 +230,7 @@ export default function MediaScreen() {
       Alert.alert(t('common.success'));
       router.replace('/');
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setSaving(false);
     }
@@ -451,7 +452,7 @@ export default function MediaScreen() {
                                   setLangVideos((prev) => prev.filter((row) => row.id !== video.id));
                                   await refreshProfile();
                                 } catch (e: any) {
-                                  Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+                                  Alert.alert(t('common.error'), localizedError(t, e));
                                 }
                               })();
                             },

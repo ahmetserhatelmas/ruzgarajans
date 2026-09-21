@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
-import { setAppLanguage } from '@/lib/i18n';
+import { appLang, setAppLanguage } from '@/lib/i18n';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import { canAdmin, type AdminPerm } from '@/lib/adminAccess';
 
@@ -20,6 +20,7 @@ export default function AdminHome() {
   const { t, i18n } = useTranslation();
   const { signOut, profile, updateLocale } = useAuth();
   const router = useRouter();
+  const lang = appLang(i18n.language);
 
   const changeLang = async (lng: 'tr' | 'en') => {
     await setAppLanguage(lng);
@@ -35,12 +36,12 @@ export default function AdminHome() {
       <Text style={styles.section}>{t('settings.language')}</Text>
       <View style={styles.langRow}>
         <LangChip
-          active={i18n.language === 'tr'}
+          active={lang === 'tr'}
           label="Türkçe"
           onPress={() => void changeLang('tr')}
         />
         <LangChip
-          active={i18n.language === 'en'}
+          active={lang === 'en'}
           label="English"
           onPress={() => void changeLang('en')}
         />

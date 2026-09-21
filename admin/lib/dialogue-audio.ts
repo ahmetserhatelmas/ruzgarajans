@@ -26,7 +26,7 @@ export async function attachDialogueAudio(
       next.lines[i] = {
         ...line,
         audioUrl: data.publicUrl,
-        words: words.map(({ at, text }) => ({ at, text })),
+        words: words.map(({ at, dur, text }) => ({ at, dur, text })),
       };
     } catch (error) {
       console.error("dialogue audio failed", error);

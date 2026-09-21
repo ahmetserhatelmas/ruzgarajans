@@ -284,6 +284,14 @@ export type ActorRow = {
   chestPhotoUrl: string | null;
 };
 
+export type AppSettings = {
+  id: number;
+  mimic_cues_tr: string[];
+  mimic_cues_en: string[];
+  mimic_speech_rate: number;
+  mimic_pause_ms: number;
+};
+
 export const REQUIRED_PHOTO_KINDS = [
   "full_body",
   "chest",

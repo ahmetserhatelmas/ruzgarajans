@@ -16,9 +16,9 @@ export default async function LoginPage({
       ? "Bu panel yalnızca admin hesapları içindir."
       : error === "reset"
         ? "Şifre linki geçersiz veya süresi doldu."
-        : /invalid login|invalid credentials|email not confirmed|too many requests/i.test(decoded)
-          ? authErrorTr({ message: decoded })
-          : decoded || null;
+        : decoded
+          ? authErrorTr(decoded)
+          : null;
   const success = ok ? decodeURIComponent(ok) : null;
 
   return (

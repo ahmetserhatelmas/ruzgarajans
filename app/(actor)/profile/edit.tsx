@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Image, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { Screen } from '@/components/ui/Screen';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { TextField } from '@/components/ui/TextField';
@@ -56,7 +57,7 @@ export default function EditProfileScreen() {
                 await clearProfileImage(user.id, role);
                 await refreshProfile();
               } catch (e: any) {
-                Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+                Alert.alert(t('common.error'), localizedError(t, e));
               } finally {
                 setPhotoBusy(null);
               }
@@ -83,7 +84,7 @@ export default function EditProfileScreen() {
       await refreshProfile();
       Alert.alert(t('common.success'));
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setPhotoBusy(null);
     }
@@ -115,7 +116,7 @@ export default function EditProfileScreen() {
       Alert.alert(t('common.success'));
       router.back();
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setLoading(false);
     }

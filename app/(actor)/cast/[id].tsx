@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Image, StyleSheet, Switch, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { Screen } from '@/components/ui/Screen';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { Button } from '@/components/ui/Button';
@@ -84,7 +85,7 @@ export default function CastDetailScreen() {
       setDeclineReason('');
       Alert.alert(t('common.success'), t('cast.optionSaved'));
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setOptionLoading(false);
     }
@@ -104,7 +105,7 @@ export default function CastDetailScreen() {
       setApp(created);
       Alert.alert(t('common.success'), t('cast.applied'));
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setLoading(false);
     }
@@ -319,7 +320,7 @@ export default function CastDetailScreen() {
                   });
                   Alert.alert(t('common.success'));
                 } catch (e: any) {
-                  Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+                  Alert.alert(t('common.error'), localizedError(t, e));
                 } finally {
                   setAuditionUploading(false);
                 }

@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,7 +23,7 @@ export default function DirectorHome() {
       await signOut();
       router.replace('/(auth)/login');
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setLoggingOut(false);
     }
@@ -36,7 +37,7 @@ export default function DirectorHome() {
           if (!cancelled) setRows(next);
         })
         .catch((e) => {
-          if (!cancelled) setError(e?.message ?? t('common.error'));
+          if (!cancelled) setError(localizedError(t, e));
         });
       return () => {
         cancelled = true;

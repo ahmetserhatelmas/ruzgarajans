@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { fetchActorsAdmin, setActorStatus } from '@/services/actors';
@@ -56,7 +57,7 @@ export default function AdminActorsScreen() {
       await setActorStatus(id, status);
       load();
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message);
+      Alert.alert(t('common.error'), localizedError(t, e));
     }
   };
 

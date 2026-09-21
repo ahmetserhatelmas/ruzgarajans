@@ -1,7 +1,7 @@
 export type DialogueSpeaker = 'ai' | 'actor';
 export type DialogueVoice = 'female' | 'male';
 
-export type DialogueWordMark = { at: number; text?: string };
+export type DialogueWordMark = { at: number; dur?: number; text?: string };
 
 export type DialogueLine = {
   speaker: DialogueSpeaker;
@@ -117,65 +117,97 @@ function parseWordMarks(raw: unknown): DialogueWordMark[] | undefined {
   const marks = raw
     .map((item) => {
       const at = Number((item as { at?: number })?.at);
+      const dur = Number((item as { dur?: number })?.dur);
       const text = typeof (item as { text?: string })?.text === 'string' ? (item as { text: string }).text : undefined;
       if (!Number.isFinite(at) || at < 0) return null;
-      return text ? { at, text } : { at };
+      const mark: DialogueWordMark = { at };
+      if (Number.isFinite(dur) && dur > 0) mark.dur = dur;
+      if (text) mark.text = text;
+      return mark;
     })
     .filter((mark): mark is DialogueWordMark => mark != null);
   return marks.length ? marks : undefined;
 }
 
 export function wordsOf(text: string) {
-  return text.trim().split(/\s+/).filter(Boolean);
+  const raw = text.trim().match(/\S+/g) ?? [];
+  return raw.flatMap((token) => token.split(/(?<=\p{L}\p{P})(?=\p{L})/u)).filter(Boolean);
 }
 
 function lettersOf(word: string) {
   return word.replace(/[^\p{L}\p{N}]+/gu, '').toLocaleLowerCase('tr-TR');
 }
 
+function matchWord(display: string, key: string) {
+  if (!display || !key) return false;
+  if (display === key) return true;
+  if (display.length < 2 || key.length < 2) return false;
+  return display.startsWith(key) || key.startsWith(display);
+}
+
 /** Map TTS word timestamps onto on-screen tokens (punctuation / quotes differ). */
-export function alignTtsMarks(text: string, marks: { at: number; text?: string }[]) {
+export function alignTtsMarks(text: string, marks: { at: number; dur?: number; text?: string }[]) {
   const words = wordsOf(text);
-  const aligned: { at: number; index: number }[] = [];
+  const aligned: { at: number; dur: number; index: number }[] = [];
   let cursor = 0;
   for (const mark of marks) {
-    const key = lettersOf(mark.text ?? '');
+    const key = lettersOf(mark.text ?? "");
     if (!key) continue;
     let found = -1;
-    for (let i = cursor; i < words.length; i += 1) {
-      const display = lettersOf(words[i]);
-      if (display && (display === key || display.startsWith(key) || key.startsWith(display))) {
+    const near = Math.min(words.length, cursor + 5);
+    for (let i = cursor; i < near; i += 1) {
+      if (lettersOf(words[i]) === key) {
         found = i;
         break;
       }
     }
+    if (found < 0) {
+      for (let i = cursor; i < near; i += 1) {
+        if (matchWord(lettersOf(words[i]), key)) {
+          found = i;
+          break;
+        }
+      }
+    }
     if (found >= 0) {
-      aligned.push({ at: mark.at, index: found });
+      aligned.push({ at: mark.at, dur: mark.dur && mark.dur > 0 ? mark.dur : 0, index: found });
       cursor = found + 1;
     }
   }
   return aligned;
 }
 
-export function wordIndexAtTime(marks: { at: number; index?: number }[], time: number) {
+export function wordIndexAtTime(
+  marks: { at: number; index?: number; dur?: number }[],
+  time: number,
+) {
   if (!marks.length) return -1;
+  const t = Math.max(0, time);
   let i = 0;
-  while (i < marks.length - 1 && time >= marks[i + 1].at) i += 1;
+  while (i < marks.length - 1) {
+    const cur = marks[i];
+    const next = marks[i + 1];
+    const spokenEnd = cur.dur && cur.dur > 0.04 ? cur.at + cur.dur : next.at;
+    const switchAt = Math.max(next.at + 0.08, spokenEnd - 0.02);
+    if (t >= switchAt) i += 1;
+    else break;
+  }
   return marks[i].index ?? i;
 }
 
 export function wordIndexAt(text: string, charIndex: number) {
-  const safe = Math.max(0, charIndex);
-  let seen = 0;
   const words = wordsOf(text);
+  if (!words.length) return -1;
+  const safe = Math.max(0, charIndex);
+  let pos = 0;
   for (let i = 0; i < words.length; i += 1) {
-    const start = text.indexOf(words[i], seen);
+    const start = text.indexOf(words[i], pos);
     if (start < 0) return i;
     const end = start + words[i].length;
     if (safe < end) return i;
-    seen = end;
+    pos = end;
   }
-  return Math.max(0, words.length - 1);
+  return words.length - 1;
 }
 
 function wordWeight(word: string) {

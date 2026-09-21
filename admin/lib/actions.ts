@@ -476,6 +476,40 @@ export async function startConversationAction(actorId: string) {
   redirect(`/messages/${data.id}`);
 }
 
+function linesFromTextarea(raw: string) {
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+export async function saveMimicSettingsAction(formData: FormData) {
+  await requireAdminPerm("announcements");
+  const cuesTr = linesFromTextarea(String(formData.get("mimic_cues_tr") ?? ""));
+  const cuesEn = linesFromTextarea(String(formData.get("mimic_cues_en") ?? ""));
+  const rate = Number(String(formData.get("mimic_speech_rate") ?? "1").replace(",", "."));
+  const pause = Number(String(formData.get("mimic_pause_ms") ?? "1500"));
+  if (!cuesTr.length) {
+    redirect(`/mimic?error=${encodeURIComponent("Türkçe cümleler boş olamaz.")}`);
+  }
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("app_settings")
+    .update({
+      mimic_cues_tr: cuesTr,
+      mimic_cues_en: cuesEn.length ? cuesEn : cuesTr,
+      mimic_speech_rate: Math.min(1.5, Math.max(0.25, Number.isFinite(rate) ? rate : 1)),
+      mimic_pause_ms: Math.min(4000, Math.max(400, Number.isFinite(pause) ? Math.round(pause) : 1500)),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", 1);
+  if (error) {
+    redirect(`/mimic?error=${encodeURIComponent(error.message)}`);
+  }
+  revalidatePath("/mimic");
+  redirect("/mimic?ok=" + encodeURIComponent("Mimik rehberi kaydedildi."));
+}
+
 export async function upsertAnnouncementAction(formData: FormData) {
   await requireAdminPerm("announcements");
   const supabase = await createClient();

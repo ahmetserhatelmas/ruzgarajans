@@ -2,15 +2,17 @@ import { useState } from 'react';
 import { Alert, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { Screen } from '@/components/ui/Screen';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
-import { setAppLanguage } from '@/lib/i18n';
+import { appLang, setAppLanguage } from '@/lib/i18n';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function SettingsScreen() {
   const { t, i18n } = useTranslation();
+  const lang = appLang(i18n.language);
   const { signOut, deleteAccount, updateLocale } = useAuth();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -27,7 +29,7 @@ export default function SettingsScreen() {
       await signOut();
       router.replace('/(auth)/login');
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setLoggingOut(false);
     }
@@ -62,8 +64,8 @@ export default function SettingsScreen() {
 
       <Text style={styles.section}>{t('settings.language')}</Text>
       <View style={styles.row}>
-        <LangChip active={i18n.language === 'tr'} label="Türkçe" onPress={() => changeLang('tr')} />
-        <LangChip active={i18n.language === 'en'} label="English" onPress={() => changeLang('en')} />
+        <LangChip active={lang === 'tr'} label="Türkçe" onPress={() => changeLang('tr')} />
+        <LangChip active={lang === 'en'} label="English" onPress={() => changeLang('en')} />
       </View>
 
       <Text style={styles.section}>{t('settings.support')}</Text>

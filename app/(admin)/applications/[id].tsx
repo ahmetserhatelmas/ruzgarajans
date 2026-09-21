@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { localizedError } from '@/lib/authErrors';
 import { Screen } from '@/components/ui/Screen';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { Button } from '@/components/ui/Button';
@@ -89,7 +90,7 @@ export default function AdminApplicationDetailScreen() {
   }, [id]);
 
   useEffect(() => {
-    load().catch((e) => Alert.alert(t('common.error'), e?.message ?? t('common.error')));
+    load().catch((e) => Alert.alert(t('common.error'), localizedError(t, e)));
   }, [load, t]);
 
   const setStatus = async (status: ApplicationStatus) => {
@@ -100,7 +101,7 @@ export default function AdminApplicationDetailScreen() {
       if (error) throw error;
       await load();
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+      Alert.alert(t('common.error'), localizedError(t, e));
     } finally {
       setBusy(false);
     }
@@ -120,7 +121,7 @@ export default function AdminApplicationDetailScreen() {
             if (error) throw error;
             router.replace('/(admin)/applications');
           } catch (e: any) {
-            Alert.alert(t('common.error'), e?.message ?? t('common.error'));
+            Alert.alert(t('common.error'), localizedError(t, e));
           } finally {
             setBusy(false);
           }

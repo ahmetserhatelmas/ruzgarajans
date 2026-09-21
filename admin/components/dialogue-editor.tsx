@@ -10,6 +10,7 @@ import {
   parseDialogueScript,
   stringifyDialogueScript,
   alignTtsMarks,
+  wordsOf,
   wordIndexAt,
   wordIndexAtProgress,
   wordIndexAtTime,
@@ -36,6 +37,8 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
     text: string;
     wordIndex: number;
     waitLeft?: number;
+    waitTotal?: number;
+    waitKind?: "read" | "gap";
   } | null>(null);
   const stopRef = useRef(false);
   const runId = useRef(0);
@@ -85,24 +88,28 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
     setPreview(null);
   };
 
-  const waitLive = async (getMs: () => number, id: number) => {
+  const waitLive = async (getMs: () => number, id: number, kind: "read" | "gap") => {
     const started = Date.now();
     while (runId.current === id && !stopRef.current) {
       const target = Math.max(0, getMs());
       const left = target - (Date.now() - started);
       if (left <= 0) break;
-      setPreview((prev) => (prev ? { ...prev, waitLeft: left } : prev));
+      setPreview((prev) =>
+        prev ? { ...prev, waitLeft: left, waitTotal: target, waitKind: kind } : prev,
+      );
       await wait(Math.min(80, left));
     }
-    setPreview((prev) => (prev ? { ...prev, waitLeft: undefined } : prev));
+    setPreview((prev) =>
+      prev ? { ...prev, waitLeft: undefined, waitTotal: undefined, waitKind: undefined } : prev,
+    );
   };
 
-  const followAudio = (audio: HTMLAudioElement, text: string, marks: { at: number; text?: string }[]) => {
+  const followAudio = (audio: HTMLAudioElement, text: string, marks: { at: number; dur?: number; text?: string }[]) => {
     stopHighlight();
     const aligned = alignTtsMarks(text, marks);
     const tick = () => {
       if (stopRef.current || audio !== audioRef.current) return;
-      const time = audio.currentTime;
+      const time = Math.max(0, audio.currentTime - 0.06);
       const index = aligned.length
         ? wordIndexAtTime(aligned, time)
         : Number.isFinite(audio.duration) && audio.duration > 0
@@ -124,7 +131,7 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
       body: JSON.stringify({ text, voice, rate }),
     });
     if (!res.ok) throw new Error("neural");
-    const payload = (await res.json()) as { audio?: string; words?: { at: number }[] };
+    const payload = (await res.json()) as { audio?: string; words?: { at: number; dur?: number; text?: string }[] };
     if (!payload.audio) throw new Error("neural");
     const bytes = Uint8Array.from(atob(payload.audio), (c) => c.charCodeAt(0));
     const url = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
@@ -216,14 +223,14 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
         if (runId.current !== id) return;
         setPreview((prev) => (prev ? { ...prev, wordIndex: words.length } : prev));
       } else {
-        await waitLive(() => Math.max(1200, words.length * 450), id);
+        await waitLive(() => Math.max(1200, words.length * 450), id, "read");
       }
       if (runId.current !== id || stopRef.current) break;
       if (i < lines.length - 1) {
         await waitLive(() => {
           const live = scriptRef.current.lines.filter((item) => item.text.trim())[i];
           return lineAfterSec(live?.holdSec) * 1000;
-        }, id);
+        }, id, "gap");
       }
     }
     if (runId.current === id) {
@@ -283,14 +290,16 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
       {preview ? (
         <div className="rounded-lg bg-primary/5 px-3 py-3 text-sm">
           <p className="mb-1 text-xs font-medium text-primary">
-            {preview.waitLeft && preview.waitLeft > 80
-              ? `Bu replikten sonra ${(preview.waitLeft / 1000).toFixed(1)} sn — o satırın kaydırıcısını değiştir`
-              : preview.speaker === "ai"
-                ? "Yapay zeka konuşuyor"
-                : "Oyuncu satırı — ses kapalı"}
+            {preview.waitKind === "read" && preview.waitLeft && preview.waitLeft > 80
+              ? `Oyuncu okuyor — ${(preview.waitLeft / 1000).toFixed(1)} sn kaldı`
+              : preview.waitKind === "gap" && preview.waitLeft && preview.waitLeft > 80
+                ? `Bu replikten sonra ${(preview.waitLeft / 1000).toFixed(1)} sn — o satırın kaydırıcısını değiştir`
+                : preview.speaker === "ai"
+                  ? "Yapay zeka konuşuyor"
+                  : "Oyuncu satırı — ses kapalı"}
           </p>
           <p className="leading-7">
-            {preview.text.split(/\s+/).map((word, i) => (
+            {wordsOf(preview.text).map((word, i) => (
               <span
                 key={`${word}-${i}`}
                 className={
@@ -303,6 +312,16 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
               </span>
             ))}
           </p>
+          {preview.waitLeft && preview.waitTotal && preview.waitTotal > 0 ? (
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-primary/15">
+              <div
+                className="h-full rounded-full bg-primary transition-[width] duration-75"
+                style={{
+                  width: `${Math.max(0, Math.min(100, (preview.waitLeft / preview.waitTotal) * 100))}%`,
+                }}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
