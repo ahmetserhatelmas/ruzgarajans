@@ -16,3 +16,33 @@ export function hasRequiredMedia(
 export function hasCompletedForm(actor: ActorProfile | null | undefined) {
   return Boolean(actor?.registration_completed_at);
 }
+
+export function isFormSectionSaved(actor: ActorProfile | null | undefined) {
+  return Boolean(actor?.form_saved_at || actor?.registration_completed_at);
+}
+
+export function isMediaSectionSaved(
+  actor: ActorProfile | null | undefined,
+  photoKinds: string[] = []
+) {
+  return (
+    Boolean(actor?.media_saved_at || actor?.registration_completed_at) &&
+    REQUIRED_PHOTO_KINDS.every((k) => photoKinds.includes(k)) &&
+    Boolean(actor?.intro_video_playback_url) &&
+    Boolean(actor?.mimic_video_playback_url)
+  );
+}
+
+export function registrationStepCount(
+  actor: ActorProfile | null | undefined,
+  photoKinds: string[] = []
+) {
+  return (isFormSectionSaved(actor) ? 1 : 0) + (isMediaSectionSaved(actor, photoKinds) ? 1 : 0);
+}
+
+export function isAwaitingApproval(
+  profile: Profile | null | undefined,
+  actor: ActorProfile | null | undefined
+) {
+  return profile?.actor_status === "pending" && hasCompletedForm(actor);
+}

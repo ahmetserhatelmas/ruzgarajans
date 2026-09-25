@@ -103,6 +103,11 @@ export function clampGap(sec: number) {
   return Math.min(8, Math.max(0, sec));
 }
 
+export function estimateActorHoldMs(text: string) {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(2500, words * 450);
+}
+
 export function lineAfterSec(holdSec?: number) {
   return clampGap(typeof holdSec === "number" ? holdSec : DEFAULT_GAP);
 }

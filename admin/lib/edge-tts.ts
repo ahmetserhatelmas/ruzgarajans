@@ -3,9 +3,11 @@ import WebSocket from "ws";
 const TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 const VERSION = "1-143.0.3650.75";
 const WSS = "wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1";
+export type TtsLang = "tr" | "en";
+
 const VOICES = {
-  female: "tr-TR-EmelNeural",
-  male: "tr-TR-AhmetNeural",
+  tr: { female: "tr-TR-EmelNeural", male: "tr-TR-AhmetNeural", lang: "tr-TR" },
+  en: { female: "en-US-JennyNeural", male: "en-US-GuyNeural", lang: "en-US" },
 } as const;
 const WIN_EPOCH = BigInt("11644473600");
 
@@ -106,15 +108,22 @@ function extractAudio(data: WebSocket.RawData) {
   return null;
 }
 
-async function connectOnce(text: string, voice: "female" | "male", rate: number, skewSeconds: number) {
+async function connectOnce(
+  text: string,
+  voice: "female" | "male",
+  rate: number,
+  skewSeconds: number,
+  lang: TtsLang = "tr",
+) {
   const id = requestId();
-  const name = VOICES[voice];
+  const pack = VOICES[lang] ?? VOICES.tr;
+  const name = pack[voice];
   const clamped = Math.min(1.5, Math.max(0.25, rate));
   const rel = Math.round((clamped - 1) * 100);
   const rateAttr = `${rel >= 0 ? "+" : ""}${rel}%`;
   const gec = await secMsGec(skewSeconds);
   const url = `${WSS}?Ocp-Apim-Subscription-Key=${TOKEN}&ConnectionId=${id}&Sec-MS-GEC=${gec}&Sec-MS-GEC-Version=${VERSION}`;
-  const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="tr-TR"><voice name="${name}"><prosody rate="${rateAttr}">${escapeXml(text)}</prosody></voice></speak>`;
+  const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${pack.lang}"><voice name="${name}"><prosody rate="${rateAttr}">${escapeXml(text)}</prosody></voice></speak>`;
 
   return new Promise<TtsResult>((resolve, reject) => {
     const ws = new WebSocket(url, {
@@ -201,14 +210,14 @@ function skewFromDate(serverDate?: string) {
   return Math.round((parsed - Date.now()) / 1000);
 }
 
-async function synthesizeChunk(text: string, voice: "female" | "male", rate: number) {
+async function synthesizeChunk(text: string, voice: "female" | "male", rate: number, lang: TtsLang = "tr") {
   try {
-    return await connectOnce(text, voice, rate, 0);
+    return await connectOnce(text, voice, rate, 0, lang);
   } catch (error) {
     const status = (error as { statusCode?: number }).statusCode;
     const serverDate = (error as { serverDate?: string }).serverDate;
     if (status === 403) {
-      return connectOnce(text, voice, rate, skewFromDate(serverDate));
+      return connectOnce(text, voice, rate, skewFromDate(serverDate), lang);
     }
     throw error;
   }
@@ -259,13 +268,14 @@ export async function synthesizeTurkishTimed(
   text: string,
   voice: "female" | "male",
   rate: number,
+  lang: TtsLang = "tr",
 ): Promise<TtsResult> {
   const chunks = splitTtsText(text);
   const audio: Buffer[] = [];
   const words: TtsWordMark[] = [];
   let shift = 0;
   for (const chunk of chunks) {
-    const part = await synthesizeChunk(chunk, voice, rate);
+    const part = await synthesizeChunk(chunk, voice, rate, lang);
     audio.push(part.audio);
     for (const word of part.words) {
       words.push({ ...word, at: word.at + shift });

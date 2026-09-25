@@ -117,16 +117,14 @@ export default function AdminCastDetailScreen() {
 
   if (!cast) {
     return (
-      <Screen>
-        <BackHeader fallbackHref="/(admin)/casts" />
+      <Screen header={<BackHeader fallbackHref="/(admin)/casts" />}>
         <Text style={styles.muted}>{t('common.loading')}</Text>
       </Screen>
     );
   }
 
   return (
-    <Screen scroll>
-      <BackHeader fallbackHref="/(admin)/casts" />
+    <Screen scroll header={<BackHeader fallbackHref="/(admin)/casts" />}>
       <Text style={styles.title}>{t('admin.editCast')}</Text>
 
       <TextField label={t('cast.project')} value={projectName} onChangeText={setProjectName} />

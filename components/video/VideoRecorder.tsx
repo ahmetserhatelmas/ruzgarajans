@@ -8,6 +8,7 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type ViewStyle,
 } from 'react-native';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import {
@@ -23,7 +24,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { localizedError } from '@/lib/authErrors';
 import * as Speech from 'expo-speech';
-import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { VideoLogoMark } from '@/components/video/VideoLogoMark';
@@ -42,6 +43,17 @@ import {
   type DialogueWordMark,
 } from '@/lib/dialogueScript';
 import type { DialogueMode } from '@/types/database';
+
+const AUDIO_PLAYER_OPTS = {
+  downloadFirst: true,
+  keepAudioSessionActive: true,
+  updateInterval: 50,
+};
+
+function audioSeconds(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return value > 100 ? value / 1000 : value;
+}
 
 type Props = {
   onRecorded: (uri: string) => void;
@@ -105,6 +117,13 @@ async function pickVoice(language: string, gender: DialogueVoice) {
   }
 }
 
+/** Dynamic Island sits on a short edge in landscape; insets often stay at portrait values after lock. */
+function landscapeEdgeInset(insets: { top: number; left: number; right: number }) {
+  const reported = Math.max(insets.left, insets.right, insets.top);
+  const island = Platform.OS === 'ios' ? 88 : Spacing.md;
+  return Math.max(reported + 16, island);
+}
+
 function DialogueWords({
   text,
   label,
@@ -112,6 +131,7 @@ function DialogueWords({
   holdLeftMs,
   holdTotalMs,
   holdCaption,
+  style,
 }: {
   text: string;
   label: string | null;
@@ -119,13 +139,14 @@ function DialogueWords({
   holdLeftMs?: number;
   holdTotalMs?: number;
   holdCaption?: string | null;
+  style?: ViewStyle;
 }) {
   const words = wordsOf(text);
   const total = holdTotalMs && holdTotalMs > 0 ? holdTotalMs : 0;
   const left = total ? Math.max(0, Math.min(total, holdLeftMs ?? 0)) : 0;
   const pct = total ? (left / total) * 100 : 0;
   return (
-    <View style={styles.dialogueCard} pointerEvents="none">
+    <View style={[styles.dialogueCard, style]} pointerEvents="none">
       {label ? <Text style={styles.dialogueWho}>{label}</Text> : null}
       <Text style={styles.dialogueLine}>
         {words.map((word, index) => (
@@ -394,70 +415,150 @@ export function VideoRecorder({
       });
     });
 
+  const mixAudioWithCamera = async () => {
+    try {
+      // Camera owns the mic. Do not set allowsRecording — that steals the session
+      // and drops the actor's voice after the first AI line.
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        interruptionMode: 'mixWithOthers',
+        shouldRouteThroughEarpiece: false,
+      });
+    } catch {
+      // Camera already owns the session; still try playback.
+    }
+  };
+
   const playRemoteAudio = (uri: string, text: string, marks?: DialogueWordMark[]) =>
-    new Promise<void>((resolve) => {
+    new Promise<boolean>((resolve) => {
       if (cancelledRef.current) {
-        resolve();
+        resolve(false);
         return;
       }
-      const prev = playerRef.current;
-      playerRef.current = null;
-      releasePlayerSoon(prev);
-      let player: AudioPlayer;
+      let player = playerRef.current;
       try {
-        player = createAudioPlayer({ uri });
+        if (player) {
+          try {
+            player.pause();
+          } catch {
+            // ignore
+          }
+          player.replace({ uri });
+        } else {
+          player = createAudioPlayer({ uri }, AUDIO_PLAYER_OPTS);
+          playerRef.current = player;
+        }
+        player.volume = 1;
       } catch {
-        resolve();
+        resolve(false);
         return;
       }
-      playerRef.current = player;
+      const active = player;
       const words = wordsOf(text);
       const aligned = alignTtsMarks(text, marks ?? []);
-      try {
-        player.play();
-      } catch {
-        resolve();
-        return;
-      }
       const started = Date.now();
+      const estimateMs = Math.max(2500, words.join(' ').length * 80);
+      let retried = false;
+      let settled = false;
+      let sub: { remove: () => void } | undefined;
+
+      const finish = (ok: boolean) => {
+        if (settled) return;
+        settled = true;
+        try {
+          sub?.remove();
+        } catch {
+          // ignore
+        }
+        resolve(ok);
+      };
+
+      const highlight = (current: number, duration: number) => {
+        if (!mountedRef.current) return;
+        if (aligned.length) {
+          setHighlightIndex(wordIndexAtTime(aligned, current - 0.06));
+        } else if (duration > 0) {
+          const lookahead = Math.min(0.28, 0.12 + duration * 0.02);
+          setHighlightIndex(wordIndexAtProgress(text, (current + lookahead) / duration));
+        } else {
+          setHighlightIndex(wordIndexAtProgress(text, (Date.now() - started) / estimateMs));
+        }
+      };
+
+      try {
+        sub = active.addListener(
+          'playbackStatusUpdate',
+          (status: { didJustFinish?: boolean; currentTime?: number; duration?: number }) => {
+            if (settled || cancelledRef.current) {
+              finish(false);
+              return;
+            }
+            highlight(audioSeconds(Number(status.currentTime ?? 0)), audioSeconds(Number(status.duration ?? 0)));
+            if (status.didJustFinish && Date.now() - started > 250) finish(true);
+          }
+        );
+      } catch {
+        // poll only
+      }
+
+      void (async () => {
+        const deadline = Date.now() + 8000;
+        while (Date.now() < deadline && !cancelledRef.current && !settled) {
+          try {
+            if (active.isLoaded || audioSeconds(Number(active.duration ?? 0)) > 0) break;
+          } catch {
+            break;
+          }
+          await sleep(50);
+        }
+        if (cancelledRef.current || settled) return;
+        await mixAudioWithCamera();
+        if (cancelledRef.current || settled) return;
+        try {
+          active.play();
+        } catch {
+          finish(false);
+        }
+      })();
+
       const tick = trackTimer(
         setInterval(() => {
-          if (cancelledRef.current || playerRef.current !== player) {
+          if (settled) return;
+          if (cancelledRef.current) {
             clearInterval(tick);
-            resolve();
+            finish(false);
             return;
           }
           let duration = 0;
           let current = 0;
+          let playing = false;
           try {
-            duration = Number(player.duration ?? 0);
-            current = Number(player.currentTime ?? 0);
+            duration = audioSeconds(Number(active.duration ?? 0));
+            current = audioSeconds(Number(active.currentTime ?? 0));
+            playing = Boolean(active.playing);
           } catch {
             clearInterval(tick);
-            resolve();
+            finish(false);
             return;
           }
-          if (duration > 100) {
-            duration /= 1000;
-            current /= 1000;
+          highlight(current, duration);
+
+          const elapsed = Date.now() - started;
+          if (!retried && elapsed > 900 && current < 0.05 && !playing) {
+            retried = true;
+            void mixAudioWithCamera().then(() => {
+              try {
+                active.play();
+              } catch {
+                // ignore
+              }
+            });
           }
-          if (mountedRef.current) {
-            if (aligned.length) {
-              setHighlightIndex(wordIndexAtTime(aligned, current - 0.06));
-            } else if (duration > 0) {
-              const lookahead = Math.min(0.28, 0.12 + duration * 0.02);
-              setHighlightIndex(wordIndexAtProgress(text, (current + lookahead) / duration));
-            } else {
-              const estimatedMs = Math.max(800, words.join(' ').length * 72);
-              setHighlightIndex(wordIndexAtProgress(text, (Date.now() - started) / estimatedMs));
-            }
-          }
-          const finished =
-            (duration > 0 && current >= duration - 0.08) ||
-            (duration <= 0 && Date.now() - started > Math.max(4000, words.length * 420));
-          if (finished) {
+
+          const limit = Math.max(estimateMs + 2500, (duration || 0) * 1000 + 2500);
+          if ((duration > 0 && current >= duration - 0.08) || elapsed > limit) {
             clearInterval(tick);
-            resolve();
+            finish(true);
           }
         }, 40)
       );
@@ -498,7 +599,8 @@ export function VideoRecorder({
     const rate = script.rate;
     const pitch = 1;
 
-    await sleep(400);
+    await mixAudioWithCamera();
+    await sleep(recordingRef.current ? 200 : 400);
 
     for (let i = 0; i < script.lines.length; i += 1) {
       const line = script.lines[i];
@@ -511,9 +613,12 @@ export function VideoRecorder({
 
       if (line.speaker === 'ai') {
         setCueHold(null);
-        if (line.audioUrl) {
-          await playRemoteAudio(line.audioUrl, line.text, line.words);
-        } else {
+        await mixAudioWithCamera();
+        const played = line.audioUrl
+          ? await playRemoteAudio(line.audioUrl, line.text, line.words)
+          : false;
+        // Speech steals the camera mic — only use it when not recording.
+        if (!played && !cancelledRef.current && !recordingRef.current) {
           await speakText(line.text, { language: lang, voice: voice.id, rate, pitch });
         }
         if (cancelledRef.current) return;
@@ -558,7 +663,8 @@ export function VideoRecorder({
       void playParsedScript(parseDialogueScript(dialogueScript));
     }
     if (dialogueMode === 'audio_file' && dialogueAudioUrl) {
-      const player = createAudioPlayer({ uri: dialogueAudioUrl });
+      const player = createAudioPlayer({ uri: dialogueAudioUrl }, AUDIO_PLAYER_OPTS);
+      player.volume = 1;
       playerRef.current = player;
       player.play();
     }
@@ -625,7 +731,12 @@ export function VideoRecorder({
 
     recordingRef.current = true;
     setRecording(true);
-    void startDialogueAssist();
+    void (async () => {
+      await sleep(650);
+      if (cancelledRef.current || !recordingRef.current) return;
+      await mixAudioWithCamera();
+      await startDialogueAssist();
+    })();
 
     let clipUri: string | null = null;
     try {
@@ -720,9 +831,12 @@ export function VideoRecorder({
     );
   }
 
+  const edgeInset = isLandscape
+    ? landscapeEdgeInset(insets)
+    : Math.max(insets.left, insets.right, Spacing.md);
   const overlayPad = {
-    paddingLeft: Math.max(insets.left, Spacing.md),
-    paddingRight: Math.max(insets.right, Spacing.md),
+    paddingLeft: edgeInset,
+    paddingRight: edgeInset,
     paddingBottom: Math.max(insets.bottom, Spacing.md) + Spacing.sm,
   };
 
@@ -755,7 +869,7 @@ export function VideoRecorder({
           ) : null}
           {!busy ? (
             <Pressable
-              style={[styles.flipBtn, { top: 52, right: Math.max(insets.right, Spacing.md) }]}
+              style={[styles.flipBtn, { top: 52, right: edgeInset }]}
               onPress={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))}
               hitSlop={12}
             >
@@ -765,7 +879,7 @@ export function VideoRecorder({
           ) : null}
           {dialogueMode === 'script_tts' || guidanceLines?.length ? (
             <Pressable
-              style={[styles.dialogueToggle, { top: 52, left: Math.max(insets.left, Spacing.md) }]}
+              style={[styles.dialogueToggle, { top: 52, left: edgeInset }]}
               onPress={() => setShowDialogue((v) => !v)}
               hitSlop={12}
             >
@@ -793,6 +907,7 @@ export function VideoRecorder({
                     })
                   : null
               }
+              style={{ left: edgeInset, right: edgeInset, bottom: 76 }}
             />
           ) : null}
           <VideoLogoMark />
@@ -804,8 +919,8 @@ export function VideoRecorder({
         </View>
       ) : (
         <View style={[styles.controls, overlayPad]} pointerEvents="box-none">
-        {hint && !uri && !recording ? <Text style={styles.mode}>{hint}</Text> : null}
-        {(dialogueMode !== 'none' || guidanceLines?.length) && !uri && !recording ? (
+        {hint && !uri && !recording && !previewing ? <Text style={styles.mode}>{hint}</Text> : null}
+        {(dialogueMode !== 'none' || guidanceLines?.length) && !uri && !recording && !previewing ? (
           <Text style={styles.mode}>
             {guidanceLines?.length
               ? t('video.mimicGuidance')
@@ -816,49 +931,58 @@ export function VideoRecorder({
         ) : null}
         {!uri ? (
           <View style={styles.recActions} pointerEvents="box-none">
-            {dialogueMode === 'script_tts' && dialogueScript && !isSimulator && !recording ? (
+            {previewing ? (
               <Button
-                label={previewing ? t('video.stopPreview') : t('video.previewScript')}
+                label={t('video.stopPreview')}
                 variant="secondary"
                 style={styles.recBtn}
                 onPress={() => {
-                  if (previewing) {
-                    cancelledRef.current = true;
-                    stopDialogueAssist();
-                    setPreviewing(false);
-                    setCueLabel(null);
-                    setCueText('');
-                    setHighlightIndex(-1);
-                    setCueHold(null);
-                    return;
-                  }
-                  void previewScript();
+                  cancelledRef.current = true;
+                  stopDialogueAssist();
+                  setPreviewing(false);
+                  setCueLabel(null);
+                  setCueText('');
+                  setHighlightIndex(-1);
+                  setCueHold(null);
                 }}
-                disabled={countdown !== null}
               />
-            ) : null}
-            {isSimulator ? (
-              <Button
-                label={t('media.pickFromGallery')}
-                style={styles.recBtn}
-                onPress={() => void pickFromLibrary()}
-              />
+            ) : recording ? (
+              <Pressable
+                onPress={stop}
+                style={({ pressed }) => [styles.stopCam, pressed && { opacity: 0.85 }]}
+                hitSlop={12}
+                accessibilityLabel={t('video.stop')}
+              >
+                <View style={styles.stopCamInner} />
+              </Pressable>
             ) : (
-              <Button
-                label={
-                  recording
-                    ? t('video.stop')
-                    : previewing
-                      ? t('video.previewing')
-                      : t('video.start')
-                }
-                onPress={recording ? stop : () => void start()}
-                variant={recording ? 'danger' : 'primary'}
-                disabled={!recording && !isLandscape}
-                style={styles.recBtn}
-              />
+              <>
+                {dialogueMode === 'script_tts' && dialogueScript && !isSimulator ? (
+                  <Button
+                    label={t('video.previewScript')}
+                    variant="secondary"
+                    style={styles.recBtn}
+                    onPress={() => void previewScript()}
+                    disabled={countdown !== null}
+                  />
+                ) : null}
+                {isSimulator ? (
+                  <Button
+                    label={t('media.pickFromGallery')}
+                    style={styles.recBtn}
+                    onPress={() => void pickFromLibrary()}
+                  />
+                ) : (
+                  <Button
+                    label={t('video.start')}
+                    onPress={() => void start()}
+                    disabled={!isLandscape}
+                    style={styles.recBtn}
+                  />
+                )}
+              </>
             )}
-            {allowLibrary && !busy ? (
+            {allowLibrary && !busy && !previewing ? (
               <Button
                 label={t('media.pickFromGallery')}
                 variant="secondary"
@@ -1000,24 +1124,25 @@ const styles = StyleSheet.create({
   },
   dialogueCard: {
     position: 'absolute',
-    left: Spacing.md,
-    right: Spacing.md,
-    bottom: 96,
-    padding: Spacing.md,
+    left: Spacing.xl,
+    right: Spacing.xl,
+    bottom: 76,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
     borderRadius: Radius.md,
     backgroundColor: 'rgba(20,8,32,0.72)',
   },
   dialogueWho: {
     fontFamily: Fonts.bodyBold,
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.gold,
-    marginBottom: 6,
+    marginBottom: 2,
     letterSpacing: 0.4,
   },
   dialogueLine: {
     fontFamily: Fonts.bodyMedium,
-    fontSize: 20,
-    lineHeight: 30,
+    fontSize: 16,
+    lineHeight: 22,
     color: Colors.textOnDark,
   },
   dialogueWord: {
@@ -1028,11 +1153,11 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyBold,
   },
   holdWrap: {
-    marginTop: 12,
-    gap: 6,
+    marginTop: 6,
+    gap: 4,
   },
   holdTrack: {
-    height: 6,
+    height: 4,
     borderRadius: 99,
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.22)',
@@ -1082,6 +1207,22 @@ const styles = StyleSheet.create({
   recBtn: {
     minWidth: 168,
     alignSelf: 'center',
+  },
+  stopCam: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.85)',
+  },
+  stopCamInner: {
+    width: 16,
+    height: 16,
+    borderRadius: 3,
+    backgroundColor: Colors.danger,
   },
   center: {
     flex: 1,

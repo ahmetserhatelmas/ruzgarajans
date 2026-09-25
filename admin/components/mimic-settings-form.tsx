@@ -34,7 +34,7 @@ function pickVoice(lang: string) {
   const prefix = lang.toLowerCase().slice(0, 2);
   const sameLang = voices.filter((voice) => voice.lang.toLowerCase().startsWith(prefix));
   return (
-    sameLang.find((voice) => /female|kadın|yelda|emel|filiz|zira|samantha/i.test(voice.name)) ??
+    sameLang.find((voice) => /female|kadın|yelda|emel|filiz|jenny|aria|samantha/i.test(voice.name)) ??
     sameLang[0]
   );
 }
@@ -57,10 +57,23 @@ export function MimicSettingsForm({
   const [hint, setHint] = useState<string | null>(null);
   const stopRef = useRef(false);
   const runId = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const stopAudio = () => {
+    const audio = audioRef.current;
+    audioRef.current = null;
+    if (!audio) return;
+    const src = audio.src;
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    if (src.startsWith("blob:")) URL.revokeObjectURL(src);
+  };
 
   const stopPreview = () => {
     stopRef.current = true;
     runId.current += 1;
+    stopAudio();
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     setPlaying(false);
     setCurrentLine(null);
@@ -77,7 +90,7 @@ export function MimicSettingsForm({
     };
   }, []);
 
-  const speakLine = (text: string, lang: string, speechRate: number) =>
+  const speakBrowser = (text: string, lang: string, previewRate: number) =>
     new Promise<void>((resolve) => {
       if (typeof window === "undefined" || !window.speechSynthesis) {
         resolve();
@@ -87,21 +100,59 @@ export function MimicSettingsForm({
       const voice = pickVoice(lang);
       if (voice) utterance.voice = voice;
       utterance.lang = lang;
-      utterance.rate = speechRate;
+      utterance.rate = previewRate;
       utterance.pitch = 1;
       utterance.onend = () => resolve();
       utterance.onerror = () => resolve();
       window.speechSynthesis.speak(utterance);
     });
 
-  const playPreview = async (form: HTMLFormElement) => {
-    if (typeof window === "undefined" || !window.speechSynthesis) {
-      setHint("Bu tarayıcıda ses önizlemesi yok.");
-      return;
+  const speakNeural = async (text: string, lang: "tr" | "en", previewRate: number) => {
+    const res = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, voice: "female", rate: previewRate, lang }),
+    });
+    if (!res.ok) throw new Error("neural");
+    const payload = (await res.json()) as { audio?: string };
+    if (!payload.audio) throw new Error("neural");
+    const bytes = Uint8Array.from(atob(payload.audio), (c) => c.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
+    await new Promise<void>((resolve, reject) => {
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => {
+        if (audioRef.current === audio) audioRef.current = null;
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      audio.onerror = () => {
+        if (audioRef.current === audio) audioRef.current = null;
+        URL.revokeObjectURL(url);
+        reject(new Error("audio"));
+      };
+      void audio.play().catch(() => {
+        URL.revokeObjectURL(url);
+        reject(new Error("audio"));
+      });
+    });
+  };
+
+  const speakLine = async (text: string, lang: "tr" | "en", previewRate: number) => {
+    try {
+      await speakNeural(text, lang, previewRate);
+      setHint(null);
+    } catch {
+      setHint("Nöral ses bağlanamadı; tarayıcı sesi kullanılıyor.");
+      await speakBrowser(text, lang === "en" ? "en-US" : "tr-TR", previewRate);
     }
+  };
+
+  const playPreview = async (form: HTMLFormElement) => {
     stopRef.current = false;
     const id = (runId.current += 1);
-    window.speechSynthesis.cancel();
+    stopAudio();
+    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     const data = new FormData(form);
     const lang = previewLang;
     const lines = linesOf(String(data.get(lang === "en" ? "mimic_cues_en" : "mimic_cues_tr") ?? ""));
@@ -116,7 +167,7 @@ export function MimicSettingsForm({
     for (const line of lines) {
       if (stopRef.current || runId.current !== id) return;
       setCurrentLine(line);
-      await speakLine(line, lang === "en" ? "en-US" : "tr-TR", previewRate);
+      await speakLine(line, lang, previewRate);
       if (stopRef.current || runId.current !== id) return;
       await wait(pause);
     }
@@ -191,7 +242,9 @@ export function MimicSettingsForm({
             Durdur
           </Button>
         ) : null}
-        <p className="text-xs text-muted-foreground">Kaydetmeden, şu anki hız ve beklemeyle duyar.</p>
+        <p className="text-xs text-muted-foreground">
+          İlandaki gibi nöral ses (Emel / Jenny). Kaydetmeden, şu anki hız ve beklemeyle duyar.
+        </p>
       </div>
       {hint ? <p className="text-xs text-destructive">{hint}</p> : null}
       {currentLine ? (

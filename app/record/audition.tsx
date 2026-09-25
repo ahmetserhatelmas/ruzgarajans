@@ -82,7 +82,18 @@ function AuditionRecordContent() {
         countdownEnabled
       />
       <View
-        style={[styles.head, { paddingTop: Math.max(insets.top, 8) }]}
+        style={[
+          styles.head,
+          {
+            paddingTop: Math.max(insets.top, 8),
+            paddingLeft: isLandscape
+              ? Math.max(insets.left, insets.top, 88)
+              : Math.max(insets.left, Spacing.md),
+            paddingRight: isLandscape
+              ? Math.max(insets.right, insets.top, 88)
+              : Math.max(insets.right, Spacing.md),
+          },
+        ]}
         pointerEvents="box-none"
       >
         {isLandscape ? (
@@ -122,7 +133,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 20,
-    paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',

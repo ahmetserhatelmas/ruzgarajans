@@ -76,8 +76,7 @@ export default function NewCastScreen() {
   };
 
   return (
-    <Screen scroll>
-      <BackHeader fallbackHref="/(admin)/casts" />
+    <Screen scroll header={<BackHeader fallbackHref="/(admin)/casts" />}>
       <Text style={styles.title}>{t('admin.newCast')}</Text>
       <TextField label={t('cast.project')} value={projectName} onChangeText={setProjectName} />
       <TextField label={t('cast.role')} value={roleName} onChangeText={setRoleName} />

@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CastCard } from '@/components/cast/CastCard';
+import { InboxBell } from '@/components/ui/InboxBell';
 import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
@@ -44,7 +45,10 @@ export default function CastListScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <Text style={styles.title}>{t('cast.title')}</Text>
+      <View style={styles.topRow}>
+        <Text style={styles.title}>{t('cast.title')}</Text>
+        <InboxBell />
+      </View>
       {!castOk ? (
         <View style={styles.gate}>
           <AccessGateCard />
@@ -73,13 +77,21 @@ export default function CastListScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.paper },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: Spacing.lg,
+    paddingRight: Spacing.md,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
   title: {
+    flex: 1,
     fontFamily: Fonts.displayBold,
     fontSize: 36,
     color: Colors.ink,
-    paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.md,
+    paddingRight: Spacing.sm,
   },
   gate: { paddingHorizontal: Spacing.lg },
   list: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl },

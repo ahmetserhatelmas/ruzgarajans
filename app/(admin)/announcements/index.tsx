@@ -108,8 +108,7 @@ export default function AdminAnnouncementsScreen() {
   };
 
   return (
-    <Screen scroll>
-      <BackHeader fallbackHref="/(admin)" />
+    <Screen scroll header={<BackHeader fallbackHref="/(admin)" />}>
       <Text style={styles.title}>{t('admin.announcements')}</Text>
 
       <View style={styles.form}>

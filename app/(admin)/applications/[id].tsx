@@ -132,8 +132,7 @@ export default function AdminApplicationDetailScreen() {
 
   if (!app) {
     return (
-      <Screen>
-        <BackHeader fallbackHref="/(admin)/applications" />
+      <Screen header={<BackHeader fallbackHref="/(admin)/applications" />}>
         <Text style={styles.meta}>{t('common.loading')}</Text>
       </Screen>
     );
@@ -144,8 +143,7 @@ export default function AdminApplicationDetailScreen() {
   const actorName = profile?.full_name || profile?.email || '—';
 
   return (
-    <Screen scroll>
-      <BackHeader fallbackHref="/(admin)/applications" />
+    <Screen scroll header={<BackHeader fallbackHref="/(admin)/applications" />}>
       <Text style={styles.title}>{project}</Text>
       <Text style={styles.sub}>
         {t('cast.role')}: {role}

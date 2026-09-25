@@ -30,8 +30,7 @@ export default function AdminActorDetail() {
       : '/(admin)/actors';
 
   return (
-    <Screen scroll>
-      <BackHeader fallbackHref={backHref} />
+    <Screen scroll header={<BackHeader fallbackHref={backHref} />}>
       <Text style={styles.title}>{profile?.full_name}</Text>
       <Text style={styles.meta}>{profile?.email}</Text>
       <Text style={styles.meta}>

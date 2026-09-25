@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard';
+import { VideoPlayerModal } from '@/components/video/VideoPlayerModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
 import { supabase } from '@/lib/supabase';
@@ -28,6 +29,10 @@ export default function ApplicationsScreen() {
   const { user, profile, actorProfile, galleryPhotos } = useAuth();
   const router = useRouter();
   const [items, setItems] = useState<AppRow[]>([]);
+  const [videoByCast, setVideoByCast] = useState<Map<string, { url: string; title: string }>>(
+    new Map()
+  );
+  const [watching, setWatching] = useState<{ url: string; title: string } | null>(null);
   const castOk = canAccessCasts(profile, actorProfile, galleryPhotos);
 
   useFocusEffect(
@@ -36,15 +41,39 @@ export default function ApplicationsScreen() {
         setItems([]);
         return;
       }
-      supabase
-        .from('applications')
-        .select(
-          'id, cast_id, status, accept_budget, counter_budget, cast_listings(project_name, role_name)'
-        )
-        .eq('actor_id', user.id)
-        .order('created_at', { ascending: false })
-        .then(({ data }) => setItems((data as unknown as AppRow[]) ?? []))
-        .catch(() => setItems([]));
+      void Promise.all([
+        supabase
+          .from('applications')
+          .select(
+            'id, cast_id, status, accept_budget, counter_budget, cast_listings(project_name, role_name)'
+          )
+          .eq('actor_id', user.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('videos')
+          .select('cast_id, playback_url, title')
+          .eq('user_id', user.id)
+          .eq('kind', 'audition')
+          .eq('status', 'ready')
+          .not('playback_url', 'is', null)
+          .order('created_at', { ascending: false }),
+      ])
+        .then(([apps, vids]) => {
+          setItems((apps.data as unknown as AppRow[]) ?? []);
+          const map = new Map<string, { url: string; title: string }>();
+          for (const row of vids.data ?? []) {
+            if (!row.cast_id || !row.playback_url || map.has(row.cast_id)) continue;
+            map.set(row.cast_id, {
+              url: row.playback_url,
+              title: row.title || t('cast.audition'),
+            });
+          }
+          setVideoByCast(map);
+        })
+        .catch(() => {
+          setItems([]);
+          setVideoByCast(new Map());
+        });
     }, [user, castOk])
   );
 
@@ -82,10 +111,28 @@ export default function ApplicationsScreen() {
                   {t('cast.yourOffer')}: {item.counter_budget.toLocaleString('tr-TR')} TRY
                 </Text>
               ) : null}
+              {videoByCast.get(item.cast_id) ? (
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    const video = videoByCast.get(item.cast_id);
+                    if (video) setWatching(video);
+                  }}
+                  hitSlop={8}
+                >
+                  <Text style={styles.watch}>{t('cast.watchSentVideo')}</Text>
+                </Pressable>
+              ) : null}
             </Pressable>
           )}
         />
       )}
+      <VideoPlayerModal
+        visible={Boolean(watching)}
+        uri={watching?.url ?? null}
+        title={watching?.title}
+        onClose={() => setWatching(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -113,4 +160,10 @@ const styles = StyleSheet.create({
   role: { fontFamily: Fonts.body, color: Colors.textMuted },
   status: { fontFamily: Fonts.bodyMedium, color: Colors.goldDeep },
   offer: { fontFamily: Fonts.body, color: Colors.textMuted },
+  watch: {
+    marginTop: 6,
+    fontFamily: Fonts.bodyBold,
+    fontSize: 14,
+    color: Colors.brand,
+  },
 });

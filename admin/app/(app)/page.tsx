@@ -2,9 +2,9 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { fetchAdminAlerts, fetchDashboardStats } from "@/lib/queries";
-import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
+import { isAwaitingApproval, isFormSectionSaved, isMediaSectionSaved } from "@/lib/access";
 import { APP_STATUS } from "@/lib/labels";
-import type { ActorProfile, ApplicationStatus, Profile } from "@/lib/types";
+import type { ActorProfile, ApplicationStatus } from "@/lib/types";
 import { canAdmin, getAdminProfile } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -29,19 +29,16 @@ export default async function DashboardPage({
     list.push(photo.kind);
     kindsByUser.set(photo.user_id, list);
   }
-  const pending = statsData.profiles.filter((a) => a.actor_status === "pending").length;
+  const pending = statsData.profiles.filter((a) =>
+    isAwaitingApproval(a, (actorById.get(a.id) as ActorProfile | undefined) ?? null),
+  ).length;
   const approved = statsData.profiles.filter((a) => a.actor_status === "approved").length;
   const rejected = statsData.profiles.filter((a) => a.actor_status === "rejected").length;
   const noForm = statsData.profiles.filter(
-    (a) => !hasCompletedForm((actorById.get(a.id) as ActorProfile | undefined) ?? null),
+    (a) => !isFormSectionSaved((actorById.get(a.id) as ActorProfile | undefined) ?? null),
   ).length;
   const noMedia = statsData.profiles.filter(
-    (a) =>
-      !hasRequiredMedia(
-        a as Profile,
-        (actorById.get(a.id) as ActorProfile | undefined) ?? null,
-        kindsByUser.get(a.id) ?? [],
-      ),
+    (a) => !isMediaSectionSaved((actorById.get(a.id) as ActorProfile | undefined) ?? null, kindsByUser.get(a.id) ?? []),
   ).length;
   const published = statsData.casts.filter((c) => c.is_published).length;
 

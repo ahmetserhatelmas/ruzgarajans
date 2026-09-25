@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     text?: string;
     voice?: "female" | "male";
     rate?: number;
+    lang?: "tr" | "en";
   } | null;
   const text = String(body?.text ?? "").trim();
   if (!text || text.length > 8000) {
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
       text,
       body?.voice === "male" ? "male" : "female",
       Number(body?.rate) || 1,
+      body?.lang === "en" ? "en" : "tr",
     );
     return NextResponse.json({
       audio: Buffer.from(audio).toString("base64"),

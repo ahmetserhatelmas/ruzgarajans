@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Image, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { localizedError } from '@/lib/authErrors';
+import { InboxBell } from '@/components/ui/InboxBell';
 import { Screen } from '@/components/ui/Screen';
 import { Button } from '@/components/ui/Button';
 import { MediaSourceButtons } from '@/components/ui/MediaSourceButtons';
@@ -26,6 +27,7 @@ import {
   type ProfileVideoKind,
 } from '@/services/videos';
 import type { Video, VideoKind } from '@/types/database';
+import { PhotoViewer } from '@/components/ui/PhotoViewer';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 const PROFILE_VIDEOS: {
@@ -71,6 +73,7 @@ export default function ProfileScreen() {
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [langVideos, setLangVideos] = useState<Video[]>([]);
   const [photoBusy, setPhotoBusy] = useState<GalleryPhotoKind | null>(null);
+  const [viewing, setViewing] = useState<{ uri: string; title: string } | null>(null);
   const showAvatar = Boolean(profile?.avatar_url) && !avatarFailed;
   const photoMap = useMemo(() => photosByKind(galleryPhotos), [galleryPhotos]);
 
@@ -174,19 +177,39 @@ export default function ProfileScreen() {
   };
 
   return (
-    <Screen scroll>
-      <View style={styles.cover}>
+    <Screen
+      scroll
+      header={
+        <View style={{ alignItems: 'flex-end' }}>
+          <InboxBell />
+        </View>
+      }
+    >
+      <Pressable
+        style={styles.cover}
+        disabled={!profile?.cover_url}
+        onPress={() => {
+          if (!profile?.cover_url) return;
+          setViewing({ uri: profile.cover_url, title: t('media.cover') });
+        }}
+      >
         {profile?.cover_url ? (
           <Image source={{ uri: profile.cover_url }} style={StyleSheet.absoluteFill} />
         ) : null}
-      </View>
+      </Pressable>
       <View style={styles.avatarWrap}>
         {showAvatar ? (
-          <Image
-            source={{ uri: profile!.avatar_url! }}
-            style={styles.avatar}
-            onError={() => setAvatarFailed(true)}
-          />
+          <Pressable
+            onPress={() =>
+              setViewing({ uri: profile!.avatar_url!, title: t('media.avatar') })
+            }
+          >
+            <Image
+              source={{ uri: profile!.avatar_url! }}
+              style={styles.avatar}
+              onError={() => setAvatarFailed(true)}
+            />
+          </Pressable>
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
             <Text style={styles.initials}>
@@ -197,6 +220,9 @@ export default function ProfileScreen() {
       </View>
 
       <Text style={styles.name}>{profile?.full_name}</Text>
+      {profile?.email || user?.email ? (
+        <Text style={styles.email}>{profile?.email || user?.email}</Text>
+      ) : null}
       <Text style={styles.city}>{actorProfile?.city ?? '—'}</Text>
 
       <Button
@@ -375,6 +401,11 @@ export default function ProfileScreen() {
           </>
         ) : null}
       </Section>
+      <PhotoViewer
+        uri={viewing?.uri ?? null}
+        title={viewing?.title}
+        onClose={() => setViewing(null)}
+      />
     </Screen>
   );
 }
@@ -429,6 +460,12 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.displayBold,
     fontSize: 34,
     color: Colors.ink,
+  },
+  email: {
+    marginTop: 2,
+    fontFamily: Fonts.body,
+    fontSize: 15,
+    color: Colors.textMuted,
   },
   city: {
     fontFamily: Fonts.body,

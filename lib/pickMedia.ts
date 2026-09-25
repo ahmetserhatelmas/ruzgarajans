@@ -28,7 +28,8 @@ export async function takePhoto(): Promise<PickedAsset | null> {
   if (!perm.granted) return null;
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: ['images'],
-    quality: 0.85,
+    quality: 0.7,
+    exif: false,
     preferredAssetRepresentationMode: COMPAT,
   });
   const asset = result.canceled ? null : result.assets[0];

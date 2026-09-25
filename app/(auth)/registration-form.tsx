@@ -462,8 +462,10 @@ export default function RegistrationFormScreen() {
 
   if (!hydrated) {
     return (
-      <Screen contentStyle={{ paddingTop: Spacing.md }}>
-        <BackHeader fallbackHref="/(actor)" />
+      <Screen
+        header={<BackHeader fallbackHref="/(actor)" />}
+        contentStyle={{ paddingTop: Spacing.md }}
+      >
         <Text style={styles.subtitle}>{t('common.loading')}</Text>
       </Screen>
     );
@@ -670,8 +672,11 @@ export default function RegistrationFormScreen() {
   );
 
   return (
-    <Screen scroll contentStyle={{ gap: Spacing.md, paddingTop: Spacing.md }}>
-      <BackHeader fallbackHref="/(actor)" />
+    <Screen
+      scroll
+      header={<BackHeader fallbackHref="/(actor)" />}
+      contentStyle={{ gap: Spacing.md, paddingTop: Spacing.md }}
+    >
       <Text style={styles.title}>{t('regForm.title')}</Text>
       <Text style={styles.subtitle}>{t('regForm.subtitle')}</Text>
       <Text style={styles.subtitle}>{t('regForm.draftHint')}</Text>

@@ -4,6 +4,7 @@ import { Redirect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/contexts/AuthContext';
 import { LANGUAGE_KEY } from '@/lib/i18n';
+import { takePendingNotificationHref } from '@/lib/notificationRoute';
 import { Colors } from '@/constants/theme';
 
 export default function Index() {
@@ -50,6 +51,8 @@ export default function Index() {
     return <Redirect href="/(auth)/rejected" />;
   }
 
-  // Actors enter the app even before form / approval; cast is gated inside
-  return <Redirect href="/(actor)" />;
+  // Actors enter the app even before form / approval; cast is gated inside.
+  // If the app was opened from a listing notification, go there instead of home.
+  const fromNotification = takePendingNotificationHref();
+  return <Redirect href={(fromNotification as any) ?? '/(actor)'} />;
 }

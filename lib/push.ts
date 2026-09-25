@@ -28,6 +28,10 @@ export async function registerAndSavePushToken(userId: string) {
       name: 'Opsiyon',
       importance: Notifications.AndroidImportance.HIGH,
     });
+    await Notifications.setNotificationChannelAsync('introductions', {
+      name: 'Tanıtım',
+      importance: Notifications.AndroidImportance.HIGH,
+    });
   }
 
   const existing = await Notifications.getPermissionsAsync();

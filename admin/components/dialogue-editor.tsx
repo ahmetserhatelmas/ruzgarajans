@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   emptyDialogueScript,
+  estimateActorHoldMs,
   lineAfterSec,
   parseDialogueScript,
   stringifyDialogueScript,
@@ -222,15 +223,19 @@ export function DialogueEditor({ defaultValue }: { defaultValue?: string | null 
         await speakLine(line.text.trim());
         if (runId.current !== id) return;
         setPreview((prev) => (prev ? { ...prev, wordIndex: words.length } : prev));
+        if (i < lines.length - 1) {
+          await waitLive(() => {
+            const live = scriptRef.current.lines.filter((item) => item.text.trim())[i];
+            return lineAfterSec(live?.holdSec) * 1000;
+          }, id, "gap");
+        }
       } else {
-        await waitLive(() => Math.max(1200, words.length * 450), id, "read");
-      }
-      if (runId.current !== id || stopRef.current) break;
-      if (i < lines.length - 1) {
+        const readMs = estimateActorHoldMs(line.text);
         await waitLive(() => {
           const live = scriptRef.current.lines.filter((item) => item.text.trim())[i];
-          return lineAfterSec(live?.holdSec) * 1000;
-        }, id, "gap");
+          const after = i < lines.length - 1 ? lineAfterSec(live?.holdSec) * 1000 : 0;
+          return readMs + after;
+        }, id, "read");
       }
     }
     if (runId.current === id) {

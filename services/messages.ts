@@ -19,6 +19,18 @@ export async function getOrCreateConversation(actorId: string): Promise<Conversa
   return data as Conversation;
 }
 
+export function mergeMessages(current: Message[], incoming: Message[]): Message[] {
+  const map = new Map<string, Message>();
+  for (const row of [...current, ...incoming]) map.set(row.id, row);
+  const rows = [...map.values()];
+  const confirmed = new Set(
+    rows.filter((m) => !m.id.startsWith('temp-')).map((m) => `${m.sender_id}:${m.body}`)
+  );
+  return rows
+    .filter((m) => !m.id.startsWith('temp-') || !confirmed.has(`${m.sender_id}:${m.body}`))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
 export async function fetchMessages(conversationId: string): Promise<Message[]> {
   const { data, error } = await supabase
     .from('messages')
@@ -47,17 +59,30 @@ export async function sendMessage(input: {
     throw new Error('Only approved actors can send messages');
   }
 
-  const { data, error } = await supabase
-    .from('messages')
-    .insert({
-      conversation_id: input.conversationId,
-      sender_id: input.senderId,
-      body: input.body.trim(),
-    })
-    .select('*')
-    .single();
+  const payload = {
+    conversation_id: input.conversationId,
+    sender_id: input.senderId,
+    body: input.body.trim(),
+  };
+  const { data, error } = await supabase.from('messages').insert(payload).select('*').single();
+  await supabase
+    .from('conversations')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', input.conversationId);
+  if (!error && data) return data as Message;
+
+  const latest = await fetchMessages(input.conversationId);
+  const found = [...latest]
+    .reverse()
+    .find((m) => m.sender_id === payload.sender_id && m.body === payload.body);
+  if (found) return found;
   if (error) throw error;
-  return data as Message;
+  return {
+    id: `temp-${Date.now()}`,
+    read_at: null,
+    created_at: new Date().toISOString(),
+    ...payload,
+  };
 }
 
 export async function fetchConversationsAdmin(): Promise<

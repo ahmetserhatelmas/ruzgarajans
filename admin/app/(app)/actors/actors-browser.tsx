@@ -27,7 +27,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ActorStatusBadge } from "@/components/status-badge";
-import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
+import {
+  hasCompletedForm,
+  isAwaitingApproval,
+  isFormSectionSaved,
+  isMediaSectionSaved,
+  registrationStepCount,
+} from "@/lib/access";
 import { downloadXlsx } from "@/lib/export-table-xlsx";
 import {
   ACTOR_STATUS,
@@ -94,11 +100,15 @@ export function ActorsBrowser({
     return rows.filter((row) => {
       const name = `${row.profile.full_name ?? ""} ${row.profile.email ?? ""} ${row.profile.phone ?? ""} ${row.actor?.national_id ?? ""} ${row.actor?.city ?? ""}`.toLowerCase();
       if (q && !name.includes(q.toLowerCase())) return false;
-      if (status !== "all" && row.profile.actor_status !== status) return false;
+      if (status === "pending" && !isAwaitingApproval(row.profile, row.actor)) return false;
+      else if (status === "draft" && (row.profile.actor_status !== "pending" || hasCompletedForm(row.actor)))
+        return false;
+      else if (status !== "all" && status !== "pending" && status !== "draft" && row.profile.actor_status !== status)
+        return false;
       if (gender !== "all" && row.actor?.gender !== gender) return false;
-      if (form === "complete" && !hasCompletedForm(row.actor)) return false;
-      if (form === "missing" && hasCompletedForm(row.actor)) return false;
-      const mediaOk = hasRequiredMedia(row.profile, row.actor, row.photoKinds);
+      if (form === "complete" && !isFormSectionSaved(row.actor)) return false;
+      if (form === "missing" && isFormSectionSaved(row.actor)) return false;
+      const mediaOk = isMediaSectionSaved(row.actor, row.photoKinds);
       if (media === "complete" && !mediaOk) return false;
       if (media === "missing" && mediaOk) return false;
       if (hair !== "all" && row.actor?.hair_color !== hair) return false;
@@ -154,15 +164,18 @@ export function ActorsBrowser({
       "Oyunculuk deneyimi",
       "Instagram",
       "Facebook",
+      "Kayıt",
       "Form",
       "Medya",
     ];
     const data = filtered.map((row) => {
-      const mediaOk = hasRequiredMedia(row.profile, row.actor, row.photoKinds);
+      const mediaOk = isMediaSectionSaved(row.actor, row.photoKinds);
       return [
         row.profile.full_name || "",
         row.profile.email || "",
-        ACTOR_STATUS[row.profile.actor_status] ?? row.profile.actor_status,
+        row.profile.actor_status === "approved" || row.profile.actor_status === "rejected"
+          ? (ACTOR_STATUS[row.profile.actor_status] ?? row.profile.actor_status)
+          : `${registrationStepCount(row.actor, row.photoKinds)}/2`,
         ageFromBirth(row.actor?.birth_date)?.toString() ?? "",
         label(GENDER, row.actor?.gender),
         row.actor?.height_cm != null ? String(row.actor.height_cm) : "",
@@ -173,7 +186,8 @@ export function ActorsBrowser({
         row.actor?.experience || "",
         row.actor?.instagram || "",
         row.actor?.facebook || "",
-        hasCompletedForm(row.actor) ? "Tamam" : "Eksik",
+        `${registrationStepCount(row.actor, row.photoKinds)}/2`,
+        isFormSectionSaved(row.actor) ? "Tamam" : "Eksik",
         mediaOk ? "Tamam" : "Eksik",
       ];
     });
@@ -225,6 +239,7 @@ export function ActorsBrowser({
           options={[
             ["all", "Tümü"],
             ["pending", "Onay bekliyor"],
+            ["draft", "Kayıt sürüyor"],
             ["approved", "Onaylı"],
             ["rejected", "Reddedildi"],
           ]}
@@ -425,14 +440,12 @@ export function ActorsBrowser({
               <TableHead>Boy / saç / göz</TableHead>
               <TableHead>Uyruk</TableHead>
               <TableHead>Diller</TableHead>
-              <TableHead>Form</TableHead>
-              <TableHead>Medya</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map((row) => {
-              const mediaOk = hasRequiredMedia(row.profile, row.actor, row.photoKinds);
+              const steps = registrationStepCount(row.actor, row.photoKinds);
               return (
                 <TableRow key={row.profile.id}>
                   <TableCell>
@@ -465,7 +478,7 @@ export function ActorsBrowser({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <ActorStatusBadge status={row.profile.actor_status} />
+                    <ActorStatusBadge status={row.profile.actor_status} steps={steps} />
                   </TableCell>
                   <TableCell>
                     {ageFromBirth(row.actor?.birth_date) ?? "—"} / {label(GENDER, row.actor?.gender)}
@@ -478,10 +491,8 @@ export function ActorsBrowser({
                   <TableCell className="max-w-56 whitespace-normal text-sm">
                     {formatLanguages(row.actor?.languages)}
                   </TableCell>
-                  <TableCell>{hasCompletedForm(row.actor) ? "Tamam" : "Eksik"}</TableCell>
-                  <TableCell>{mediaOk ? "Tamam" : "Eksik"}</TableCell>
                   <TableCell className="text-right">
-                    {row.profile.actor_status === "pending" && canApprove ? (
+                    {canApprove ? (
                       <div className="flex justify-end gap-1">
                         <Button
                           size="sm"

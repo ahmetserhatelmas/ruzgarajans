@@ -3,6 +3,7 @@ import { Alert, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { localizedError } from '@/lib/authErrors';
+import { InboxBell } from '@/components/ui/InboxBell';
 import { Screen } from '@/components/ui/Screen';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
 import { Button } from '@/components/ui/Button';
@@ -60,7 +61,10 @@ export default function SettingsScreen() {
 
   return (
     <Screen scroll>
-      <Text style={styles.title}>{t('settings.title')}</Text>
+      <View style={styles.topRow}>
+        <Text style={styles.title}>{t('settings.title')}</Text>
+        <InboxBell />
+      </View>
 
       <Text style={styles.section}>{t('settings.language')}</Text>
       <View style={styles.row}>
@@ -111,12 +115,19 @@ function LangChip({
 }
 
 const styles = StyleSheet.create({
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.md,
+    marginBottom: Spacing.lg,
+    gap: Spacing.sm,
+  },
   title: {
+    flex: 1,
     fontFamily: Fonts.displayBold,
     fontSize: 36,
     color: Colors.ink,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.lg,
   },
   section: {
     fontFamily: Fonts.bodyBold,

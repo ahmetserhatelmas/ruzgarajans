@@ -246,6 +246,17 @@ export function formatDate(value?: string | null) {
   return new Date(value).toLocaleDateString("tr-TR");
 }
 
+export function formatDateTime(value?: string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function formatMoney(amount?: number | null, currency = "TRY") {
   if (amount == null) return "—";
   return `${amount.toLocaleString("tr-TR")} ${currency}`;

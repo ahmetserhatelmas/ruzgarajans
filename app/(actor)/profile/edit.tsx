@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Image, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { localizedError } from '@/lib/authErrors';
@@ -18,6 +18,7 @@ import {
   updateProfileBasics,
   uploadProfileImage,
 } from '@/services/actors';
+import { PhotoViewer } from '@/components/ui/PhotoViewer';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function EditProfileScreen() {
@@ -39,6 +40,7 @@ export default function EditProfileScreen() {
   const [city, setCity] = useState(actorProfile?.city ?? '');
   const [loading, setLoading] = useState(false);
   const [photoBusy, setPhotoBusy] = useState<'avatar' | 'cover' | null>(null);
+  const [viewing, setViewing] = useState<{ uri: string; title: string } | null>(null);
 
   const removeImage = (role: 'avatar' | 'cover') => {
     if (!user) return;
@@ -123,13 +125,22 @@ export default function EditProfileScreen() {
   };
 
   return (
-    <Screen scroll contentStyle={{ gap: Spacing.md, paddingTop: Spacing.md }}>
-      <BackHeader fallbackHref="/(actor)/profile" />
+    <Screen
+      scroll
+      header={<BackHeader fallbackHref="/(actor)/profile" />}
+      contentStyle={{ gap: Spacing.md, paddingTop: Spacing.md }}
+    >
       <Text style={styles.title}>{t('profile.edit')}</Text>
 
       <View style={styles.photoRow}>
         {profile?.avatar_url ? (
-          <Image source={{ uri: profile.avatar_url }} style={styles.avatarPreview} />
+          <Pressable
+            onPress={() =>
+              setViewing({ uri: profile.avatar_url!, title: t('media.avatar') })
+            }
+          >
+            <Image source={{ uri: profile.avatar_url }} style={styles.avatarPreview} />
+          </Pressable>
         ) : (
           <View style={[styles.avatarPreview, styles.avatarEmpty]} />
         )}
@@ -181,7 +192,13 @@ export default function EditProfileScreen() {
         </View>
       </View>
       {profile?.cover_url ? (
-        <Image source={{ uri: profile.cover_url }} style={styles.coverPreview} />
+        <Pressable
+          onPress={() =>
+            setViewing({ uri: profile.cover_url!, title: t('media.cover') })
+          }
+        >
+          <Image source={{ uri: profile.cover_url }} style={styles.coverPreview} />
+        </Pressable>
       ) : null}
 
       <TextField label={t('auth.fullName')} value={fullName} onChangeText={setFullName} />
@@ -226,6 +243,11 @@ export default function EditProfileScreen() {
         onPress={onSave}
         loading={loading}
         style={{ marginTop: Spacing.md, marginBottom: Spacing.xxl }}
+      />
+      <PhotoViewer
+        uri={viewing?.uri ?? null}
+        title={viewing?.title}
+        onClose={() => setViewing(null)}
       />
     </Screen>
   );

@@ -8,7 +8,12 @@ import { ActorStatusBadge, AppStatusBadge } from "@/components/status-badge";
 import { fetchActorDetail, fetchCasts } from "@/lib/queries";
 import { ActorIntroduceCast } from "@/components/actor-introduce-cast";
 import { ActorOptionCast } from "@/components/actor-option-cast";
-import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
+import {
+  hasCompletedForm,
+  isFormSectionSaved,
+  isMediaSectionSaved,
+  registrationStepCount,
+} from "@/lib/access";
 import {
   ageFromBirth,
   boolLabel,
@@ -88,7 +93,6 @@ export default async function ActorDetailPage({
   );
 
   const photoKinds = photos.map((p) => p.kind).filter(Boolean) as string[];
-  const mediaOk = hasRequiredMedia(profile, actor, photoKinds);
   const age = ageFromBirth(actor?.birth_date);
   const avatarSrc = displayImageUrl(profile.avatar_url);
   const chestPhoto = photos.find((p) => p.kind === "chest");
@@ -149,7 +153,7 @@ export default async function ActorDetailPage({
                     Mesaj yaz
                   </Button>
                 </form>
-                {canApproveActor && profile.actor_status !== "approved" ? (
+                {canApproveActor && profile.actor_status !== "approved" && hasCompletedForm(actor) ? (
                   <form action={setActorStatusAction.bind(null, profile.id, "approved")}>
                     <Button type="submit">Onayla</Button>
                   </form>
@@ -169,11 +173,17 @@ export default async function ActorDetailPage({
           />
 
           <div className="-mt-4 flex flex-wrap items-center gap-3">
-            <ActorStatusBadge status={profile.actor_status} />
-            <span className="text-sm text-muted-foreground">
-              Form: {hasCompletedForm(actor) ? "tamam" : "eksik"} · Medya:{" "}
-              {mediaOk ? "tamam" : "eksik"}
-            </span>
+            <ActorStatusBadge
+              status={profile.actor_status}
+              steps={registrationStepCount(actor, photoKinds)}
+            />
+            {profile.actor_status === "approved" || profile.actor_status === "rejected" ? null : (
+              <span className="text-sm text-muted-foreground">
+                {isFormSectionSaved(actor) ? "Form tamam" : "Form eksik"}
+                {" · "}
+                {isMediaSectionSaved(actor, photoKinds) ? "Medya tamam" : "Medya eksik"}
+              </span>
+            )}
           </div>
         </div>
       </div>

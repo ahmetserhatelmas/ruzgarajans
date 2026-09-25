@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   Alert,
   Image,
@@ -47,6 +48,12 @@ export function IntroVideoCard({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => setOpen(false);
+    }, [])
+  );
 
   const thumb =
     videoId != null && videoId.length > 0

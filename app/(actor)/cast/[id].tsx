@@ -21,6 +21,7 @@ import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard'
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
 import { pickFromLibrary } from '@/lib/pickMedia';
+import { VideoPlayerModal } from '@/components/video/VideoPlayerModal';
 import { fetchMyAuditionVideos, recordAndUploadVideo } from '@/services/videos';
 import {
   applyToCast,
@@ -36,7 +37,8 @@ import { languageLabel } from '@/constants/languages';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function CastDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
+  const backHref = from === 'inbox' ? '/(actor)/inbox' : '/(actor)/cast';
   const { t, i18n } = useTranslation();
   const { user, profile, actorProfile, galleryPhotos } = useAuth();
   const router = useRouter();
@@ -54,6 +56,7 @@ export default function CastDetailScreen() {
   const [declineReason, setDeclineReason] = useState('');
   const [auditionUploading, setAuditionUploading] = useState(false);
   const [auditionVideo, setAuditionVideo] = useState<Video | null>(null);
+  const [watchOpen, setWatchOpen] = useState(false);
   const [pendingUri, setPendingUri] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const applyY = useRef(0);
@@ -103,8 +106,7 @@ export default function CastDetailScreen() {
 
   if (!castOk) {
     return (
-      <Screen scroll>
-        <BackHeader fallbackHref="/(actor)/cast" />
+      <Screen scroll header={<BackHeader fallbackHref={backHref} />}>
         <AccessGateCard />
         <MediaAccessCard />
       </Screen>
@@ -193,8 +195,7 @@ export default function CastDetailScreen() {
   }
 
   return (
-    <Screen scroll ref={scrollRef}>
-      <BackHeader fallbackHref="/(actor)/cast" />
+    <Screen scroll ref={scrollRef} header={<BackHeader fallbackHref={backHref} />}>
       <View style={styles.hero}>
         {cast.cover_image_url ? (
           <Image source={{ uri: cast.cover_image_url }} style={styles.logo} />
@@ -336,6 +337,14 @@ export default function CastDetailScreen() {
                 : t('cast.videoNotSent')}
             </Text>
           ) : null}
+          {auditionVideo?.status === 'ready' && auditionVideo.playback_url ? (
+            <Button
+              label={t('cast.watchSentVideo')}
+              variant="secondary"
+              onPress={() => setWatchOpen(true)}
+              style={{ marginTop: Spacing.sm }}
+            />
+          ) : null}
         </View>
       ) : (
         <View
@@ -429,6 +438,12 @@ export default function CastDetailScreen() {
           )}
         </View>
       ) : null}
+      <VideoPlayerModal
+        visible={watchOpen}
+        uri={auditionVideo?.playback_url ?? null}
+        title={cast.project_name}
+        onClose={() => setWatchOpen(false)}
+      />
     </Screen>
   );
 }

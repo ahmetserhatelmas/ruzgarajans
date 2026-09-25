@@ -23,16 +23,23 @@ export { getAdminProfile as requireAdmin } from "@/lib/permissions";
 
 export const fetchPendingActorCount = cache(async () => {
   const supabase = await createClient();
-  const { count } = await supabase
+  const { data: pending } = await supabase
     .from("profiles")
-    .select("id", { count: "exact", head: true })
+    .select("id")
     .eq("role", "actor")
     .eq("actor_status", "pending");
+  const ids = (pending ?? []).map((row) => row.id);
+  if (!ids.length) return 0;
+  const { count } = await supabase
+    .from("actor_profiles")
+    .select("user_id", { count: "exact", head: true })
+    .in("user_id", ids)
+    .not("registration_completed_at", "is", null);
   return count ?? 0;
 });
 
 const ACTOR_ROW_SELECT =
-  "user_id, gender, national_id, city, birth_date, height_cm, weight_kg, body_size, tshirt_size, pants_size, suit_size, shoe_size, hair_color, eye_color, sports, dances, nationality, languages, address, whatsapp, instagram, facebook, experience, registration_completed_at, intro_video_playback_url, mimic_video_playback_url";
+  "user_id, gender, national_id, city, birth_date, height_cm, weight_kg, body_size, tshirt_size, pants_size, suit_size, shoe_size, hair_color, eye_color, sports, dances, nationality, languages, address, whatsapp, instagram, facebook, experience, form_saved_at, media_saved_at, registration_completed_at, intro_video_playback_url, mimic_video_playback_url";
 
 const ACTOR_ROW_SELECT_NO_FACEBOOK = ACTOR_ROW_SELECT.replace(" instagram, facebook,", " instagram,");
 
@@ -159,7 +166,7 @@ export async function fetchDashboardStats() {
       supabase.from("profiles").select("id, actor_status, avatar_url, cover_url").eq("role", "actor"),
       supabase
         .from("actor_profiles")
-        .select("user_id, registration_completed_at, intro_video_playback_url, mimic_video_playback_url"),
+        .select("user_id, form_saved_at, media_saved_at, registration_completed_at, intro_video_playback_url, mimic_video_playback_url"),
       supabase.from("gallery_photos").select("user_id, kind"),
       supabase.from("cast_listings").select("id, is_published"),
       supabase.from("applications").select("id, status"),
@@ -168,7 +175,12 @@ export async function fetchDashboardStats() {
     profiles: (profiles ?? []) as Pick<Profile, "id" | "actor_status" | "avatar_url" | "cover_url">[],
     actors: (actors ?? []) as Pick<
       ActorProfile,
-      "user_id" | "registration_completed_at" | "intro_video_playback_url" | "mimic_video_playback_url"
+      | "user_id"
+      | "form_saved_at"
+      | "media_saved_at"
+      | "registration_completed_at"
+      | "intro_video_playback_url"
+      | "mimic_video_playback_url"
     >[],
     kinds: (kinds ?? []) as { user_id: string; kind: string | null }[],
     casts: (casts ?? []) as Pick<CastListing, "id" | "is_published">[],

@@ -6,12 +6,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { registerAndSavePushToken } from '@/lib/push';
 import { supabase } from '@/lib/supabase';
 import i18n from '@/lib/i18n';
+import {
+  hrefFromNotificationData,
+  setPendingNotificationHref,
+} from '@/lib/notificationRoute';
 
 function openFromNotification(notification: Notifications.Notification) {
-  const url = notification.request.content.data?.url;
-  if (typeof url === 'string' && url.startsWith('/')) {
-    router.push(url as any);
-  }
+  const href = hrefFromNotificationData(notification.request.content.data);
+  if (!href) return;
+  setPendingNotificationHref(href);
+  router.push(href as any);
 }
 
 export function NotificationObserver() {
@@ -25,14 +29,9 @@ export function NotificationObserver() {
   useEffect(() => {
     if (Platform.OS === 'web' || loading || !session) return;
 
-    const last = Notifications.getLastNotificationResponse();
-    if (last?.notification) {
-      openFromNotification(last.notification);
-      void Notifications.clearLastNotificationResponseAsync();
-    }
-
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       openFromNotification(response.notification);
+      void Notifications.clearLastNotificationResponseAsync();
     });
     return () => sub.remove();
   }, [loading, session]);
@@ -41,7 +40,7 @@ export function NotificationObserver() {
     if (loading || !session?.user || profile?.role !== 'actor') return;
     const userId = session.user.id;
     const channel = supabase
-      .channel(`cast-options-${userId}`)
+      .channel(`cast-inbox-${userId}`)
       .on(
         'postgres_changes',
         {
@@ -69,6 +68,34 @@ export function NotificationObserver() {
             },
             trigger: null,
             identifier: `option-${row.cast_id}`,
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'cast_introductions',
+          filter: `actor_id=eq.${userId}`,
+        },
+        (payload) => {
+          const row = payload.new as { cast_id?: string } | null;
+          if (!row?.cast_id) return;
+          if (Platform.OS === 'web') return;
+          const tr = !i18n.language?.toLowerCase().startsWith('en');
+          void Notifications.scheduleNotificationAsync({
+            content: {
+              title: tr ? 'Tanıtımınız yapıldı' : 'You were introduced',
+              body: tr
+                ? 'Ajans sizi bu rol için bir firmaya tanıttı. İlanı inceleyebilirsiniz.'
+                : 'The agency introduced you for this role. You can review the listing.',
+              subtitle: 'Rüzgar Oyunculuk',
+              data: { castId: row.cast_id, url: `/(actor)/cast/${row.cast_id}` },
+              sound: 'default',
+            },
+            trigger: null,
+            identifier: `intro-${row.cast_id}`,
           });
         }
       )

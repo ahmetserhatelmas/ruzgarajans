@@ -38,8 +38,11 @@ export default function DirectorActorDetail() {
   }, [id]);
 
   return (
-    <Screen scroll contentStyle={{ gap: Spacing.sm, paddingTop: Spacing.md }}>
-      <BackHeader fallbackHref="/(director)" />
+    <Screen
+      scroll
+      header={<BackHeader fallbackHref="/(director)" />}
+      contentStyle={{ gap: Spacing.sm, paddingTop: Spacing.md }}
+    >
       <Text style={styles.title}>{profile?.full_name || t('director.actor')}</Text>
       <Line label={t('regForm.fields.email')} value={profile?.email} />
       <Line label={t('regForm.fields.phone')} value={profile?.phone} />

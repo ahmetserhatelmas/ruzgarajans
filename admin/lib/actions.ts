@@ -10,7 +10,7 @@ import {
   siteUrl,
 } from "@/lib/supabase/admin";
 import { removeUserMediaFiles } from "@/lib/storage-delete";
-import { notifyMatchingActors, notifyOptionedActor } from "@/lib/notify-cast";
+import { notifyIntroducedActor, notifyMatchingActors, notifyOptionedActor } from "@/lib/notify-cast";
 import { attachDialogueAudio } from "@/lib/dialogue-audio";
 import { parseDialogueScript } from "@/lib/dialogue-script";
 import { ADMIN_PERMS, requireAdminPerm, type AdminPerm } from "@/lib/permissions";
@@ -322,11 +322,35 @@ export async function introduceActorToCastAction(castId: string, actorId: string
     data: { user },
   } = await supabase.auth.getUser();
   if (!user || !ACTOR_ID_RE.test(castId) || !ACTOR_ID_RE.test(actorId)) return;
-  const { error } = await supabase.from("cast_introductions").upsert(
-    { cast_id: castId, actor_id: actorId, created_by: user.id },
-    { onConflict: "cast_id,actor_id", ignoreDuplicates: true },
-  );
+  const { data: existing } = await supabase
+    .from("cast_introductions")
+    .select("id")
+    .eq("cast_id", castId)
+    .eq("actor_id", actorId)
+    .maybeSingle();
+  if (existing) {
+    revalidatePath(`/casts/${castId}`);
+    revalidatePath(`/actors/${actorId}`);
+    return;
+  }
+  const { error } = await supabase.from("cast_introductions").insert({
+    cast_id: castId,
+    actor_id: actorId,
+    created_by: user.id,
+  });
   if (error) throw error;
+  const { data: cast } = await supabase
+    .from("cast_listings")
+    .select("id, project_name, role_name")
+    .eq("id", castId)
+    .maybeSingle();
+  if (cast) {
+    try {
+      await notifyIntroducedActor(cast, actorId);
+    } catch (err) {
+      console.error("intro notify failed", err);
+    }
+  }
   revalidatePath(`/casts/${castId}`);
   revalidatePath(`/actors/${actorId}`);
 }
@@ -444,18 +468,41 @@ export async function sendMessageAction(conversationId: string, body: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user || !body.trim()) return;
-  const { error } = await supabase.from("messages").insert({
+  const payload = {
     conversation_id: conversationId,
     sender_id: user.id,
     body: body.trim(),
-  });
-  if (error) throw error;
+  };
+  const { data, error } = await supabase.from("messages").insert(payload).select("*").single();
   await supabase
     .from("conversations")
     .update({ updated_at: new Date().toISOString() })
     .eq("id", conversationId);
   revalidatePath(`/messages/${conversationId}`);
   revalidatePath("/messages");
+  if (!error && data) return data;
+
+  const { data: latest } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .eq("sender_id", user.id)
+    .eq("body", payload.body)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latest) return latest;
+  if (error) throw error;
+}
+
+export async function deleteConversationAction(conversationId: string) {
+  await requireAdminPerm("messages");
+  const supabase = await createClient();
+  const { error } = await supabase.from("conversations").delete().eq("id", conversationId);
+  if (error) return { ok: false as const, error: "Konuşma silinemedi. SQL politikasını çalıştırmanız gerekebilir." };
+  revalidatePath("/messages");
+  revalidatePath(`/messages/${conversationId}`);
+  return { ok: true as const };
 }
 
 export async function startConversationAction(actorId: string) {

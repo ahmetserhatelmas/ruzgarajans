@@ -27,11 +27,18 @@ import {
   deleteOwnVideo,
   fetchLangIntroVideos,
   recordAndUploadVideo,
-  type ProfileVideoKind,
 } from '@/services/videos';
 import type { Video, VideoKind } from '@/types/database';
 import { pickFromLibrary, takePhoto } from '@/lib/pickMedia';
+import { IntroVideoCard } from '@/components/video/IntroVideoCard';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+
+const PROFILE_VIDEO_KEYS = {
+  intro: { url: 'intro_video_playback_url', id: 'intro_video_id' },
+  mimic: { url: 'mimic_video_playback_url', id: 'mimic_video_id' },
+  showreel: { url: 'showreel_playback_url', id: 'showreel_video_id' },
+  talent: { url: 'talent_video_playback_url', id: 'talent_video_id' },
+} as const;
 
 const CARD_PHOTO_KINDS: GalleryPhotoKind[] = [
   'full_body',
@@ -193,27 +200,6 @@ export default function MediaScreen() {
     ]);
   };
 
-  const removeProfileVideo = (kind: ProfileVideoKind, title: string) => {
-    if (!user) return;
-    Alert.alert(t('profile.deleteVideoTitle', { title }), t('profile.deleteVideoBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            try {
-              await clearProfileVideo(user.id, kind);
-              await refreshProfile();
-            } catch (e: any) {
-              Alert.alert(t('common.error'), localizedError(t, e));
-            }
-          })();
-        },
-      },
-    ]);
-  };
-
   const onSave = async () => {
     if (!user) return;
     const approved = profile?.actor_status === 'approved';
@@ -237,8 +223,11 @@ export default function MediaScreen() {
   };
 
   return (
-    <Screen scroll contentStyle={{ gap: Spacing.md, paddingTop: Spacing.md }}>
-      <BackHeader fallbackHref="/(actor)" />
+    <Screen
+      scroll
+      header={<BackHeader fallbackHref="/(actor)" />}
+      contentStyle={{ gap: Spacing.md, paddingTop: Spacing.md }}
+    >
       <Text style={styles.title}>{reqLabel(t('media.section'))}</Text>
       <Text style={styles.hint}>{t('media.sectionHint')}</Text>
 
@@ -367,30 +356,25 @@ export default function MediaScreen() {
               {item.ready ? t('media.uploaded') : t('media.missing')}
             </Text>
           </View>
-          <Button
-            label={t('media.takeNow')}
-            variant={item.required && !item.ready ? 'primary' : 'secondary'}
-            onPress={() =>
+          <IntroVideoCard
+            playbackUrl={actorProfile?.[PROFILE_VIDEO_KEYS[item.kind].url]}
+            videoId={actorProfile?.[PROFILE_VIDEO_KEYS[item.kind].id]}
+            title={t(`media.videos.${item.kind}`)}
+            canManage
+            changeLabel={t('media.takeNow')}
+            emptyText={item.required ? t('media.missing') : t('profile.noVideo')}
+            onChange={() =>
               router.push((item.kind === 'intro' ? '/record/intro' : `/record/${item.kind}`) as any)
             }
-          />
-          <Button
-            label={t('media.pickFromGallery')}
-            variant="secondary"
-            loading={videoBusy === item.kind}
-            onPress={() =>
+            onPickLibrary={() =>
               void pickProfileVideo(item.kind, t(`media.videos.${item.kind}`))
             }
+            onDelete={async () => {
+              if (!user) return;
+              await clearProfileVideo(user.id, item.kind);
+              await refreshProfile();
+            }}
           />
-          {item.ready ? (
-            <Button
-              label={t('common.delete')}
-              variant="danger"
-              onPress={() =>
-                removeProfileVideo(item.kind, t(`media.videos.${item.kind}`))
-              }
-            />
-          ) : null}
           {item.kind === 'intro' ? (
             <View style={styles.langBox}>
               <Text style={styles.langTitle}>{t('media.videos.langIntro')}</Text>
@@ -400,10 +384,13 @@ export default function MediaScreen() {
                   <Text style={styles.langSlot}>
                     {video.title || t('media.videos.langIntroSlot', { n: index + 1 })}
                   </Text>
-                  <Button
-                    label={t('media.takeNow')}
-                    variant="secondary"
-                    onPress={() =>
+                  <IntroVideoCard
+                    playbackUrl={video.playback_url}
+                    videoId={video.cf_uid ?? video.id}
+                    title={video.title || t('media.videos.langIntroSlot', { n: index + 1 })}
+                    canManage
+                    changeLabel={t('media.takeNow')}
+                    onChange={() =>
                       pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
                         router.push({
                           pathname: '/record/lang_intro',
@@ -411,12 +398,7 @@ export default function MediaScreen() {
                         } as any);
                       })
                     }
-                  />
-                  <Button
-                    label={t('media.pickFromGallery')}
-                    variant="secondary"
-                    loading={videoBusy === video.id}
-                    onPress={() =>
+                    onPickLibrary={() =>
                       pickLangIntroThen(t, i18n.language, actorProfile?.languages, (lang) => {
                         void pickProfileVideo(
                           LANG_INTRO_KIND,
@@ -429,36 +411,11 @@ export default function MediaScreen() {
                         );
                       })
                     }
-                  />
-                  <Button
-                    label={t('common.delete')}
-                    variant="danger"
-                    onPress={() => {
+                    onDelete={async () => {
                       if (!user) return;
-                      Alert.alert(
-                        t('profile.deleteVideoTitle', {
-                          title: video.title || t('media.videos.langIntroSlot', { n: index + 1 }),
-                        }),
-                        t('profile.deleteVideoBody'),
-                        [
-                          { text: t('common.cancel'), style: 'cancel' },
-                          {
-                            text: t('common.delete'),
-                            style: 'destructive',
-                            onPress: () => {
-                              void (async () => {
-                                try {
-                                  await deleteOwnVideo(user.id, video.id);
-                                  setLangVideos((prev) => prev.filter((row) => row.id !== video.id));
-                                  await refreshProfile();
-                                } catch (e: any) {
-                                  Alert.alert(t('common.error'), localizedError(t, e));
-                                }
-                              })();
-                            },
-                          },
-                        ]
-                      );
+                      await deleteOwnVideo(user.id, video.id);
+                      setLangVideos((prev) => prev.filter((row) => row.id !== video.id));
+                      await refreshProfile();
                     }}
                   />
                 </View>

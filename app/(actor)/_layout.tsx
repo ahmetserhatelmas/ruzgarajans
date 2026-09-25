@@ -3,6 +3,7 @@ import { Redirect, Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { InboxProvider } from '@/contexts/InboxContext';
 import { Colors, Fonts } from '@/constants/theme';
 
 export default function ActorLayout() {
@@ -30,6 +31,7 @@ export default function ActorLayout() {
   }
 
   return (
+    <InboxProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -65,20 +67,20 @@ export default function ActorLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile/index"
-        options={{
-          title: t('tabs.profile'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="messages/index"
         options={{
           title: t('tabs.messages'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubble-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile/index"
+        options={{
+          title: t('tabs.profile'),
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
           ),
         }}
       />
@@ -94,7 +96,10 @@ export default function ActorLayout() {
       <Tabs.Screen name="cast/[id]" options={{ href: null }} />
       <Tabs.Screen name="profile/edit" options={{ href: null }} />
       <Tabs.Screen name="applications" options={{ href: null }} />
+      <Tabs.Screen name="announcements" options={{ href: null }} />
       <Tabs.Screen name="media" options={{ href: null }} />
+      <Tabs.Screen name="inbox" options={{ href: null }} />
     </Tabs>
+    </InboxProvider>
   );
 }

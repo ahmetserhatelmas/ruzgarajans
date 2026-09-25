@@ -209,3 +209,49 @@ export async function notifyOptionedActor(
     ]);
   }
 }
+
+export async function notifyIntroducedActor(
+  cast: Pick<CastListing, "id" | "project_name" | "role_name">,
+  actorId: string
+) {
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, locale, expo_push_token")
+    .eq("id", actorId)
+    .maybeSingle();
+  if (!profile) return;
+
+  const tr = isTurkish(profile.locale);
+  const title = tr ? "Tanıtımınız yapıldı" : "You were introduced";
+  const body = tr
+    ? `${cast.project_name} · ${cast.role_name}. Ajans sizi bu rol için tanıttı.`
+    : `${cast.project_name} · ${cast.role_name}. The agency introduced you for this role.`;
+  const data = { castId: cast.id, url: `/(actor)/cast/${cast.id}`, kind: "introduced" };
+
+  const { error } = await supabase.from("notifications").insert({
+    user_id: profile.id,
+    type: "new_cast",
+    title,
+    body,
+    data,
+  });
+  if (error) console.error("intro notify insert failed", error.message);
+
+  if (profile.expo_push_token) {
+    await sendExpoPush([
+      {
+        to: profile.expo_push_token,
+        title,
+        body,
+        data,
+        sound: "default",
+        channelId: "introductions",
+        priority: "high" as const,
+        subtitle: "Rüzgar Oyunculuk",
+        mutableContent: true,
+        richContent: { image: BRAND_LOGO_URL },
+      },
+    ]);
+  }
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -11,12 +11,14 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { InboxBell } from '@/components/ui/InboxBell';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { canSendAgencyMessages } from '@/lib/access';
 import {
   fetchMessages,
   getOrCreateConversation,
+  mergeMessages,
   sendMessage,
 } from '@/services/messages';
 import { supabase } from '@/lib/supabase';
@@ -24,13 +26,14 @@ import type { Message } from '@/types/database';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function MessagesScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, profile } = useAuth();
   const canMessage = canSendAgencyMessages(profile);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  const listRef = useRef<FlatList<Message>>(null);
 
   const load = useCallback(async () => {
     if (!user || !canMessage) {
@@ -41,12 +44,16 @@ export default function MessagesScreen() {
     const conv = await getOrCreateConversation(user.id);
     setConversationId(conv.id);
     const msgs = await fetchMessages(conv.id);
-    setMessages(msgs);
+    setMessages((prev) => mergeMessages(prev, msgs));
   }, [user, canMessage]);
 
   useFocusEffect(
     useCallback(() => {
-      load().catch(() => undefined);
+      void load();
+      const poll = setInterval(() => {
+        void load();
+      }, 4000);
+      return () => clearInterval(poll);
     }, [load])
   );
 
@@ -64,7 +71,7 @@ export default function MessagesScreen() {
         },
         (payload) => {
           const msg = payload.new as Message;
-          setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+          if (msg?.id) setMessages((prev) => mergeMessages(prev, [msg]));
         }
       )
       .subscribe();
@@ -73,17 +80,35 @@ export default function MessagesScreen() {
     };
   }, [conversationId]);
 
+  useEffect(() => {
+    if (!messages.length) return;
+    listRef.current?.scrollToEnd({ animated: true });
+  }, [messages.length]);
+
   const onSend = async () => {
     if (!user || !conversationId || !body.trim() || !canMessage) return;
+    const text = body.trim();
+    const temp: Message = {
+      id: `temp-${Date.now()}`,
+      conversation_id: conversationId,
+      sender_id: user.id,
+      body: text,
+      read_at: null,
+      created_at: new Date().toISOString(),
+    };
+    setBody('');
+    setMessages((prev) => mergeMessages(prev, [temp]));
     try {
       setSending(true);
       const msg = await sendMessage({
         conversationId,
         senderId: user.id,
-        body,
+        body: text,
       });
-      setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
-      setBody('');
+      setMessages((prev) => mergeMessages(prev.filter((m) => m.id !== temp.id), [msg]));
+    } catch {
+      setMessages((prev) => prev.filter((m) => m.id !== temp.id));
+      setBody(text);
     } finally {
       setSending(false);
     }
@@ -91,7 +116,10 @@ export default function MessagesScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <Text style={styles.title}>{t('messages.title')}</Text>
+      <View style={styles.topRow}>
+        <Text style={styles.title}>{t('messages.title')}</Text>
+        <InboxBell />
+      </View>
       <Text style={styles.hint}>{t('messages.agencyOnly')}</Text>
       {!canMessage ? (
         <View style={styles.locked}>
@@ -105,17 +133,25 @@ export default function MessagesScreen() {
           keyboardVerticalOffset={12}
         >
           <FlatList
+            ref={listRef}
             data={messages}
             keyExtractor={(m) => m.id}
             contentContainerStyle={styles.list}
             ListEmptyComponent={<Text style={styles.empty}>{t('messages.empty')}</Text>}
             renderItem={({ item }) => {
               const mine = item.sender_id === user?.id;
+              const when = new Date(item.created_at).toLocaleString(
+                i18n.language?.toLowerCase().startsWith('en') ? 'en-GB' : 'tr-TR',
+                { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }
+              );
               return (
-                <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
-                  <Text style={[styles.bubbleText, mine && { color: Colors.textOnDark }]}>
-                    {item.body}
-                  </Text>
+                <View style={[styles.bubbleWrap, mine ? styles.mineWrap : styles.theirsWrap]}>
+                  <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
+                    <Text style={[styles.bubbleText, mine && { color: Colors.textOnDark }]}>
+                      {item.body}
+                    </Text>
+                  </View>
+                  <Text style={[styles.stamp, mine && styles.stampMine]}>{when}</Text>
                 </View>
               );
             }}
@@ -139,11 +175,19 @@ export default function MessagesScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.paper },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: Spacing.lg,
+    paddingRight: Spacing.md,
+  },
   title: {
+    flex: 1,
     fontFamily: Fonts.displayBold,
     fontSize: 34,
     color: Colors.ink,
-    paddingHorizontal: Spacing.lg,
+    paddingRight: Spacing.sm,
   },
   hint: {
     fontFamily: Fonts.body,
@@ -174,18 +218,24 @@ const styles = StyleSheet.create({
   },
   list: { padding: Spacing.lg, gap: Spacing.sm, flexGrow: 1 },
   empty: { fontFamily: Fonts.body, color: Colors.textMuted },
+  bubbleWrap: { maxWidth: '80%', marginBottom: Spacing.sm },
+  mineWrap: { alignSelf: 'flex-end', alignItems: 'flex-end' },
+  theirsWrap: { alignSelf: 'flex-start', alignItems: 'flex-start' },
+  stamp: {
+    marginTop: 4,
+    fontFamily: Fonts.body,
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  stampMine: { textAlign: 'right' },
   bubble: {
-    maxWidth: '80%',
     padding: Spacing.md,
     borderRadius: Radius.md,
-    marginBottom: Spacing.sm,
   },
   mine: {
-    alignSelf: 'flex-end',
     backgroundColor: Colors.brand,
   },
   theirs: {
-    alignSelf: 'flex-start',
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: Colors.border,
