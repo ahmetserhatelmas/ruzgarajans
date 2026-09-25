@@ -13,7 +13,9 @@ export function hasRequiredMedia(
   );
 }
 
-export function hasCompletedForm(actor: ActorProfile | null | undefined) {
+export function hasCompletedForm(
+  actor: Pick<ActorProfile, "registration_completed_at"> | null | undefined
+) {
   return Boolean(actor?.registration_completed_at);
 }
 
@@ -41,8 +43,8 @@ export function registrationStepCount(
 }
 
 export function isAwaitingApproval(
-  profile: Profile | null | undefined,
-  actor: ActorProfile | null | undefined
+  profile: Pick<Profile, "actor_status"> | null | undefined,
+  actor: Pick<ActorProfile, "registration_completed_at"> | null | undefined
 ) {
   return profile?.actor_status === "pending" && hasCompletedForm(actor);
 }
