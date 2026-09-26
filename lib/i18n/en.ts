@@ -519,9 +519,13 @@ export default {
     favoritePhotosTitle: 'Photos you like',
     favoritePhotosHint:
       'Favorite photo 1 is added to the setcard if you upload it. If you skip it, the card still has 3 photos. Photo 2 is portfolio only. Both are optional.',
+    photoExample: 'Example',
+    photoExampleHint: 'Please take it like this. Female and male examples together.',
+    exampleHandsPalms: 'Both hands side by side — palms facing the camera',
+    exampleHandsBacks: 'Both hands side by side — backs of the hands',
     photos: {
       full_body: 'Full-length photo',
-      chest: 'Chest-up close photo',
+      chest: 'Chest-up (ID-style)',
       profile_right: 'Right profile',
       profile_left: 'Left profile',
       model_pose: 'Model pose',

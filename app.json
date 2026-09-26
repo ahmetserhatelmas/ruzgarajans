@@ -21,6 +21,7 @@
     "android": {
       "softwareKeyboardLayoutMode": "pan",
       "package": "com.ruzgarajans.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#120A1C",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -93,6 +94,6 @@
         "projectId": "fa749bd7-a0ea-4af1-aae5-51fa5a90dd05"
       }
     },
-    "owner": "4se"
+    "owner": "ruzgarajans"
   }
 }

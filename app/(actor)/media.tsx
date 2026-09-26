@@ -30,6 +30,7 @@ import {
 } from '@/services/videos';
 import type { Video, VideoKind } from '@/types/database';
 import { pickFromLibrary, takePhoto } from '@/lib/pickMedia';
+import { PhotoExample } from '@/components/ui/PhotoExample';
 import { IntroVideoCard } from '@/components/video/IntroVideoCard';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
@@ -245,7 +246,7 @@ export default function MediaScreen() {
                 {photo ? t('media.uploaded') : t('media.missing')}
               </Text>
             </View>
-            {photo ? <PhotoPreview uri={photo.public_url} /> : null}
+            {photo ? <PhotoPreview uri={photo.public_url} /> : <PhotoExample kind={kind} />}
             <MediaSourceButtons
               loading={photoBusy === kind}
               onTake={() => takeNowPhoto(kind)}
@@ -277,7 +278,7 @@ export default function MediaScreen() {
                 {photo ? t('media.uploaded') : t('media.missing')}
               </Text>
             </View>
-            {photo ? <PhotoPreview uri={photo.public_url} /> : null}
+            {photo ? <PhotoPreview uri={photo.public_url} /> : <PhotoExample kind={kind} />}
             <MediaSourceButtons
               loading={photoBusy === kind}
               onTake={() => takeNowPhoto(kind)}

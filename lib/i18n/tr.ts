@@ -519,9 +519,13 @@ export default {
     favoritePhotosTitle: 'Beğendiğin fotoğraflar',
     favoritePhotosHint:
       'Beğendiğin fotoğraf 1 setcard’a eklenir (yüklersen). Yüklemezsen setcard’da yine 3 fotoğraf olur. Fotoğraf 2 yalnızca portföy içindir. İkisi de zorunlu değil.',
+    photoExample: 'Örnek',
+    photoExampleHint: 'Böyle çekmenizi rica ederiz. Kadın ve erkek örneği bir arada.',
+    exampleHandsPalms: 'İki el yan yana — avuç içi önde',
+    exampleHandsBacks: 'İki el yan yana — avuç içi arkada',
     photos: {
       full_body: 'Boydan düz fotoğraf',
-      chest: 'Göğüs plan yakın fotoğraf',
+      chest: 'Göğüs plan (vesikalık)',
       profile_right: 'Sağ profil',
       profile_left: 'Sol profil',
       model_pose: 'Model pozu',

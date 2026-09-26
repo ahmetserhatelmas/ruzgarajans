@@ -28,6 +28,7 @@ import {
 } from '@/services/videos';
 import type { Video, VideoKind } from '@/types/database';
 import { PhotoViewer } from '@/components/ui/PhotoViewer';
+import { PhotoExample } from '@/components/ui/PhotoExample';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 const PROFILE_VIDEOS: {
@@ -284,7 +285,7 @@ export default function ProfileScreen() {
                   resizeMode="contain"
                 />
               ) : (
-                <Text style={styles.missing}>{t('media.missing')}</Text>
+                <PhotoExample kind={kind} />
               )}
               <MediaSourceButtons
                 loading={photoBusy === kind}
