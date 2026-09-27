@@ -1,11 +1,11 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { supabase } from '@/lib/supabase';
 import i18n from '@/lib/i18n';
+import { Notifications } from '@/lib/notifications';
 
-if (Platform.OS !== 'web') {
+if (Notifications) {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldPlaySound: true,
@@ -17,7 +17,7 @@ if (Platform.OS !== 'web') {
 }
 
 export async function registerAndSavePushToken(userId: string) {
-  if (Platform.OS === 'web' || !Device.isDevice) return;
+  if (!Notifications || Platform.OS === 'web' || !Device.isDevice) return;
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('casts', {

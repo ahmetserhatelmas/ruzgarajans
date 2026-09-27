@@ -1,18 +1,18 @@
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { router } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import { useAuth } from '@/contexts/AuthContext';
 import { registerAndSavePushToken } from '@/lib/push';
 import { supabase } from '@/lib/supabase';
 import i18n from '@/lib/i18n';
+import { Notifications } from '@/lib/notifications';
 import {
   hrefFromNotificationData,
   setPendingNotificationHref,
 } from '@/lib/notificationRoute';
 
-function openFromNotification(notification: Notifications.Notification) {
-  const href = hrefFromNotificationData(notification.request.content.data);
+function openFromNotification(data: unknown) {
+  const href = hrefFromNotificationData(data);
   if (!href) return;
   setPendingNotificationHref(href);
   router.push(href as any);
@@ -27,10 +27,10 @@ export function NotificationObserver() {
   }, [loading, session?.user, profile?.role]);
 
   useEffect(() => {
-    if (Platform.OS === 'web' || loading || !session) return;
+    if (!Notifications || Platform.OS === 'web' || loading || !session) return;
 
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      openFromNotification(response.notification);
+      openFromNotification(response.notification.request.content.data);
       void Notifications.clearLastNotificationResponseAsync();
     });
     return () => sub.remove();
@@ -52,7 +52,7 @@ export function NotificationObserver() {
         (payload) => {
           const row = payload.new as { cast_id?: string; status?: string } | null;
           if (!row?.cast_id || row.status !== 'pending') return;
-          if (Platform.OS === 'web') return;
+          if (!Notifications || Platform.OS === 'web') return;
           const tr = !i18n.language?.toLowerCase().startsWith('en');
           void Notifications.scheduleNotificationAsync({
             content: {
@@ -82,7 +82,7 @@ export function NotificationObserver() {
         (payload) => {
           const row = payload.new as { cast_id?: string } | null;
           if (!row?.cast_id) return;
-          if (Platform.OS === 'web') return;
+          if (!Notifications || Platform.OS === 'web') return;
           const tr = !i18n.language?.toLowerCase().startsWith('en');
           void Notifications.scheduleNotificationAsync({
             content: {

@@ -1,5 +1,4 @@
-import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import { Notifications } from '@/lib/notifications';
 
 export function hrefFromNotificationData(data: unknown): string | null {
   if (!data || typeof data !== 'object') return null;
@@ -25,13 +24,13 @@ export function peekPendingNotificationHref() {
 export function takePendingNotificationHref() {
   const href = pendingHref;
   pendingHref = null;
-  if (href && Platform.OS !== 'web') {
+  if (href && Notifications) {
     void Notifications.clearLastNotificationResponseAsync();
   }
   return href;
 }
 
-if (Platform.OS !== 'web') {
+if (Notifications) {
   try {
     const last = Notifications.getLastNotificationResponse();
     const href = last
