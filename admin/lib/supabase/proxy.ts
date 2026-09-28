@@ -33,9 +33,10 @@ export async function updateSession(request: NextRequest) {
   const isLogin = path === "/login" || path.startsWith("/login/");
   const isAuth = path.startsWith("/auth/");
   const isPublicShare = path.startsWith("/p/");
+  const isEmailOtp = path === "/api/email-otp";
   const isPasswordUpdate = path === "/login/update-password";
 
-  if (isPublicShare || isAuth) {
+  if (isPublicShare || isAuth || isEmailOtp) {
     return supabaseResponse;
   }
 
