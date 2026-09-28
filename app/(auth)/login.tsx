@@ -70,6 +70,11 @@ export default function LoginScreen() {
           onChangeText={setPassword}
         />
         <Button label={t('auth.login')} onPress={() => void onSubmit()} loading={loading} />
+        <Link href="/(auth)/forgot-password" asChild>
+          <Pressable>
+            <Text style={styles.link}>{t('auth.forgotPassword')}</Text>
+          </Pressable>
+        </Link>
         <Link href="/(auth)/register" asChild>
           <Pressable>
             <Text style={styles.link}>

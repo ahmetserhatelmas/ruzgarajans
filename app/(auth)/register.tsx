@@ -7,13 +7,13 @@ import { LinearGradient } from '@/components/ui/Atmosphere';
 import { TextField } from '@/components/ui/TextField';
 import { Button } from '@/components/ui/Button';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
-import { useAuth } from '@/contexts/AuthContext';
 import { localizedError } from '@/lib/authErrors';
+import { requestEmailOtp } from '@/lib/emailOtp';
+import { setPendingSignup } from '@/lib/pendingAuth';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function RegisterScreen() {
-  const { t } = useTranslation();
-  const { signUp } = useAuth();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -22,12 +22,43 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async () => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = fullName.trim();
+    if (cleanName.length < 2) {
+      Alert.alert(t('common.error'), t('auth.invalidName'));
+      return;
+    }
+    if (!cleanEmail.includes('@')) {
+      Alert.alert(t('common.error'), t('auth.invalidEmail'));
+      return;
+    }
+    if (password.trim().length < 6) {
+      Alert.alert(t('common.error'), t('auth.weakPassword'));
+      return;
+    }
     try {
       setLoading(true);
-      await signUp({ email, password, fullName, phone });
-      router.replace('/');
-    } catch (e: any) {
-      Alert.alert(t('common.error'), localizedError(t, e, 'auth.loginFailed'));
+      const locale = i18n.language?.toLowerCase().startsWith('en') ? 'en' : 'tr';
+      await requestEmailOtp({
+        purpose: 'signup',
+        email: cleanEmail,
+        password,
+        fullName: cleanName,
+        phone: phone.trim(),
+        locale,
+      });
+      setPendingSignup({
+        email: cleanEmail,
+        password,
+        fullName: cleanName,
+        phone: phone.trim(),
+      });
+      router.push({
+        pathname: '/(auth)/verify-code',
+        params: { purpose: 'signup', email: cleanEmail },
+      });
+    } catch (e: unknown) {
+      Alert.alert(t('common.error'), localizedError(t, e, 'auth.emailSendFailed'));
     } finally {
       setLoading(false);
     }
@@ -62,7 +93,7 @@ export default function RegisterScreen() {
           value={password}
           onChangeText={setPassword}
         />
-        <Button label={t('auth.register')} onPress={onSubmit} loading={loading} />
+        <Button label={t('auth.register')} onPress={() => void onSubmit()} loading={loading} />
         <Link href="/(auth)/login" asChild>
           <Pressable>
             <Text style={styles.link}>

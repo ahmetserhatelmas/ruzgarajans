@@ -63,8 +63,20 @@ export function authErrorKey(error: AuthLike | unknown): string | null {
   if (text.includes('weak_password') || text.includes('password should be')) {
     return 'auth.weakPassword';
   }
-  if (text.includes('over_request') || text.includes('too many') || text.includes('rate limit')) {
+  if (text.includes('over_request') || text.includes('too many') || text.includes('rate limit') || text.includes('too_many_attempts')) {
     return 'auth.tooManyAttempts';
+  }
+  if (text.includes('already_registered') || text.includes('already registered')) {
+    return 'auth.alreadyRegistered';
+  }
+  if (text.includes('invalid_code')) return 'auth.invalidCode';
+  if (text.includes('expired')) return 'auth.codeExpired';
+  if (text.includes('email_not_found')) return 'auth.emailNotFound';
+  if (text.includes('invalid_email')) return 'auth.invalidEmail';
+  if (text.includes('invalid_name')) return 'auth.invalidName';
+  if (text.includes('cooldown')) return 'auth.resendWait';
+  if (text.includes('email_send_failed') || text.includes('resend_not_configured')) {
+    return 'auth.emailSendFailed';
   }
   if (
     text.includes('login') &&

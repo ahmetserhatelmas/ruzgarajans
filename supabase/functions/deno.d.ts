@@ -15,12 +15,5 @@ declare module 'https://esm.sh/@supabase/supabase-js@2.49.1' {
     url: string,
     key: string,
     options?: Record<string, unknown>
-  ): {
-    auth: {
-      getUser: () => Promise<{
-        data: { user: { id: string } | null };
-        error: { message: string } | null;
-      }>;
-    };
-  };
+  ): any;
 }
