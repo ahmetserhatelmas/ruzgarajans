@@ -41,25 +41,53 @@ function isEmail(value: string) {
 
 function copy(locale: string, purpose: Purpose, code: string) {
   const tr = !locale.toLowerCase().startsWith("en");
-  if (purpose === "signup") {
-    return {
-      subject: tr ? "Rüzgar Oyunculuk kayıt kodunuz" : "Your Rüzgar Oyunculuk signup code",
-      text: tr
-        ? `Kayıt kodunuz: ${code}\n\nBu kod 15 dakika geçerlidir. Siz istemediyseniz bu e-postayı yok sayabilirsiniz.`
-        : `Your signup code is ${code}.\n\nIt expires in 15 minutes. If you did not request this, you can ignore this email.`,
-    };
-  }
+  const title = purpose === "signup"
+    ? tr ? "E-posta doğrulama" : "Confirm your email"
+    : tr ? "Şifre sıfırlama" : "Reset your password";
+  const intro = purpose === "signup"
+    ? tr
+      ? "Rüzgar Oyunculuk üyeliğinizi tamamlamak için doğrulama kodunuz aşağıdadır."
+      : "Here is the code to finish your Rüzgar Oyunculuk registration."
+    : tr
+      ? "Şifrenizi sıfırlamak için doğrulama kodunuz aşağıdadır."
+      : "Here is the code to reset your Rüzgar Oyunculuk password.";
+  const ignore = tr
+    ? "Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz. Kod 15 dakika geçerlidir."
+    : "If you did not request this, you can ignore this email. The code expires in 15 minutes.";
+  const text = `${title}\n\n${intro}\n\n${code}\n\n${ignore}\n\nRüzgar Oyunculuk\ninfo@ruzgaroyunculuk.com\nhttps://ruzgaroyunculuk.com`;
+  const html = `<!doctype html>
+<html lang="${tr ? "tr" : "en"}">
+<body style="margin:0;padding:0;background:#f6f3f8;font-family:Georgia,serif;color:#16181d;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f3f8;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="520" cellspacing="0" cellpadding="0" style="background:#ffffff;border:1px solid #eadff0;border-radius:16px;padding:28px 28px 24px;">
+          <tr><td style="font-size:13px;letter-spacing:0.08em;color:#6b2c91;text-transform:uppercase;">Rüzgar Oyunculuk</td></tr>
+          <tr><td style="padding-top:10px;font-size:22px;font-weight:700;">${title}</td></tr>
+          <tr><td style="padding-top:12px;font-size:16px;line-height:1.5;color:#3d3d3d;">${intro}</td></tr>
+          <tr><td style="padding:22px 0 8px;">
+            <div style="display:inline-block;background:#f6f3f8;border:1px solid #eadff0;border-radius:12px;padding:12px 22px;font-size:32px;letter-spacing:0.28em;font-weight:700;color:#4e2175;">${code}</div>
+          </td></tr>
+          <tr><td style="padding-top:16px;font-size:14px;line-height:1.5;color:#5c616a;">${ignore}</td></tr>
+          <tr><td style="padding-top:24px;border-top:1px solid #eadff0;font-size:13px;line-height:1.6;color:#5c616a;">
+            Rüzgar Oyunculuk<br>
+            <a href="mailto:info@ruzgaroyunculuk.com" style="color:#6b2c91;">info@ruzgaroyunculuk.com</a><br>
+            <a href="https://ruzgaroyunculuk.com" style="color:#6b2c91;">ruzgaroyunculuk.com</a>
+          </td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
   return {
-    subject: tr
-      ? "Rüzgar Oyunculuk şifre sıfırlama kodunuz"
-      : "Your Rüzgar Oyunculuk password reset code",
-    text: tr
-      ? `Şifre sıfırlama kodunuz: ${code}\n\nBu kod 15 dakika geçerlidir. Siz istemediyseniz bu e-postayı yok sayabilirsiniz.`
-      : `Your password reset code is ${code}.\n\nIt expires in 15 minutes. If you did not request this, you can ignore this email.`,
+    subject: tr ? `Rüzgar Oyunculuk · ${title}` : `Rüzgar Oyunculuk · ${title}`,
+    text,
+    html,
   };
 }
 
-async function sendResend(to: string, subject: string, text: string) {
+async function sendResend(to: string, subject: string, text: string, html: string) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error("resend_not_configured");
   const from =
@@ -70,7 +98,14 @@ async function sendResend(to: string, subject: string, text: string) {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from, to: [to], subject, text }),
+    body: JSON.stringify({
+      from,
+      to: [to],
+      reply_to: "info@ruzgaroyunculuk.com",
+      subject,
+      text,
+      html,
+    }),
   });
   if (!res.ok) {
     const detail = await res.text();
@@ -155,7 +190,7 @@ async function requestCode(admin: SupabaseClient, body: Record<string, unknown>)
   }
 
   const mail = copy(locale, purpose, code);
-  await sendResend(email, mail.subject, mail.text);
+  await sendResend(email, mail.subject, mail.text, mail.html);
   return { ok: true };
 }
 

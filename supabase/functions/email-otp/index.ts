@@ -60,23 +60,33 @@ function adminClient() {
 
 function copy(locale: string, purpose: Purpose, code: string) {
   const tr = !locale.toLowerCase().startsWith('en');
-  if (purpose === 'signup') {
-    return {
-      subject: tr ? 'Rüzgar Oyunculuk kayıt kodunuz' : 'Your Rüzgar Oyunculuk signup code',
-      text: tr
-        ? `Kayıt kodunuz: ${code}\n\nBu kod 15 dakika geçerlidir. Siz istemediyseniz bu e-postayı yok sayabilirsiniz.`
-        : `Your signup code is ${code}.\n\nIt expires in 15 minutes. If you did not request this, you can ignore this email.`,
-    };
-  }
+  const title =
+    purpose === 'signup'
+      ? tr
+        ? 'E-posta doğrulama'
+        : 'Confirm your email'
+      : tr
+        ? 'Şifre sıfırlama'
+        : 'Reset your password';
+  const intro =
+    purpose === 'signup'
+      ? tr
+        ? 'Rüzgar Oyunculuk üyeliğinizi tamamlamak için doğrulama kodunuz aşağıdadır.'
+        : 'Here is the code to finish your Rüzgar Oyunculuk registration.'
+      : tr
+        ? 'Şifrenizi sıfırlamak için doğrulama kodunuz aşağıdadır.'
+        : 'Here is the code to reset your Rüzgar Oyunculuk password.';
+  const ignore = tr
+    ? 'Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz. Kod 15 dakika geçerlidir.'
+    : 'If you did not request this, you can ignore this email. The code expires in 15 minutes.';
   return {
-    subject: tr ? 'Rüzgar Oyunculuk şifre sıfırlama kodunuz' : 'Your Rüzgar Oyunculuk password reset code',
-    text: tr
-      ? `Şifre sıfırlama kodunuz: ${code}\n\nBu kod 15 dakika geçerlidir. Siz istemediyseniz bu e-postayı yok sayabilirsiniz.`
-      : `Your password reset code is ${code}.\n\nIt expires in 15 minutes. If you did not request this, you can ignore this email.`,
+    subject: `Rüzgar Oyunculuk · ${title}`,
+    text: `${title}\n\n${intro}\n\n${code}\n\n${ignore}\n\nRüzgar Oyunculuk\ninfo@ruzgaroyunculuk.com`,
+    html: `<p>${intro}</p><p style="font-size:28px;letter-spacing:6px"><strong>${code}</strong></p><p>${ignore}</p>`,
   };
 }
 
-async function sendResend(to: string, subject: string, text: string) {
+async function sendResend(to: string, subject: string, text: string, html?: string) {
   const apiKey = Deno.env.get('RESEND_API_KEY');
   if (!apiKey) throw new Error('resend_not_configured');
   const from =
@@ -90,8 +100,10 @@ async function sendResend(to: string, subject: string, text: string) {
     body: JSON.stringify({
       from,
       to: [to],
+      reply_to: 'info@ruzgaroyunculuk.com',
       subject,
       text,
+      html,
     }),
   });
   if (!res.ok) {
@@ -179,7 +191,7 @@ async function requestCode(body: Record<string, unknown>) {
   }
 
   const mail = copy(locale, purpose, code);
-  await sendResend(email, mail.subject, mail.text);
+  await sendResend(email, mail.subject, mail.text, mail.html);
   return json({ ok: true });
 }
 
