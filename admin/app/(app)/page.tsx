@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
+import { TableSkeleton } from "@/components/page-skeleton";
 import { fetchAdminAlerts, fetchDashboardStats } from "@/lib/queries";
 import { isAwaitingApproval, isFormSectionSaved, isMediaSectionSaved } from "@/lib/access";
 import { APP_STATUS } from "@/lib/labels";
@@ -14,8 +16,32 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
-  const { profile } = await getAdminProfile();
   const { error, ok } = await searchParams;
+  return (
+    <div>
+      <PageHeader
+        title="Özet"
+        description="Ajansın güncel durumu. Filtreli listelere kartlardan geçebilirsin."
+      />
+      {error === "forbidden" ? (
+        <p className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          Bu bölüme yetkin yok.
+        </p>
+      ) : null}
+      {ok ? (
+        <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {decodeURIComponent(ok)}
+        </p>
+      ) : null}
+      <Suspense fallback={<TableSkeleton />}>
+        <DashboardBody />
+      </Suspense>
+    </div>
+  );
+}
+
+async function DashboardBody() {
+  const { profile } = await getAdminProfile();
   const [statsData, alerts] = await Promise.all([
     fetchDashboardStats(),
     canAdmin(profile, "applications") ? fetchAdminAlerts(8) : Promise.resolve([]),
@@ -73,21 +99,7 @@ export default async function DashboardPage({
   ].filter((s): s is { label: string; value: number; href: string } => Boolean(s));
 
   return (
-    <div>
-      <PageHeader
-        title="Özet"
-        description="Ajansın güncel durumu. Filtreli listelere kartlardan geçebilirsin."
-      />
-      {error === "forbidden" ? (
-        <p className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          Bu bölüme yetkin yok.
-        </p>
-      ) : null}
-      {ok ? (
-        <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          {decodeURIComponent(ok)}
-        </p>
-      ) : null}
+    <>
       {unreadAlerts.length ? (
         <div className="mb-6 space-y-2 rounded-xl bg-primary/5 p-4 ring-1 ring-primary/20">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -114,7 +126,7 @@ export default async function DashboardPage({
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s) => (
-          <Link key={s.label} href={s.href}>
+          <Link key={s.label} href={s.href} prefetch={false}>
             <Card className="transition-colors hover:bg-muted/40">
               <CardHeader>
                 <CardTitle className="text-sm text-muted-foreground">{s.label}</CardTitle>
@@ -132,7 +144,7 @@ export default async function DashboardPage({
           <h2 className="mt-10 mb-3 font-heading text-2xl">Başvuru durumları</h2>
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {byStatus.map((s) => (
-              <Link key={s.status} href={`/applications?status=${s.status}`}>
+              <Link key={s.status} href={`/applications?status=${s.status}`} prefetch={false}>
                 <Card size="sm" className="hover:bg-muted/40">
                   <CardHeader>
                     <CardTitle className="text-xs text-muted-foreground">
@@ -148,6 +160,6 @@ export default async function DashboardPage({
           </div>
         </>
       ) : null}
-    </div>
+    </>
   );
 }

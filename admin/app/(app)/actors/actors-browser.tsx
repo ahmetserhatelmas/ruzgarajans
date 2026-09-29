@@ -75,25 +75,26 @@ export function ActorsBrowser({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const q = searchParams.get("q") ?? "";
-  const status = searchParams.get("status") ?? "all";
-  const gender = searchParams.get("gender") ?? "all";
-  const form = searchParams.get("form") ?? "all";
-  const media = searchParams.get("media") ?? "all";
-  const hair = searchParams.get("hair") ?? "all";
-  const eyes = searchParams.get("eyes") ?? "all";
-  const sport = searchParams.get("sport") ?? "all";
-  const dance = searchParams.get("dance") ?? "all";
-  const ageMin = searchParams.get("ageMin") ?? "";
-  const ageMax = searchParams.get("ageMax") ?? "";
-  const heightMin = searchParams.get("heightMin") ?? "";
-  const heightMax = searchParams.get("heightMax") ?? "";
+  const [q, setQ] = useState(searchParams.get("q") ?? "");
+  const [status, setStatus] = useState(searchParams.get("status") ?? "all");
+  const [gender, setGender] = useState(searchParams.get("gender") ?? "all");
+  const [form, setForm] = useState(searchParams.get("form") ?? "all");
+  const [media, setMedia] = useState(searchParams.get("media") ?? "all");
+  const [hair, setHair] = useState(searchParams.get("hair") ?? "all");
+  const [eyes, setEyes] = useState(searchParams.get("eyes") ?? "all");
+  const [sport, setSport] = useState(searchParams.get("sport") ?? "all");
+  const [dance, setDance] = useState(searchParams.get("dance") ?? "all");
+  const [ageMin, setAgeMin] = useState(searchParams.get("ageMin") ?? "");
+  const [ageMax, setAgeMax] = useState(searchParams.get("ageMax") ?? "");
+  const [heightMin, setHeightMin] = useState(searchParams.get("heightMin") ?? "");
+  const [heightMax, setHeightMax] = useState(searchParams.get("heightMax") ?? "");
 
-  const update = (patch: Record<string, string>) => {
-    const next = new URLSearchParams(searchParams.toString());
-    for (const [k, v] of Object.entries(patch)) setParam(next, k, v);
+  const update = (key: string, value: string, setter: (v: string) => void) => {
+    setter(value);
+    const next = new URLSearchParams(window.location.search);
+    setParam(next, key, value);
     const qs = next.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname);
+    window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname);
   };
 
   const filtered = useMemo(() => {
@@ -228,14 +229,14 @@ export function ActorsBrowser({
         <Field label="Ara">
           <Input
             placeholder="Ad, e-posta, telefon, TCKN, şehir"
-            defaultValue={q}
-            onChange={(e) => update({ q: e.target.value })}
+            value={q}
+            onChange={(e) => update("q", e.target.value, setQ)}
           />
         </Field>
         <SelectField
           label="Durum"
           value={status}
-          onChange={(v) => update({ status: v })}
+          onChange={(v) => update("status", v, setStatus)}
           options={[
             ["all", "Tümü"],
             ["pending", "Onay bekliyor"],
@@ -247,13 +248,13 @@ export function ActorsBrowser({
         <SelectField
           label="Cinsiyet"
           value={gender}
-          onChange={(v) => update({ gender: v })}
+          onChange={(v) => update("gender", v, setGender)}
           options={[["all", "Tümü"], ...Object.entries(GENDER)]}
         />
         <SelectField
           label="Kayıt formu"
           value={form}
-          onChange={(v) => update({ form: v })}
+          onChange={(v) => update("form", v, setForm)}
           options={[
             ["all", "Tümü"],
             ["complete", "Tamamlanmış"],
@@ -263,7 +264,7 @@ export function ActorsBrowser({
         <SelectField
           label="Medya"
           value={media}
-          onChange={(v) => update({ media: v })}
+          onChange={(v) => update("media", v, setMedia)}
           options={[
             ["all", "Tümü"],
             ["complete", "Zorunlular tam"],
@@ -273,38 +274,38 @@ export function ActorsBrowser({
         <SelectField
           label="Saç"
           value={hair}
-          onChange={(v) => update({ hair: v })}
+          onChange={(v) => update("hair", v, setHair)}
           options={[["all", "Tümü"], ...Object.entries(HAIR)]}
         />
         <SelectField
           label="Göz"
           value={eyes}
-          onChange={(v) => update({ eyes: v })}
+          onChange={(v) => update("eyes", v, setEyes)}
           options={[["all", "Tümü"], ...Object.entries(EYES)]}
         />
         <SelectField
           label="Spor"
           value={sport}
-          onChange={(v) => update({ sport: v })}
+          onChange={(v) => update("sport", v, setSport)}
           options={[["all", "Tümü"], ...Object.entries(SPORTS)]}
         />
         <SelectField
           label="Dans"
           value={dance}
-          onChange={(v) => update({ dance: v })}
+          onChange={(v) => update("dance", v, setDance)}
           options={[["all", "Tümü"], ...Object.entries(DANCES)]}
         />
         <Field label="Yaş min">
-          <Input type="number" defaultValue={ageMin} onChange={(e) => update({ ageMin: e.target.value })} />
+          <Input type="number" value={ageMin} onChange={(e) => update("ageMin", e.target.value, setAgeMin)} />
         </Field>
         <Field label="Yaş max">
-          <Input type="number" defaultValue={ageMax} onChange={(e) => update({ ageMax: e.target.value })} />
+          <Input type="number" value={ageMax} onChange={(e) => update("ageMax", e.target.value, setAgeMax)} />
         </Field>
         <Field label="Boy min">
-          <Input type="number" defaultValue={heightMin} onChange={(e) => update({ heightMin: e.target.value })} />
+          <Input type="number" value={heightMin} onChange={(e) => update("heightMin", e.target.value, setHeightMin)} />
         </Field>
         <Field label="Boy max">
-          <Input type="number" defaultValue={heightMax} onChange={(e) => update({ heightMax: e.target.value })} />
+          <Input type="number" value={heightMax} onChange={(e) => update("heightMax", e.target.value, setHeightMax)} />
         </Field>
       </div>
 
@@ -470,7 +471,7 @@ export function ActorsBrowser({
                         </div>
                       )}
                       <div className="min-w-0">
-                        <Link href={`/actors/${row.profile.id}`} className="font-medium hover:underline">
+                        <Link href={`/actors/${row.profile.id}`} prefetch={false} className="font-medium hover:underline">
                           {row.profile.full_name || "—"}
                         </Link>
                         <div className="truncate text-xs text-muted-foreground">{row.profile.email}</div>

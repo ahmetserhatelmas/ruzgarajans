@@ -40,7 +40,7 @@ import {
 } from "@/lib/labels";
 import { AcceptedProjectsTable } from "@/components/accepted-projects-table";
 import { ShareActorPanel } from "@/components/share-actor-panel";
-import { fetchActorShares, fetchDirectors, sharePublicUrl } from "@/lib/share";
+import { fetchActorShares, fetchDirectors, shareUrlMap } from "@/lib/share";
 import { setActorStatusAction, startConversationAction } from "@/lib/actions";
 import { REQUIRED_PHOTO_KINDS } from "@/lib/types";
 import { BrandedVideo } from "@/components/branded-video";
@@ -85,12 +85,7 @@ export default async function ActorDetailPage({
       canIntroduce ? fetchCasts() : Promise.resolve([]),
     ]);
   if (!profile) notFound();
-  const shareUrls: Record<string, string> = {};
-  await Promise.all(
-    shares.map(async (s) => {
-      shareUrls[s.id] = await sharePublicUrl(s.token);
-    })
-  );
+  const shareUrls = await shareUrlMap(shares);
 
   const photoKinds = photos.map((p) => p.kind).filter(Boolean) as string[];
   const age = ageFromBirth(actor?.birth_date);

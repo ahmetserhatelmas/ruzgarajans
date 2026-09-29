@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { fetchCasts } from "@/lib/queries";
 import { formatDate, formatMoney, GENDER, label } from "@/lib/labels";
 import { displayImageUrl } from "@/lib/media";
 import { requireAdminPerm } from "@/lib/permissions";
+import { TableSkeleton } from "@/components/page-skeleton";
 
 export const dynamic = "force-dynamic";
 
@@ -22,17 +24,7 @@ export default async function CastsPage({
 }: {
   searchParams: Promise<{ q?: string; published?: string }>;
 }) {
-  await requireAdminPerm("casts");
   const { q = "", published = "all" } = await searchParams;
-  const casts = await fetchCasts();
-  const filtered = casts.filter((c) => {
-    const hay = `${c.project_name} ${c.role_name} ${c.shoot_location ?? ""}`.toLowerCase();
-    if (q && !hay.includes(q.toLowerCase())) return false;
-    if (published === "yes" && !c.is_published) return false;
-    if (published === "no" && c.is_published) return false;
-    return true;
-  });
-
   return (
     <div>
       <PageHeader
@@ -44,6 +36,26 @@ export default async function CastsPage({
           </Button>
         }
       />
+      <Suspense fallback={<TableSkeleton />}>
+        <CastsBody q={q} published={published} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function CastsBody({ q, published }: { q: string; published: string }) {
+  await requireAdminPerm("casts");
+  const casts = await fetchCasts();
+  const filtered = casts.filter((c) => {
+    const hay = `${c.project_name} ${c.role_name} ${c.shoot_location ?? ""}`.toLowerCase();
+    if (q && !hay.includes(q.toLowerCase())) return false;
+    if (published === "yes" && !c.is_published) return false;
+    if (published === "no" && c.is_published) return false;
+    return true;
+  });
+
+  return (
+    <>
       <form className="mb-4 flex flex-wrap gap-2">
         <input
           name="q"
@@ -83,7 +95,7 @@ export default async function CastsPage({
             {filtered.map((c) => (
               <TableRow key={c.id}>
                 <TableCell>
-                  <Link href={`/casts/${c.id}`} className="flex items-center gap-3 font-medium hover:underline">
+                  <Link href={`/casts/${c.id}`} prefetch={false} className="flex items-center gap-3 font-medium hover:underline">
                     {c.cover_image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -120,6 +132,6 @@ export default async function CastsPage({
           </TableBody>
         </Table>
       </div>
-    </div>
+    </>
   );
 }

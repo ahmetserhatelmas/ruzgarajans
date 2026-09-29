@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -40,13 +40,13 @@ const LINKS: { href: string; label: string; icon: typeof Users; perm?: AdminPerm
 
 export function Sidebar({
   email,
-  pendingCount,
-  alertCount = 0,
+  pendingBadge,
+  alertBadge,
   profile,
 }: {
   email?: string | null;
-  pendingCount: number;
-  alertCount?: number;
+  pendingBadge?: ReactNode;
+  alertBadge?: ReactNode;
   profile: Pick<Profile, "role" | "is_super_admin" | "admin_permissions"> | null;
 }) {
   const pathname = usePathname();
@@ -88,6 +88,7 @@ export function Sidebar({
             <Link
               key={link.href}
               href={link.href}
+              prefetch={false}
               className={cn(
                 "flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
                 active
@@ -97,16 +98,8 @@ export function Sidebar({
             >
               <Icon className="size-4 shrink-0" />
               <span className="flex-1">{link.label}</span>
-              {link.href === "/actors" && pendingCount > 0 ? (
-                <span className="rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-white">
-                  {pendingCount > 99 ? "99+" : pendingCount}
-                </span>
-              ) : null}
-              {link.href === "/alerts" && alertCount > 0 ? (
-                <span className="rounded-full bg-destructive px-1.5 text-[10px] font-semibold text-white">
-                  {alertCount > 99 ? "99+" : alertCount}
-                </span>
-              ) : null}
+              {link.href === "/actors" ? pendingBadge : null}
+              {link.href === "/alerts" ? alertBadge : null}
             </Link>
           );
         })}

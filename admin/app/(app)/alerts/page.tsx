@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { TableSkeleton } from "@/components/page-skeleton";
 import { markAdminAlertReadAction, markAllAdminAlertsReadAction } from "@/lib/actions";
 import { formatDate } from "@/lib/labels";
 import { fetchAdminAlerts } from "@/lib/queries";
@@ -8,26 +10,34 @@ import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
-export default async function AlertsPage() {
-  await requireAdminPerm("applications");
-  const alerts = await fetchAdminAlerts();
-  const unread = alerts.filter((alert) => !alert.read_at).length;
-
+export default function AlertsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
         title="Bildirimler"
         description="Tanıtım yaptığın oyuncu aynı ilana kendi başvurursa burada görünür."
-        actions={
-          unread ? (
-            <form action={markAllAdminAlertsReadAction}>
-              <Button type="submit" variant="outline">
-                Tümünü okundu yap
-              </Button>
-            </form>
-          ) : null
-        }
       />
+      <Suspense fallback={<TableSkeleton />}>
+        <AlertsBody />
+      </Suspense>
+    </div>
+  );
+}
+
+async function AlertsBody() {
+  await requireAdminPerm("applications");
+  const alerts = await fetchAdminAlerts();
+  const unread = alerts.filter((alert) => !alert.read_at).length;
+
+  return (
+    <>
+      {unread ? (
+        <form action={markAllAdminAlertsReadAction} className="mb-4">
+          <Button type="submit" variant="outline">
+            Tümünü okundu yap
+          </Button>
+        </form>
+      ) : null}
 
       {alerts.length === 0 ? (
         <p className="text-sm text-muted-foreground">Henüz bildirim yok.</p>
@@ -74,6 +84,6 @@ export default async function AlertsPage() {
           })}
         </ul>
       )}
-    </div>
+    </>
   );
 }

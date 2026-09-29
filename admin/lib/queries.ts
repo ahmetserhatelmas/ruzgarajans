@@ -23,6 +23,14 @@ export { getAdminProfile as requireAdmin } from "@/lib/permissions";
 
 export const fetchPendingActorCount = cache(async () => {
   const supabase = await createClient();
+  const joined = await supabase
+    .from("actor_profiles")
+    .select("user_id, profiles!inner(role, actor_status)", { count: "exact", head: true })
+    .eq("profiles.role", "actor")
+    .eq("profiles.actor_status", "pending")
+    .not("registration_completed_at", "is", null);
+  if (!joined.error) return joined.count ?? 0;
+
   const { data: pending } = await supabase
     .from("profiles")
     .select("id")
@@ -43,16 +51,17 @@ const ACTOR_ROW_SELECT =
 
 const ACTOR_ROW_SELECT_NO_FACEBOOK = ACTOR_ROW_SELECT.replace(" instagram, facebook,", " instagram,");
 
-export async function fetchActorRows(): Promise<ActorRow[]> {
+export const fetchActorRows = cache(async (): Promise<ActorRow[]> => {
   const supabase = await createClient();
-  const [{ data: profiles }, actorsRes, { data: photos }] = await Promise.all([
+  const [{ data: profiles }, actorsRes, { data: kinds }, { data: chests }] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, email, full_name, phone, actor_status, avatar_url, cover_url, created_at")
       .eq("role", "actor")
       .order("created_at", { ascending: false }),
     supabase.from("actor_profiles").select(ACTOR_ROW_SELECT),
-    supabase.from("gallery_photos").select("user_id, kind, public_url"),
+    supabase.from("gallery_photos").select("user_id, kind"),
+    supabase.from("gallery_photos").select("user_id, public_url").eq("kind", "chest"),
   ]);
   const actors = actorsRes.error
     ? (await supabase.from("actor_profiles").select(ACTOR_ROW_SELECT_NO_FACEBOOK)).data
@@ -62,17 +71,15 @@ export async function fetchActorRows(): Promise<ActorRow[]> {
     ((actors ?? []) as ActorProfile[]).map((a) => [a.user_id, a])
   );
   const photoMap = new Map<string, string[]>();
-  const chestMap = new Map<string, string>();
-  for (const p of (photos ?? []) as {
-    user_id: string;
-    kind: string | null;
-    public_url: string | null;
-  }[]) {
+  for (const p of (kinds ?? []) as { user_id: string; kind: string | null }[]) {
     if (!p.kind) continue;
     const list = photoMap.get(p.user_id) ?? [];
     list.push(p.kind);
     photoMap.set(p.user_id, list);
-    if (p.kind === "chest" && p.public_url) chestMap.set(p.user_id, p.public_url);
+  }
+  const chestMap = new Map<string, string>();
+  for (const p of (chests ?? []) as { user_id: string; public_url: string | null }[]) {
+    if (p.public_url) chestMap.set(p.user_id, p.public_url);
   }
 
   return ((profiles ?? []) as Profile[]).map((profile) => ({
@@ -81,7 +88,7 @@ export async function fetchActorRows(): Promise<ActorRow[]> {
     photoKinds: photoMap.get(profile.id) ?? [],
     chestPhotoUrl: chestMap.get(profile.id) ?? null,
   }));
-}
+});
 
 export async function fetchActorDetail(id: string) {
   const supabase = await createClient();
@@ -144,7 +151,7 @@ export async function fetchActorDetail(id: string) {
   };
 }
 
-export async function fetchCasts() {
+export const fetchCasts = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("cast_listings")
@@ -157,13 +164,13 @@ export async function fetchCasts() {
     const count = Number(row.applications?.[0]?.count ?? 0);
     return { ...row, applications: [], application_count: count };
   });
-}
+});
 
-export async function fetchDashboardStats() {
+export const fetchDashboardStats = cache(async () => {
   const supabase = await createClient();
   const [{ data: profiles }, { data: actors }, { data: kinds }, { data: casts }, { data: apps }] =
     await Promise.all([
-      supabase.from("profiles").select("id, actor_status, avatar_url, cover_url").eq("role", "actor"),
+      supabase.from("profiles").select("id, actor_status").eq("role", "actor"),
       supabase
         .from("actor_profiles")
         .select("user_id, form_saved_at, media_saved_at, registration_completed_at, intro_video_playback_url, mimic_video_playback_url"),
@@ -172,7 +179,7 @@ export async function fetchDashboardStats() {
       supabase.from("applications").select("id, status"),
     ]);
   return {
-    profiles: (profiles ?? []) as Pick<Profile, "id" | "actor_status" | "avatar_url" | "cover_url">[],
+    profiles: (profiles ?? []) as Pick<Profile, "id" | "actor_status">[],
     actors: (actors ?? []) as Pick<
       ActorProfile,
       | "user_id"
@@ -186,7 +193,7 @@ export async function fetchDashboardStats() {
     casts: (casts ?? []) as Pick<CastListing, "id" | "is_published">[],
     applications: (apps ?? []) as Pick<Application, "id" | "status">[],
   };
-}
+});
 
 export async function fetchCastDetail(id: string) {
   const supabase = await createClient();
@@ -225,7 +232,7 @@ export async function fetchCastDetail(id: string) {
   };
 }
 
-export async function fetchApplications() {
+export const fetchApplications = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("applications")
@@ -241,7 +248,7 @@ export async function fetchApplications() {
       "id" | "project_name" | "role_name" | "deadline" | "budget_amount" | "budget_currency"
     > | null;
   })[];
-}
+});
 
 export async function fetchApplicationDetail(id: string) {
   const supabase = await createClient();
@@ -275,7 +282,7 @@ export async function fetchApplicationDetail(id: string) {
   return { app, actor, videos };
 }
 
-export async function fetchConversations() {
+export const fetchConversations = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("conversations")
@@ -285,7 +292,7 @@ export async function fetchConversations() {
   return (data ?? []) as (Conversation & {
     profiles: { full_name: string | null; email: string | null; avatar_url: string | null } | null;
   })[];
-}
+});
 
 export async function fetchMessages(conversationId: string) {
   const supabase = await createClient();
@@ -298,7 +305,7 @@ export async function fetchMessages(conversationId: string) {
   return (data ?? []) as Message[];
 }
 
-export async function fetchAnnouncements() {
+export const fetchAnnouncements = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("announcements")
@@ -306,7 +313,7 @@ export async function fetchAnnouncements() {
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Announcement[];
-}
+});
 
 export function matchesCast(row: ActorRow, cast: CastListing) {
   const age = ageFromBirth(row.actor?.birth_date);
@@ -345,7 +352,7 @@ export const fetchUnreadAdminAlertCount = cache(async () => {
   return count ?? 0;
 });
 
-export async function fetchAdminAlerts(limit = 50): Promise<AdminAlert[]> {
+export const fetchAdminAlerts = cache(async (limit = 50): Promise<AdminAlert[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("admin_alerts")
@@ -354,7 +361,7 @@ export async function fetchAdminAlerts(limit = 50): Promise<AdminAlert[]> {
     .limit(limit);
   if (error) return [];
   return (data ?? []) as AdminAlert[];
-}
+});
 
 export async function markAdminAlertsForApplication(applicationId: string) {
   const supabase = await createClient();

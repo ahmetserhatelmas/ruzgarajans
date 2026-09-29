@@ -26,6 +26,11 @@ export async function sharePublicUrl(token: string) {
   return `${await shareOrigin()}/p/${token}`;
 }
 
+export async function shareUrlMap(items: { id: string; token: string }[]) {
+  const origin = await shareOrigin();
+  return Object.fromEntries(items.map((item) => [item.id, `${origin}/p/${item.token}`]));
+}
+
 export async function purgeExpiredActorShares() {
   const supabase = await createClient();
   await supabase
@@ -35,7 +40,7 @@ export async function purgeExpiredActorShares() {
     .lte("expires_at", new Date().toISOString());
 }
 
-export async function fetchActorShares(actorId: string) {
+export const fetchActorShares = cache(async (actorId: string) => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("actor_shares")
@@ -47,9 +52,9 @@ export async function fetchActorShares(actorId: string) {
   return ((data ?? []) as ActorShare[]).filter(
     (share) => !share.expires_at || new Date(share.expires_at).getTime() > Date.now()
   );
-}
+});
 
-export async function fetchActiveActorShares() {
+export const fetchActiveActorShares = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("actor_shares")
@@ -60,9 +65,9 @@ export async function fetchActiveActorShares() {
   return ((data ?? []) as ActorShare[]).filter(
     (share) => !share.expires_at || new Date(share.expires_at).getTime() > Date.now()
   );
-}
+});
 
-export async function fetchDirectors() {
+export const fetchDirectors = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("profiles")
@@ -71,7 +76,7 @@ export async function fetchDirectors() {
     .order("full_name");
   if (error) throw error;
   return (data ?? []) as Pick<Profile, "id" | "full_name" | "email" | "role">[];
-}
+});
 
 export async function readSharePinCookie(token: string) {
   const store = await cookies();
@@ -117,7 +122,7 @@ export async function purgeExpiredApplicationShares() {
     .lte("expires_at", new Date().toISOString());
 }
 
-export async function fetchApplicationShares(applicationId: string) {
+export const fetchApplicationShares = cache(async (applicationId: string) => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("application_shares")
@@ -129,9 +134,9 @@ export async function fetchApplicationShares(applicationId: string) {
   return ((data ?? []) as ApplicationShare[]).filter(
     (share) => !share.expires_at || new Date(share.expires_at).getTime() > Date.now()
   );
-}
+});
 
-export async function fetchActiveApplicationShares() {
+export const fetchActiveApplicationShares = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("application_shares")
@@ -142,7 +147,7 @@ export async function fetchActiveApplicationShares() {
   return ((data ?? []) as ApplicationShare[]).filter(
     (share) => !share.expires_at || new Date(share.expires_at).getTime() > Date.now()
   );
-}
+});
 
 export type SharedApplicationOpen =
   | { status: "ok"; items: SharedApplicationPayload[] }

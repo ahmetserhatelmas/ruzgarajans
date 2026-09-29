@@ -1,12 +1,14 @@
+import { Suspense } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { TableSkeleton } from "@/components/page-skeleton";
 import { fetchAdminAlerts, fetchApplications, fetchCasts } from "@/lib/queries";
 import { APP_STATUS } from "@/lib/labels";
 import type { ApplicationStatus } from "@/lib/types";
 import { canAdmin, requireAdminPerm } from "@/lib/permissions";
 import { ApplicationsExcelButton } from "@/components/applications-excel";
 import { applicationExcelRow } from "@/lib/export-application";
-import { fetchActiveApplicationShares, sharePublicUrl } from "@/lib/share";
+import { fetchActiveApplicationShares, shareUrlMap } from "@/lib/share";
 import { ApplicationsBrowser } from "./applications-browser";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +18,28 @@ export default async function ApplicationsPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; cast?: string; share?: string; shared?: string }>;
 }) {
+  const params = await searchParams;
+  return (
+    <div>
+      <PageHeader
+        title="Başvurular"
+        description="Durum ve ilana göre filtrele, detayda audition videosunu izle."
+      />
+      <Suspense fallback={<TableSkeleton />}>
+        <ApplicationsBody params={params} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function ApplicationsBody({
+  params,
+}: {
+  params: { q?: string; status?: string; cast?: string; share?: string; shared?: string };
+}) {
   const { profile } = await requireAdminPerm("applications");
   const canExport = canAdmin(profile, "export_applications");
-  const { q = "", status = "all", cast = "all", share, shared } = await searchParams;
+  const { q = "", status = "all", cast = "all", share, shared } = params;
   const [apps, casts, shares, alerts] = await Promise.all([
     fetchApplications(),
     fetchCasts(),
@@ -28,12 +49,7 @@ export default async function ApplicationsPage({
   const introducedApplyIds = new Set(
     alerts.filter((alert) => alert.application_id).map((alert) => alert.application_id as string),
   );
-  const shareUrls: Record<string, string> = {};
-  await Promise.all(
-    shares.map(async (item) => {
-      shareUrls[item.id] = await sharePublicUrl(item.token);
-    })
-  );
+  const shareUrls = await shareUrlMap(shares);
   const filtered = apps.filter((a) => {
     const hay = `${a.profiles?.full_name ?? ""} ${a.profiles?.email ?? ""} ${a.cast_listings?.project_name ?? ""} ${a.cast_listings?.role_name ?? ""}`.toLowerCase();
     if (q && !hay.includes(q.toLowerCase())) return false;
@@ -43,19 +59,15 @@ export default async function ApplicationsPage({
   });
 
   return (
-    <div>
-      <PageHeader
-        title="Başvurular"
-        description="Durum ve ilana göre filtrele, detayda audition videosunu izle."
-        actions={
-          canExport ? (
-            <ApplicationsExcelButton
-              filename={`basvurular-${new Date().toISOString().slice(0, 10)}.xlsx`}
-              rows={filtered.map((a) => applicationExcelRow(a, a.profiles, a.cast_listings))}
-            />
-          ) : null
-        }
-      />
+    <>
+      {canExport ? (
+        <div className="mb-4 flex justify-end">
+          <ApplicationsExcelButton
+            filename={`basvurular-${new Date().toISOString().slice(0, 10)}.xlsx`}
+            rows={filtered.map((a) => applicationExcelRow(a, a.profiles, a.cast_listings))}
+          />
+        </div>
+      ) : null}
       <form className="mb-4 flex flex-wrap gap-2">
         <input
           name="q"
@@ -108,6 +120,6 @@ export default async function ApplicationsPage({
         canExport={canExport}
         introducedApplyIds={introducedApplyIds}
       />
-    </div>
+    </>
   );
 }

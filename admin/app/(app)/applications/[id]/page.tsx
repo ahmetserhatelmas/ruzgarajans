@@ -11,7 +11,7 @@ import type { ApplicationStatus } from "@/lib/types";
 import { BrandedVideo } from "@/components/branded-video";
 import { canAdmin, requireAdminPerm } from "@/lib/permissions";
 import { ShareApplicationPanel } from "@/components/share-application-panel";
-import { fetchApplicationShares, fetchDirectors, sharePublicUrl } from "@/lib/share";
+import { fetchApplicationShares, fetchDirectors, shareUrlMap } from "@/lib/share";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -50,12 +50,7 @@ export default async function ApplicationDetailPage({
     .eq("cast_id", app.cast_id)
     .eq("actor_id", app.actor_id)
     .maybeSingle();
-  const shareUrls: Record<string, string> = {};
-  await Promise.all(
-    shares.map(async (item) => {
-      shareUrls[item.id] = await sharePublicUrl(item.token);
-    })
-  );
+  const shareUrls = await shareUrlMap(shares);
 
   const listing = app.cast_listings as {
     id: string;

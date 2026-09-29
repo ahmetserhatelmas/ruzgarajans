@@ -178,7 +178,7 @@ export function ApplicationsBrowser({
                   />
                 </TableCell>
                 <TableCell>
-                  <Link href={`/applications/${a.id}`} className="font-medium hover:underline">
+                  <Link href={`/applications/${a.id}`} prefetch={false} className="font-medium hover:underline">
                     {a.profiles?.full_name || a.profiles?.email}
                   </Link>
                   {introducedApplyIds?.has(a.id) ? (
