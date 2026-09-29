@@ -1,9 +1,19 @@
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { supabase } from '@/lib/supabase';
 import i18n from '@/lib/i18n';
 import { Notifications } from '@/lib/notifications';
+
+export type PushPermissionState = 'granted' | 'denied' | 'undetermined' | 'unavailable';
+
+export async function getPushPermissionState(): Promise<PushPermissionState> {
+  if (!Notifications || Platform.OS === 'web' || !Device.isDevice) return 'unavailable';
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status === 'granted') return 'granted';
+  if (status === 'denied') return 'denied';
+  return 'undetermined';
+}
 
 if (Notifications) {
   Notifications.setNotificationHandler({
@@ -54,4 +64,15 @@ export async function registerAndSavePushToken(userId: string) {
     .from('profiles')
     .update({ expo_push_token: token, locale })
     .eq('id', userId);
+}
+
+export async function enablePushFromSettings(userId: string): Promise<PushPermissionState> {
+  const current = await getPushPermissionState();
+  if (current === 'unavailable') return current;
+  if (current === 'denied') {
+    await Linking.openSettings();
+    return current;
+  }
+  await registerAndSavePushToken(userId);
+  return getPushPermissionState();
 }

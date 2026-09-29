@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CastCard } from '@/components/cast/CastCard';
 import { InboxBell } from '@/components/ui/InboxBell';
 import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard';
+import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
 import { fetchMyCastOptions, fetchMyIntroducedCastIds, fetchPublishedCasts } from '@/services/casts';
@@ -19,28 +20,45 @@ export default function CastListScreen() {
   const [items, setItems] = useState<CastListing[]>([]);
   const [introducedIds, setIntroducedIds] = useState<Set<string>>(new Set());
   const [optionByCast, setOptionByCast] = useState<Map<string, CastOptionStatus>>(new Map());
+  const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const castOk = canAccessCasts(profile, actorProfile, galleryPhotos);
+
+  const loadList = useCallback(() => {
+    if (!castOk) {
+      setItems([]);
+      setIntroducedIds(new Set());
+      setOptionByCast(new Map());
+      setLoadError(false);
+      setReady(true);
+      return;
+    }
+    setLoadError(false);
+    setReady(false);
+    void (async () => {
+      try {
+        const [list, introIds, optionRows] = await Promise.all([
+          fetchPublishedCasts(),
+          user ? fetchMyIntroducedCastIds(user.id) : Promise.resolve([] as string[]),
+          user
+            ? fetchMyCastOptions(user.id)
+            : Promise.resolve([] as { cast_id: string; status: CastOptionStatus }[]),
+        ]);
+        setItems(list);
+        setIntroducedIds(new Set(introIds));
+        setOptionByCast(new Map(optionRows.map((r) => [r.cast_id, r.status])));
+      } catch {
+        setLoadError(true);
+      } finally {
+        setReady(true);
+      }
+    })();
+  }, [castOk, user]);
 
   useFocusEffect(
     useCallback(() => {
-      if (!castOk) {
-        setItems([]);
-        setIntroducedIds(new Set());
-        setOptionByCast(new Map());
-        return;
-      }
-      fetchPublishedCasts()
-        .then(setItems)
-        .catch(() => setItems([]));
-      if (user) {
-        fetchMyIntroducedCastIds(user.id)
-          .then((ids) => setIntroducedIds(new Set(ids)))
-          .catch(() => setIntroducedIds(new Set()));
-        fetchMyCastOptions(user.id)
-          .then((rows) => setOptionByCast(new Map(rows.map((r) => [r.cast_id, r.status]))))
-          .catch(() => setOptionByCast(new Map()));
-      }
-    }, [castOk, user])
+      loadList();
+    }, [loadList])
   );
 
   return (
@@ -60,7 +78,20 @@ export default function CastListScreen() {
           keyExtractor={(i) => i.id}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
-          ListEmptyComponent={<Text style={styles.empty}>{t('cast.empty')}</Text>}
+          ListEmptyComponent={
+            <View>
+              <Text style={styles.empty}>
+                {!ready
+                  ? t('common.loading')
+                  : loadError
+                    ? t('cast.loadFailed')
+                    : t('cast.empty')}
+              </Text>
+              {ready && loadError ? (
+                <Button label={t('common.retry')} onPress={loadList} />
+              ) : null}
+            </View>
+          }
           renderItem={({ item }) => (
             <CastCard
               item={item}

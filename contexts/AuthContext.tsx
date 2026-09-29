@@ -151,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const deleteAccount = useCallback(async () => {
     const uid = session?.user?.id;
     if (uid) {
-      await removeUserMediaFiles(supabase, [uid]);
+      await removeUserMediaFiles(supabase, [uid]).catch(() => undefined);
     }
     const { error } = await supabase.rpc('delete_own_account');
     if (error) throw error;

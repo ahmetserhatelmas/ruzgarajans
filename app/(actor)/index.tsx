@@ -10,6 +10,7 @@ import { LinearGradient } from '@/components/ui/Atmosphere';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
 import { AccessGateCard, MediaAccessCard } from '@/components/ui/AccessGateCard';
 import { RegistrationSteps } from '@/components/ui/RegistrationSteps';
+import { NotificationNudge } from '@/components/ui/NotificationNudge';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessCasts } from '@/lib/access';
 import { appLang } from '@/lib/i18n';
@@ -28,44 +29,59 @@ export default function HomeScreen() {
   const [introducedIds, setIntroducedIds] = useState<Set<string>>(new Set());
   const [optionByCast, setOptionByCast] = useState<Map<string, CastOptionStatus>>(new Map());
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [castsError, setCastsError] = useState(false);
   const castOk = canAccessCasts(profile, actorProfile, galleryPhotos);
+
+  const loadHome = useCallback(() => {
+    let active = true;
+    void refreshProfile();
+    void (async () => {
+      const announce = supabase
+        .from('announcements')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(3)
+        .then((r) => (r.data as Announcement[]) ?? []);
+
+      if (!castOk) {
+        const a = await announce.catch(() => [] as Announcement[]);
+        if (!active) return;
+        setCasts([]);
+        setCastsError(false);
+        setAnnouncements(a);
+        return;
+      }
+
+      const [castsResult, announceResult, introResult, optionResult] = await Promise.allSettled([
+        fetchPublishedCasts(),
+        announce,
+        user ? fetchMyIntroducedCastIds(user.id) : Promise.resolve([] as string[]),
+        user
+          ? fetchMyCastOptions(user.id)
+          : Promise.resolve([] as { cast_id: string; status: CastOptionStatus }[]),
+      ]);
+      if (!active) return;
+      if (castsResult.status === 'fulfilled') {
+        setCasts(castsResult.value.slice(0, 3));
+        setCastsError(false);
+      } else {
+        setCastsError(true);
+      }
+      if (announceResult.status === 'fulfilled') setAnnouncements(announceResult.value);
+      if (introResult.status === 'fulfilled') setIntroducedIds(new Set(introResult.value));
+      if (optionResult.status === 'fulfilled') {
+        setOptionByCast(new Map(optionResult.value.map((r) => [r.cast_id, r.status])));
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [castOk, refreshProfile, user]);
 
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      void refreshProfile();
-      (async () => {
-        try {
-          const [c, a, introIds, optionRows] = await Promise.all([
-            castOk
-              ? fetchPublishedCasts()
-              : Promise.resolve([] as CastListing[]),
-            supabase
-              .from('announcements')
-              .select('*')
-              .order('created_at', { ascending: false })
-              .limit(3)
-              .then((r) => (r.data as Announcement[]) ?? []),
-            user && castOk
-              ? fetchMyIntroducedCastIds(user.id)
-              : Promise.resolve([] as string[]),
-            user && castOk
-              ? fetchMyCastOptions(user.id)
-              : Promise.resolve([] as { cast_id: string; status: CastOptionStatus }[]),
-          ]);
-          if (!active) return;
-          setCasts(c.slice(0, 3));
-          setAnnouncements(a);
-          setIntroducedIds(new Set(introIds));
-          setOptionByCast(new Map(optionRows.map((r) => [r.cast_id, r.status])));
-        } catch {
-          // ignore offline / unset env during scaffold
-        }
-      })();
-      return () => {
-        active = false;
-      };
-    }, [castOk, refreshProfile, user])
+      return loadHome();
+    }, [loadHome])
   );
 
   return (
@@ -82,6 +98,8 @@ export default function HomeScreen() {
         </View>
         <InboxBell />
       </View>
+
+      <NotificationNudge />
 
       {actorProfile?.registration_completed_at ? (
         <>
@@ -143,6 +161,13 @@ export default function HomeScreen() {
         </View>
         {!castOk ? (
           <Text style={styles.empty}>{t('access.castLocked')}</Text>
+        ) : castsError ? (
+          <View style={{ gap: Spacing.sm }}>
+            <Text style={styles.empty}>{t('cast.loadFailed')}</Text>
+            <Pressable onPress={() => void loadHome()}>
+              <Text style={styles.link}>{t('common.retry')}</Text>
+            </Pressable>
+          </View>
         ) : casts.length === 0 ? (
           <Text style={styles.empty}>{t('cast.empty')}</Text>
         ) : (

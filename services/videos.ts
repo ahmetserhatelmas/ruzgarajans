@@ -8,6 +8,32 @@ import { supabase } from '@/lib/supabase';
 import { LANG_INTRO_KIND, LANG_INTRO_MAX } from '@/lib/langIntro';
 import type { Video, VideoKind } from '@/types/database';
 
+const PROFILE_VIDEO_FIELDS = {
+  intro: { id: 'intro_video_id', url: 'intro_video_playback_url' },
+  mimic: { id: 'mimic_video_id', url: 'mimic_video_playback_url' },
+  showreel: { id: 'showreel_video_id', url: 'showreel_playback_url' },
+  talent: { id: 'talent_video_id', url: 'talent_video_playback_url' },
+} as const;
+
+export type ProfileVideoKind = keyof typeof PROFILE_VIDEO_FIELDS;
+
+function isProfileVideoKind(kind: VideoKind): kind is ProfileVideoKind {
+  return kind in PROFILE_VIDEO_FIELDS;
+}
+
+async function saveProfileVideoFields(userId: string, fields: Record<string, string>) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const { data, error } = await supabase
+      .from('actor_profiles')
+      .update(fields)
+      .eq('user_id', userId)
+      .select('user_id')
+      .maybeSingle();
+    if (!error && data) return;
+  }
+  throw new Error('profile_video_save_failed');
+}
+
 export async function fetchLangIntroVideos(userId: string): Promise<Video[]> {
   const { data, error } = await supabase
     .from('videos')
@@ -88,44 +114,12 @@ export async function recordAndUploadVideo(input: {
 
   if (updateError) throw updateError;
 
-  if (input.kind === 'intro') {
-    await supabase
-      .from('actor_profiles')
-      .update({
-        intro_video_id: uid,
-        intro_video_playback_url: playback,
-      })
-      .eq('user_id', input.userId);
-  }
-
-  if (input.kind === 'showreel') {
-    await supabase
-      .from('actor_profiles')
-      .update({
-        showreel_video_id: uid,
-        showreel_playback_url: playback,
-      })
-      .eq('user_id', input.userId);
-  }
-
-  if (input.kind === 'mimic') {
-    await supabase
-      .from('actor_profiles')
-      .update({
-        mimic_video_id: uid,
-        mimic_video_playback_url: playback,
-      })
-      .eq('user_id', input.userId);
-  }
-
-  if (input.kind === 'talent') {
-    await supabase
-      .from('actor_profiles')
-      .update({
-        talent_video_id: uid,
-        talent_video_playback_url: playback,
-      })
-      .eq('user_id', input.userId);
+  if (isProfileVideoKind(input.kind)) {
+    const profileFields = PROFILE_VIDEO_FIELDS[input.kind];
+    await saveProfileVideoFields(input.userId, {
+      [profileFields.id]: uid,
+      [profileFields.url]: playback,
+    });
   }
 
   if (input.kind === LANG_INTRO_KIND && input.replaceVideoId) {
@@ -174,15 +168,6 @@ export async function fetchAuditionVideosAdmin(): Promise<Video[]> {
   if (error) throw error;
   return (data ?? []) as Video[];
 }
-
-const PROFILE_VIDEO_FIELDS = {
-  intro: { id: 'intro_video_id', url: 'intro_video_playback_url' },
-  mimic: { id: 'mimic_video_id', url: 'mimic_video_playback_url' },
-  showreel: { id: 'showreel_video_id', url: 'showreel_playback_url' },
-  talent: { id: 'talent_video_id', url: 'talent_video_playback_url' },
-} as const;
-
-export type ProfileVideoKind = keyof typeof PROFILE_VIDEO_FIELDS;
 
 /** Clears a profile video (intro / mimic / showreel / talent). */
 export async function clearProfileVideo(userId: string, kind: ProfileVideoKind): Promise<void> {

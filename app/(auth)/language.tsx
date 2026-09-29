@@ -1,18 +1,19 @@
-import { StyleSheet, Text, View, Pressable } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from '@/components/ui/Atmosphere';
 import { Screen } from '@/components/ui/Screen';
 import { setAppLanguage } from '@/lib/i18n';
 import { BrandMark } from '@/components/ui/BrandMark';
+import { useAuth } from '@/contexts/AuthContext';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 export default function LanguageScreen() {
   const router = useRouter();
+  const { session, loading } = useAuth();
 
   const choose = async (lng: 'tr' | 'en') => {
     await setAppLanguage(lng);
-    // push so hardware/back can return to language pick if needed
-    router.replace('/(auth)/login');
+    router.replace(session ? '/' : '/(auth)/login');
   };
 
   return (
@@ -28,8 +29,14 @@ export default function LanguageScreen() {
           Which language would you like to use?
         </Text>
       </View>
+      {loading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={Colors.brand} />
+        </View>
+      ) : null}
       <View style={styles.choices}>
         <Pressable
+          disabled={loading}
           onPress={() => void choose('tr')}
           style={({ pressed }) => [styles.choice, pressed && styles.pressed]}
         >
@@ -40,6 +47,7 @@ export default function LanguageScreen() {
           <Text style={styles.choiceHint}>TR</Text>
         </Pressable>
         <Pressable
+          disabled={loading}
           onPress={() => void choose('en')}
           style={({ pressed }) => [styles.choice, pressed && styles.pressed]}
         >
@@ -82,6 +90,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: Spacing.xs,
   },
+  loading: { marginTop: Spacing.xl },
   choices: {
     marginTop: Spacing.xxl,
     gap: Spacing.md,

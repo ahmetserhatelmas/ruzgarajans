@@ -14,10 +14,15 @@ const ADMIN_URL = (
   process.env.EXPO_PUBLIC_ADMIN_URL ?? 'https://ruzgarajans.vercel.app'
 ).replace(/\/$/, '');
 
+const OTP_APP_SECRET = process.env.EXPO_PUBLIC_OTP_APP_SECRET ?? '';
+
 async function callOtp(body: Record<string, unknown>) {
   const res = await fetch(`${ADMIN_URL}/api/email-otp`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-ruzgar-otp-key': OTP_APP_SECRET,
+    },
     body: JSON.stringify(body),
   });
   const payload = (await res.json().catch(() => ({}))) as {

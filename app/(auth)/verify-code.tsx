@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/ui/Screen';
 import { LinearGradient } from '@/components/ui/Atmosphere';
 import { TextField } from '@/components/ui/TextField';
 import { Button } from '@/components/ui/Button';
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { localizedError } from '@/lib/authErrors';
 import { EmailOtpError, requestEmailOtp, verifyEmailOtp, type OtpPurpose } from '@/lib/emailOtp';
 import {
-  clearPendingSignup,
-  getPendingSignup,
+  clearPendingOtp,
+  getPendingOtp,
+  remainingResendSeconds,
+  setPendingOtp,
   setPendingReset,
 } from '@/lib/pendingAuth';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
@@ -20,13 +21,35 @@ import { Colors, Fonts, Spacing } from '@/constants/theme';
 export default function VerifyCodeScreen() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const { signIn } = useAuth();
   const params = useLocalSearchParams<{ purpose?: string; email?: string }>();
-  const purpose: OtpPurpose = params.purpose === 'reset' ? 'reset' : 'signup';
-  const email = String(params.email ?? '').trim().toLowerCase();
+  const [purpose, setPurpose] = useState<OtpPurpose>(params.purpose === 'reset' ? 'reset' : 'signup');
+  const [email, setEmail] = useState(String(params.email ?? '').trim().toLowerCase());
+  const [ready, setReady] = useState(Boolean(email));
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendIn, setResendIn] = useState(60);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const pending = await getPendingOtp();
+      if (!active) return;
+      const nextEmail = (String(params.email ?? '') || pending?.email || '').trim().toLowerCase();
+      const nextPurpose: OtpPurpose =
+        params.purpose === 'reset' || pending?.purpose === 'reset' ? 'reset' : 'signup';
+      if (!nextEmail) {
+        router.replace(nextPurpose === 'reset' ? '/(auth)/forgot-password' : '/(auth)/register');
+        return;
+      }
+      setEmail(nextEmail);
+      setPurpose(nextPurpose);
+      if (pending?.lastSentAt) setResendIn(remainingResendSeconds(pending.lastSentAt));
+      setReady(true);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [params.email, params.purpose, router]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -45,30 +68,25 @@ export default function VerifyCodeScreen() {
       setLoading(true);
       const result = await verifyEmailOtp({ purpose, email, code: digits });
       if (purpose === 'signup') {
+        await clearPendingOtp();
         if (result.accessToken && result.refreshToken) {
           const { error } = await supabase.auth.setSession({
             access_token: result.accessToken,
             refresh_token: result.refreshToken,
           });
           if (error) throw error;
-        } else {
-          const pending = getPendingSignup();
-          if (!pending?.password) {
-            Alert.alert(t('common.error'), t('auth.loginFailed'));
-            router.replace('/(auth)/register');
-            return;
-          }
-          await signIn(pending.email, pending.password);
+          router.replace('/');
+          return;
         }
-        clearPendingSignup();
-        router.replace('/');
+        Alert.alert(t('common.success'), t('auth.accountCreated'));
+        router.replace('/(auth)/login');
         return;
       }
       if (!result.resetToken) {
         Alert.alert(t('common.error'), t('auth.invalidCode'));
         return;
       }
-      setPendingReset({ email, resetToken: result.resetToken });
+      await setPendingReset({ email, resetToken: result.resetToken });
       router.replace({
         pathname: '/(auth)/reset-password',
         params: { email },
@@ -85,15 +103,8 @@ export default function VerifyCodeScreen() {
     try {
       setLoading(true);
       const locale = i18n.language?.toLowerCase().startsWith('en') ? 'en' : 'tr';
-      const pending = getPendingSignup();
-      await requestEmailOtp({
-        purpose,
-        email,
-        password: pending?.password,
-        fullName: pending?.fullName,
-        phone: pending?.phone,
-        locale,
-      });
+      await requestEmailOtp({ purpose, email, locale });
+      await setPendingOtp({ email, purpose });
       setResendIn(60);
       Alert.alert(t('common.success'), t('auth.codeSent'));
     } catch (e: unknown) {
@@ -105,6 +116,17 @@ export default function VerifyCodeScreen() {
     }
   };
 
+  if (!ready) {
+    return (
+      <Screen>
+        <LinearGradient />
+        <View style={styles.loading}>
+          <ActivityIndicator color={Colors.brand} />
+        </View>
+      </Screen>
+    );
+  }
+
   return (
     <Screen scroll>
       <LinearGradient />
@@ -113,6 +135,7 @@ export default function VerifyCodeScreen() {
         <Text style={styles.hint}>
           {t(purpose === 'signup' ? 'auth.verifySignupHint' : 'auth.verifyResetHint', { email })}
         </Text>
+        <Text style={styles.hint}>{t('auth.junkHint')}</Text>
       </View>
       <View style={styles.form}>
         <TextField
@@ -137,6 +160,7 @@ export default function VerifyCodeScreen() {
 }
 
 const styles = StyleSheet.create({
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   hero: { marginTop: Spacing.xl, gap: Spacing.sm },
   title: {
     fontFamily: Fonts.bodyBold,

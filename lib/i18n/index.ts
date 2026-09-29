@@ -31,8 +31,10 @@ export async function initI18n(preferred?: string | null) {
       interpolation: { escapeValue: false },
       compatibilityJSON: 'v4',
     });
-  } else if (lng !== i18n.language) {
-    await i18n.changeLanguage(lng);
+  } else {
+    i18n.addResourceBundle('tr', 'translation', tr, true, true);
+    i18n.addResourceBundle('en', 'translation', en, true, true);
+    if (lng !== i18n.language) await i18n.changeLanguage(lng);
   }
 
   return i18n;

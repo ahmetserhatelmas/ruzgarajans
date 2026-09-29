@@ -1,6 +1,7 @@
 import { createHash, randomInt } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { decryptSecret, encryptSecret, limitOtpAction } from "@/lib/otp-protect";
 
 const TTL_MS = 15 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
@@ -52,8 +53,8 @@ function copy(locale: string, purpose: Purpose, code: string) {
       ? "Şifrenizi sıfırlamak için doğrulama kodunuz aşağıdadır."
       : "Here is the code to reset your Rüzgar Oyunculuk password.";
   const ignore = tr
-    ? "Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz. Kod 15 dakika geçerlidir."
-    : "If you did not request this, you can ignore this email. The code expires in 15 minutes.";
+    ? "Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz. Kod 15 dakika geçerlidir. Gelen kutusu boşsa junk / spam klasörüne bakın."
+    : "If you did not request this, you can ignore this email. The code expires in 15 minutes. If it is missing, check junk / spam.";
   const text = `${title}\n\n${intro}\n\n${code}\n\n${ignore}\n\nRüzgar Oyunculuk\ninfo@ruzgaroyunculuk.com\nhttps://ruzgaroyunculuk.com`;
   const html = `<!doctype html>
 <html lang="${tr ? "tr" : "en"}">
@@ -136,7 +137,7 @@ async function requestCode(admin: SupabaseClient, body: Record<string, unknown>)
       .eq("purpose", "signup")
       .maybeSingle();
     const stored = (existingOtp?.payload ?? {}) as SignupPayload;
-    const password = String(body.password ?? stored.password ?? "");
+    const password = String(body.password ?? decryptSecret(String(stored.password ?? "")) ?? "");
     const fullName = String(body.fullName ?? stored.fullName ?? "").trim();
     if (fullName.length < 2) return { ok: false, code: "invalid_name" };
     if (password.length < 6) return { ok: false, code: "weak_password" };
@@ -164,7 +165,7 @@ async function requestCode(admin: SupabaseClient, body: Record<string, unknown>)
   const payload: SignupPayload =
     purpose === "signup"
       ? {
-          password: String(body.password ?? ""),
+          password: encryptSecret(String(body.password ?? "")),
           fullName: String(body.fullName ?? "").trim(),
           phone: String(body.phone ?? "").trim(),
           locale,
@@ -226,7 +227,8 @@ async function verifyCode(admin: SupabaseClient, body: Record<string, unknown>):
 
   if (purpose === "signup") {
     const payload = (row.payload ?? {}) as SignupPayload;
-    const password = payload.password ?? "";
+    const password = decryptSecret(String(payload.password ?? ""));
+    if (password.length < 6) return { ok: false, code: "server_error" };
     const fullName = payload.fullName ?? "";
     const phone = payload.phone ?? "";
     const { data: created, error } = await admin.auth.admin.createUser({
@@ -308,12 +310,21 @@ async function completeReset(admin: SupabaseClient, body: Record<string, unknown
   return { ok: true };
 }
 
-export async function handleEmailOtp(body: Record<string, unknown>): Promise<OtpResult> {
+export async function handleEmailOtp(
+  body: Record<string, unknown>,
+  ctx: { ip: string }
+): Promise<OtpResult> {
   const admin = createServiceClient();
   if (!admin) return { ok: false, code: "server_error" };
   const action = String(body.action ?? "request");
+  if (action !== "request" && action !== "verify" && action !== "complete_reset") {
+    return { ok: false, code: "invalid_action" };
+  }
+  const limited = await limitOtpAction(admin, ctx.ip, action);
+  if (!limited.ok) {
+    return { ok: false, code: "rate_limited", retryAfter: limited.retryAfter };
+  }
   if (action === "request") return requestCode(admin, body);
   if (action === "verify") return verifyCode(admin, body);
-  if (action === "complete_reset") return completeReset(admin, body);
-  return { ok: false, code: "invalid_action" };
+  return completeReset(admin, body);
 }

@@ -8,6 +8,7 @@ import { TextField } from '@/components/ui/TextField';
 import { Button } from '@/components/ui/Button';
 import { localizedError } from '@/lib/authErrors';
 import { requestEmailOtp } from '@/lib/emailOtp';
+import { setPendingOtp } from '@/lib/pendingAuth';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function ForgotPasswordScreen() {
@@ -26,6 +27,7 @@ export default function ForgotPasswordScreen() {
       setLoading(true);
       const locale = i18n.language?.toLowerCase().startsWith('en') ? 'en' : 'tr';
       await requestEmailOtp({ purpose: 'reset', email: cleanEmail, locale });
+      await setPendingOtp({ email: cleanEmail, purpose: 'reset' });
       router.push({
         pathname: '/(auth)/verify-code',
         params: { purpose: 'reset', email: cleanEmail },

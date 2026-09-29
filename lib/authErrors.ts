@@ -63,7 +63,14 @@ export function authErrorKey(error: AuthLike | unknown): string | null {
   if (text.includes('weak_password') || text.includes('password should be')) {
     return 'auth.weakPassword';
   }
-  if (text.includes('over_request') || text.includes('too many') || text.includes('rate limit') || text.includes('too_many_attempts')) {
+  if (
+    text.includes('over_request') ||
+    text.includes('too many') ||
+    text.includes('rate limit') ||
+    text.includes('rate_limited') ||
+    text.includes('too_many_attempts') ||
+    text.includes('unauthorized')
+  ) {
     return 'auth.tooManyAttempts';
   }
   if (text.includes('already_registered') || text.includes('already registered')) {
@@ -77,6 +84,12 @@ export function authErrorKey(error: AuthLike | unknown): string | null {
   if (text.includes('cooldown')) return 'auth.resendWait';
   if (text.includes('email_send_failed') || text.includes('resend_not_configured')) {
     return 'auth.emailSendFailed';
+  }
+  if (text.includes('profile_video_save_failed')) {
+    return 'profile.videoSaveFailed';
+  }
+  if (text.includes('delete_failed') || text.includes('forbidden')) {
+    return 'settings.deleteFailed';
   }
   if (
     text.includes('login') &&

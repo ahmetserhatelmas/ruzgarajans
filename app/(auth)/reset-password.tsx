@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/ui/Screen';
@@ -8,19 +8,38 @@ import { TextField } from '@/components/ui/TextField';
 import { Button } from '@/components/ui/Button';
 import { localizedError } from '@/lib/authErrors';
 import { completePasswordReset } from '@/lib/emailOtp';
-import { clearPendingReset, getPendingReset } from '@/lib/pendingAuth';
+import { clearPendingReset, getPendingReset, type PendingReset } from '@/lib/pendingAuth';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function ResetPasswordScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ email?: string }>();
+  const [pending, setPending] = useState<PendingReset | null>(null);
+  const [ready, setReady] = useState(false);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const row = await getPendingReset();
+      if (!active) return;
+      if (!row) {
+        Alert.alert(t('common.error'), t('auth.codeExpired'));
+        router.replace('/(auth)/forgot-password');
+        return;
+      }
+      setPending(row);
+      setReady(true);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [router, t]);
+
   const onSubmit = async () => {
-    const pending = getPendingReset();
     const email = (pending?.email || params.email || '').trim().toLowerCase();
     if (!pending?.resetToken || !email) {
       Alert.alert(t('common.error'), t('auth.codeExpired'));
@@ -42,7 +61,7 @@ export default function ResetPasswordScreen() {
         resetToken: pending.resetToken,
         password,
       });
-      clearPendingReset();
+      await clearPendingReset();
       Alert.alert(t('common.success'), t('auth.resetSuccess'));
       router.replace('/(auth)/login');
     } catch (e: unknown) {
@@ -51,6 +70,17 @@ export default function ResetPasswordScreen() {
       setLoading(false);
     }
   };
+
+  if (!ready) {
+    return (
+      <Screen>
+        <LinearGradient />
+        <View style={styles.loading}>
+          <ActivityIndicator color={Colors.brand} />
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen scroll>
@@ -78,6 +108,7 @@ export default function ResetPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   hero: { marginTop: Spacing.xl, gap: Spacing.sm },
   title: {
     fontFamily: Fonts.bodyBold,

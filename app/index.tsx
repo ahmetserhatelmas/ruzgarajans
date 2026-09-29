@@ -5,19 +5,35 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/contexts/AuthContext';
 import { LANGUAGE_KEY } from '@/lib/i18n';
 import { takePendingNotificationHref } from '@/lib/notificationRoute';
+import { clearAllPendingAuth, getAuthResumeHref, type AuthResume } from '@/lib/pendingAuth';
 import { Colors } from '@/constants/theme';
 
 export default function Index() {
   const { session, profile, loading, configured } = useAuth();
   const [langChecked, setLangChecked] = useState(false);
   const [hasLang, setHasLang] = useState(false);
+  const [resumeHref, setResumeHref] = useState<AuthResume | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem(LANGUAGE_KEY).then((v) => {
-      setHasLang(Boolean(v));
+    let active = true;
+    void (async () => {
+      const [lang, resume] = await Promise.all([
+        AsyncStorage.getItem(LANGUAGE_KEY),
+        getAuthResumeHref(),
+      ]);
+      if (!active) return;
+      setHasLang(Boolean(lang));
+      setResumeHref(resume);
       setLangChecked(true);
-    });
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
+
+  useEffect(() => {
+    if (session) void clearAllPendingAuth();
+  }, [session]);
 
   if (loading || !langChecked) {
     return (
@@ -36,6 +52,7 @@ export default function Index() {
   }
 
   if (!session) {
+    if (resumeHref) return <Redirect href={resumeHref} />;
     return <Redirect href="/(auth)/login" />;
   }
 

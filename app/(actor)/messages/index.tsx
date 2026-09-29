@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -109,6 +110,7 @@ export default function MessagesScreen() {
     } catch {
       setMessages((prev) => prev.filter((m) => m.id !== temp.id));
       setBody(text);
+      Alert.alert(t('common.error'), t('messages.sendFailed'));
     } finally {
       setSending(false);
     }

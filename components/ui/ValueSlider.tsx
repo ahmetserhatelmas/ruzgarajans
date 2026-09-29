@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
@@ -14,6 +14,11 @@ type Props = {
   error?: string;
 };
 
+function snapToStep(value: number, min: number, max: number, step: number) {
+  const snapped = Math.round((value - min) / step) * step + min;
+  return Math.min(max, Math.max(min, snapped));
+}
+
 export function ValueSlider({
   label,
   value,
@@ -24,15 +29,32 @@ export function ValueSlider({
   unit = '',
   error,
 }: Props) {
-  const display = value ?? Math.round((min + max) / 2);
+  const fallback = snapToStep((min + max) / 2, min, max, step);
+  const committed = value ?? fallback;
+  const sliding = useRef(false);
+  const [thumb, setThumb] = useState(committed);
+  const [shown, setShown] = useState(committed);
   const hasValue = value != null;
+
+  useEffect(() => {
+    if (sliding.current || value == null) return;
+    setThumb(value);
+    setShown(value);
+  }, [value]);
+
+  const commit = (raw: number) => {
+    const next = snapToStep(raw, min, max, step);
+    setThumb(next);
+    setShown(next);
+    onChange(next);
+  };
 
   return (
     <View style={styles.wrap}>
       <View style={styles.head}>
         <Text style={styles.label}>{label}</Text>
-        <Text style={[styles.value, !hasValue && styles.valueMuted]}>
-          {hasValue ? `${display}${unit ? ` ${unit}` : ''}` : '—'}
+        <Text style={[styles.value, !hasValue && !sliding.current && styles.valueMuted]}>
+          {hasValue || sliding.current ? `${shown}${unit ? ` ${unit}` : ''}` : '—'}
         </Text>
       </View>
       <View style={styles.trackCard}>
@@ -40,9 +62,19 @@ export function ValueSlider({
           style={styles.slider}
           minimumValue={min}
           maximumValue={max}
-          step={step}
-          value={display}
-          onValueChange={(v) => onChange(Math.round(v))}
+          value={thumb}
+          onSlidingStart={() => {
+            sliding.current = true;
+          }}
+          onValueChange={(raw) => {
+            if (!sliding.current) return;
+            setThumb(raw);
+            setShown(snapToStep(raw, min, max, step));
+          }}
+          onSlidingComplete={(raw) => {
+            commit(raw);
+            sliding.current = false;
+          }}
           minimumTrackTintColor={Colors.brand}
           maximumTrackTintColor={Colors.border}
           thumbTintColor={Colors.brand}

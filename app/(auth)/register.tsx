@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher';
 import { localizedError } from '@/lib/authErrors';
 import { requestEmailOtp } from '@/lib/emailOtp';
-import { setPendingSignup } from '@/lib/pendingAuth';
+import { setPendingOtp } from '@/lib/pendingAuth';
 import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function RegisterScreen() {
@@ -47,12 +47,7 @@ export default function RegisterScreen() {
         phone: phone.trim(),
         locale,
       });
-      setPendingSignup({
-        email: cleanEmail,
-        password,
-        fullName: cleanName,
-        phone: phone.trim(),
-      });
+      await setPendingOtp({ email: cleanEmail, purpose: 'signup' });
       router.push({
         pathname: '/(auth)/verify-code',
         params: { purpose: 'signup', email: cleanEmail },

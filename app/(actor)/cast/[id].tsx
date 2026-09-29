@@ -44,6 +44,7 @@ export default function CastDetailScreen() {
   const router = useRouter();
   const castOk = canAccessCasts(profile, actorProfile, galleryPhotos);
   const [cast, setCast] = useState<CastListing | null>(null);
+  const [loadState, setLoadState] = useState<'loading' | 'error' | 'missing' | 'ready'>('loading');
   const [app, setApp] = useState<Application | null>(null);
   const [acceptBudget, setAcceptBudget] = useState(true);
   const [counter, setCounter] = useState('');
@@ -78,21 +79,28 @@ export default function CastDetailScreen() {
   const loadCast = useCallback(() => {
     if (!id || !user || !castOk) return;
     let active = true;
+    setLoadState((prev) => (prev === 'ready' ? prev : 'loading'));
     (async () => {
-      const [c, apps, intro, opt, vids] = await Promise.all([
-        fetchCastById(id),
-        fetchMyApplications(user.id),
-        fetchIntroductionForCast(id, user.id),
-        fetchOptionForCast(id, user.id),
-        fetchMyAuditionVideos(user.id, id),
-      ]);
-      if (!active) return;
-      setCast(c);
-      setApp(apps.find((a) => a.cast_id === id) ?? null);
-      setIntroduced(intro);
-      setOption(opt);
-      setAuditionVideo(vids.find((v) => v.status === 'ready') ?? vids[0] ?? null);
-    })().catch(() => undefined);
+      try {
+        const [c, apps, intro, opt, vids] = await Promise.all([
+          fetchCastById(id),
+          fetchMyApplications(user.id),
+          fetchIntroductionForCast(id, user.id),
+          fetchOptionForCast(id, user.id),
+          fetchMyAuditionVideos(user.id, id),
+        ]);
+        if (!active) return;
+        setCast(c);
+        setApp(apps.find((a) => a.cast_id === id) ?? null);
+        setIntroduced(intro);
+        setOption(opt);
+        setAuditionVideo(vids.find((v) => v.status === 'ready') ?? vids[0] ?? null);
+        setLoadState(c ? 'ready' : 'missing');
+      } catch {
+        if (!active) return;
+        setLoadState('error');
+      }
+    })();
     return () => {
       active = false;
     };
@@ -188,8 +196,17 @@ export default function CastDetailScreen() {
 
   if (!cast) {
     return (
-      <Screen>
-        <Text style={styles.muted}>{t('common.loading')}</Text>
+      <Screen header={<BackHeader fallbackHref={backHref} />}>
+        <Text style={styles.muted}>
+          {loadState === 'error'
+            ? t('cast.loadFailed')
+            : loadState === 'missing'
+              ? t('cast.notFound')
+              : t('common.loading')}
+        </Text>
+        {loadState === 'error' ? (
+          <Button label={t('common.retry')} onPress={() => void loadCast()} style={{ marginTop: Spacing.md }} />
+        ) : null}
       </Screen>
     );
   }
