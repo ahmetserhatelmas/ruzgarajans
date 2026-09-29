@@ -1,6 +1,9 @@
 import { cache } from "react";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, unstable_cache } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
+import { ADMIN_CACHE_TAGS } from "@/lib/admin-cache";
 import { ageFromBirth } from "@/lib/labels";
 import type {
   AdminAlert,
@@ -21,29 +24,43 @@ import type {
 
 export { getAdminProfile as requireAdmin } from "@/lib/permissions";
 
-export const fetchPendingActorCount = cache(async () => {
-  const supabase = await createClient();
-  const joined = await supabase
-    .from("actor_profiles")
-    .select("user_id, profiles!inner(role, actor_status)", { count: "exact", head: true })
-    .eq("profiles.role", "actor")
-    .eq("profiles.actor_status", "pending")
-    .not("registration_completed_at", "is", null);
-  if (!joined.error) return joined.count ?? 0;
+async function dataClient() {
+  const service = createServiceClient();
+  if (service) return { supabase: service, cacheable: true as const };
+  return { supabase: await createClient(), cacheable: false as const };
+}
 
-  const { data: pending } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("role", "actor")
-    .eq("actor_status", "pending");
-  const ids = (pending ?? []).map((row) => row.id);
-  if (!ids.length) return 0;
-  const { count } = await supabase
-    .from("actor_profiles")
-    .select("user_id", { count: "exact", head: true })
-    .in("user_id", ids)
-    .not("registration_completed_at", "is", null);
-  return count ?? 0;
+export const fetchPendingActorCount = cache(async () => {
+  const load = async () => {
+    const { supabase } = await dataClient();
+    const joined = await supabase
+      .from("actor_profiles")
+      .select("user_id, profiles!inner(role, actor_status)", { count: "exact", head: true })
+      .eq("profiles.role", "actor")
+      .eq("profiles.actor_status", "pending")
+      .not("registration_completed_at", "is", null);
+    if (!joined.error) return joined.count ?? 0;
+
+    const { data: pending } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("role", "actor")
+      .eq("actor_status", "pending");
+    const ids = (pending ?? []).map((row) => row.id);
+    if (!ids.length) return 0;
+    const { count } = await supabase
+      .from("actor_profiles")
+      .select("user_id", { count: "exact", head: true })
+      .in("user_id", ids)
+      .not("registration_completed_at", "is", null);
+    return count ?? 0;
+  };
+
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, ["admin-pending-actor-count"], {
+    revalidate: 60,
+    tags: [ADMIN_CACHE_TAGS.actors, ADMIN_CACHE_TAGS.dashboard],
+  })();
 });
 
 /** Fields needed for list/filter/match — keep narrow for fast first paint. */
@@ -52,8 +69,11 @@ const ACTOR_LIST_SELECT =
 
 const ACTOR_LIST_SELECT_NO_FACEBOOK = ACTOR_LIST_SELECT.replace(", facebook,", ",");
 
-async function loadActorRows(select: string, selectFallback: string): Promise<ActorRow[]> {
-  const supabase = await createClient();
+async function loadActorRows(
+  supabase: SupabaseClient,
+  select: string,
+  selectFallback: string,
+): Promise<ActorRow[]> {
   const [{ data: profiles }, actorsRes, { data: kinds }, { data: chests }] = await Promise.all([
     supabase
       .from("profiles")
@@ -91,8 +111,23 @@ async function loadActorRows(select: string, selectFallback: string): Promise<Ac
   }));
 }
 
+/** Fresh (uncached) load — used by push notifications after publish. */
+export async function fetchActorRowsFresh(): Promise<ActorRow[]> {
+  const { supabase } = await dataClient();
+  return loadActorRows(supabase, ACTOR_LIST_SELECT, ACTOR_LIST_SELECT_NO_FACEBOOK);
+}
+
 export const fetchActorRows = cache(async (): Promise<ActorRow[]> => {
-  return loadActorRows(ACTOR_LIST_SELECT, ACTOR_LIST_SELECT_NO_FACEBOOK);
+  const load = async () => {
+    const service = createServiceClient();
+    if (!service) return loadActorRows(await createClient(), ACTOR_LIST_SELECT, ACTOR_LIST_SELECT_NO_FACEBOOK);
+    return loadActorRows(service, ACTOR_LIST_SELECT, ACTOR_LIST_SELECT_NO_FACEBOOK);
+  };
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, ["admin-actor-rows-v2"], {
+    revalidate: 45,
+    tags: [ADMIN_CACHE_TAGS.actors],
+  })();
 });
 
 export async function fetchActorDetail(id: string) {
@@ -157,50 +192,32 @@ export async function fetchActorDetail(id: string) {
 }
 
 export const fetchCasts = cache(async () => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("cast_listings")
-    .select(
-      "id, project_name, role_name, shoot_location, age_min, age_max, gender, deadline, option_date, payment_due_date, budget_amount, budget_currency, is_published, cover_image_url, created_at, applications(count)",
-    )
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return ((data ?? []) as (CastListing & { applications?: { count?: number }[] })[]).map((row) => {
-    const count = Number(row.applications?.[0]?.count ?? 0);
-    return { ...row, applications: [], application_count: count };
-  });
+  const load = async () => {
+    const { supabase } = await dataClient();
+    const { data, error } = await supabase
+      .from("cast_listings")
+      .select(
+        "id, project_name, role_name, shoot_location, age_min, age_max, gender, deadline, option_date, payment_due_date, budget_amount, budget_currency, is_published, cover_image_url, created_at, applications(count)",
+      )
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return ((data ?? []) as (CastListing & { applications?: { count?: number }[] })[]).map((row) => {
+      const count = Number(row.applications?.[0]?.count ?? 0);
+      return { ...row, applications: [], application_count: count };
+    });
+  };
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, ["admin-casts-v2"], {
+    revalidate: 45,
+    tags: [ADMIN_CACHE_TAGS.casts],
+  })();
 });
 
-export const fetchDashboardStats = cache(async () => {
-  const supabase = await createClient();
-  const [{ data: profiles }, { data: actors }, { data: kinds }, { data: casts }, { data: apps }] =
-    await Promise.all([
-      supabase.from("profiles").select("id, actor_status").eq("role", "actor"),
-      supabase
-        .from("actor_profiles")
-        .select(
-          "user_id, form_saved_at, media_saved_at, registration_completed_at, intro_video_playback_url, mimic_video_playback_url",
-        ),
-      supabase.from("gallery_photos").select("user_id, kind"),
-      supabase.from("cast_listings").select("id, is_published"),
-      supabase.from("applications").select("status"),
-    ]);
-  return {
-    profiles: (profiles ?? []) as Pick<Profile, "id" | "actor_status">[],
-    actors: (actors ?? []) as Pick<
-      ActorProfile,
-      | "user_id"
-      | "form_saved_at"
-      | "media_saved_at"
-      | "registration_completed_at"
-      | "intro_video_playback_url"
-      | "mimic_video_playback_url"
-    >[],
-    kinds: (kinds ?? []) as { user_id: string; kind: string | null }[],
-    casts: (casts ?? []) as Pick<CastListing, "id" | "is_published">[],
-    applications: (apps ?? []) as Pick<Application, "status">[],
-  };
-});
+/** @deprecated Prefer getCachedDashboardStats from admin-cache */
+export async function fetchDashboardStats() {
+  const { getCachedDashboardStats } = await import("@/lib/admin-cache");
+  return getCachedDashboardStats();
+}
 
 export async function fetchCastDetail(id: string) {
   const supabase = await createClient();
@@ -240,21 +257,28 @@ export async function fetchCastDetail(id: string) {
 }
 
 export const fetchApplications = cache(async () => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("applications")
-    .select(
-      "*, profiles:actor_id(id, full_name, email, avatar_url, actor_status), cast_listings(id, project_name, role_name, deadline, option_date, payment_due_date, budget_amount, budget_currency)"
-    )
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as (Application & {
-    profiles: Pick<Profile, "id" | "full_name" | "email" | "avatar_url" | "actor_status"> | null;
-    cast_listings: Pick<
-      CastListing,
-      "id" | "project_name" | "role_name" | "deadline" | "budget_amount" | "budget_currency"
-    > | null;
-  })[];
+  const load = async () => {
+    const { supabase } = await dataClient();
+    const { data, error } = await supabase
+      .from("applications")
+      .select(
+        "*, profiles:actor_id(id, full_name, email, avatar_url, actor_status), cast_listings(id, project_name, role_name, deadline, option_date, payment_due_date, budget_amount, budget_currency)",
+      )
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as (Application & {
+      profiles: Pick<Profile, "id" | "full_name" | "email" | "avatar_url" | "actor_status"> | null;
+      cast_listings: Pick<
+        CastListing,
+        "id" | "project_name" | "role_name" | "deadline" | "budget_amount" | "budget_currency"
+      > | null;
+    })[];
+  };
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, ["admin-applications-v2"], {
+    revalidate: 45,
+    tags: [ADMIN_CACHE_TAGS.applications],
+  })();
 });
 
 export async function fetchApplicationDetail(id: string) {
@@ -290,15 +314,22 @@ export async function fetchApplicationDetail(id: string) {
 }
 
 export const fetchConversations = cache(async () => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("conversations")
-    .select("*, profiles:actor_id(full_name, email, avatar_url)")
-    .order("updated_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as (Conversation & {
-    profiles: { full_name: string | null; email: string | null; avatar_url: string | null } | null;
-  })[];
+  const load = async () => {
+    const { supabase } = await dataClient();
+    const { data, error } = await supabase
+      .from("conversations")
+      .select("*, profiles:actor_id(full_name, email, avatar_url)")
+      .order("updated_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as (Conversation & {
+      profiles: { full_name: string | null; email: string | null; avatar_url: string | null } | null;
+    })[];
+  };
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, ["admin-conversations-v2"], {
+    revalidate: 30,
+    tags: [ADMIN_CACHE_TAGS.messages],
+  })();
 });
 
 export async function fetchMessages(conversationId: string) {
@@ -313,13 +344,20 @@ export async function fetchMessages(conversationId: string) {
 }
 
 export const fetchAnnouncements = cache(async () => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("announcements")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []) as Announcement[];
+  const load = async () => {
+    const { supabase } = await dataClient();
+    const { data, error } = await supabase
+      .from("announcements")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as Announcement[];
+  };
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, ["admin-announcements-v2"], {
+    revalidate: 60,
+    tags: [ADMIN_CACHE_TAGS.announcements],
+  })();
 });
 
 export function matchesCast(row: ActorRow, cast: CastListing) {
@@ -374,14 +412,21 @@ export const fetchIntroducedApplicationIds = cache(async () => {
 });
 
 export const fetchAdminAlerts = cache(async (limit = 50): Promise<AdminAlert[]> => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("admin_alerts")
-    .select("id, type, title, body, application_id, actor_id, cast_id, read_at, created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (error) return [];
-  return (data ?? []) as AdminAlert[];
+  const load = async () => {
+    const { supabase } = await dataClient();
+    const { data, error } = await supabase
+      .from("admin_alerts")
+      .select("id, type, title, body, application_id, actor_id, cast_id, read_at, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) return [];
+    return (data ?? []) as AdminAlert[];
+  };
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, [`admin-alerts-v2-${limit}`], {
+    revalidate: 30,
+    tags: [ADMIN_CACHE_TAGS.alerts],
+  })();
 });
 
 export async function markAdminAlertsForApplication(applicationId: string) {

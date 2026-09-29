@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { bustAdminCache } from "@/lib/admin-cache";
 import {
   createAuthUser,
   parseNewPassword,
@@ -101,6 +102,7 @@ export async function deleteActorsAction(ids: string[]) {
   if (error) return { ok: false as const, count: 0, error: error.message };
   revalidatePath("/actors");
   revalidatePath("/");
+  bustAdminCache("actors", "dashboard");
   return { ok: true as const, count: Number(data ?? 0) };
 }
 
@@ -115,6 +117,7 @@ export async function setActorStatusAction(id: string, status: ActorStatus) {
   revalidatePath("/actors");
   revalidatePath(`/actors/${id}`);
   revalidatePath("/");
+  bustAdminCache("actors", "dashboard");
 }
 
 export async function setApplicationStatusAction(id: string, status: ApplicationStatus) {
@@ -125,6 +128,7 @@ export async function setApplicationStatusAction(id: string, status: Application
   revalidatePath("/applications");
   revalidatePath(`/applications/${id}`);
   revalidatePath("/casts");
+  bustAdminCache("applications", "casts", "dashboard");
 }
 
 const UUID_RE =
@@ -145,6 +149,7 @@ export async function deleteApplicationsAction(ids: string[]) {
   if (error) return { ok: false as const, count: 0, error: error.message };
   revalidatePath("/applications");
   revalidatePath("/casts");
+  bustAdminCache("applications", "casts", "dashboard");
   return { ok: true as const, count: unique.length };
 }
 
@@ -156,6 +161,7 @@ export async function markAdminAlertReadAction(formData: FormData) {
   await supabase.from("admin_alerts").update({ read_at: new Date().toISOString() }).eq("id", id);
   revalidatePath("/alerts");
   revalidatePath("/");
+  bustAdminCache("alerts", "dashboard");
 }
 
 export async function markAllAdminAlertsReadAction() {
@@ -167,6 +173,7 @@ export async function markAllAdminAlertsReadAction() {
     .is("read_at", null);
   revalidatePath("/alerts");
   revalidatePath("/");
+  bustAdminCache("alerts", "dashboard");
 }
 
 export async function upsertCastAction(formData: FormData) {
@@ -253,6 +260,7 @@ export async function upsertCastAction(formData: FormData) {
     }
     revalidatePath("/casts");
     revalidatePath(`/casts/${id}`);
+    bustAdminCache("casts", "dashboard");
     redirect(`/casts/${id}`);
   }
 
@@ -278,6 +286,7 @@ export async function upsertCastAction(formData: FormData) {
     }
   }
   revalidatePath("/casts");
+  bustAdminCache("casts", "dashboard");
   redirect(`/casts/${data.id}`);
 }
 
@@ -307,6 +316,7 @@ export async function toggleCastPublishedAction(id: string, isPublished: boolean
   }
   revalidatePath("/casts");
   revalidatePath(`/casts/${id}`);
+  bustAdminCache("casts", "dashboard");
 }
 
 export async function introduceActorToCastFormAction(formData: FormData) {

@@ -3,11 +3,11 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { TableSkeleton } from "@/components/page-skeleton";
-import { fetchAdminAlerts, fetchDashboardStats } from "@/lib/queries";
-import { isAwaitingApproval, isFormSectionSaved, isMediaSectionSaved } from "@/lib/access";
+import { fetchAdminAlerts } from "@/lib/queries";
+import { getCachedDashboardStats } from "@/lib/admin-cache";
 import { APP_STATUS } from "@/lib/labels";
-import type { ActorProfile, ApplicationStatus } from "@/lib/types";
-import { canAdmin, getAdminProfile } from "@/lib/permissions";
+import type { ApplicationStatus } from "@/lib/types";
+import { canAdmin, requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -41,60 +41,42 @@ export default async function DashboardPage({
 }
 
 async function DashboardBody() {
-  const { profile } = await getAdminProfile();
+  const { profile } = await requireAdminPerm();
   const [statsData, alerts] = await Promise.all([
-    fetchDashboardStats(),
+    getCachedDashboardStats(),
     canAdmin(profile, "applications") ? fetchAdminAlerts(8) : Promise.resolve([]),
   ]);
   const unreadAlerts = alerts.filter((alert) => !alert.read_at);
-  const actorById = new Map(statsData.actors.map((a) => [a.user_id, a]));
-  const kindsByUser = new Map<string, string[]>();
-  for (const photo of statsData.kinds) {
-    if (!photo.kind) continue;
-    const list = kindsByUser.get(photo.user_id) ?? [];
-    list.push(photo.kind);
-    kindsByUser.set(photo.user_id, list);
-  }
-  const pending = statsData.profiles.filter((a) =>
-    isAwaitingApproval(a, (actorById.get(a.id) as ActorProfile | undefined) ?? null),
-  ).length;
-  const approved = statsData.profiles.filter((a) => a.actor_status === "approved").length;
-  const rejected = statsData.profiles.filter((a) => a.actor_status === "rejected").length;
-  const noForm = statsData.profiles.filter(
-    (a) => !isFormSectionSaved((actorById.get(a.id) as ActorProfile | undefined) ?? null),
-  ).length;
-  const noMedia = statsData.profiles.filter(
-    (a) => !isMediaSectionSaved((actorById.get(a.id) as ActorProfile | undefined) ?? null, kindsByUser.get(a.id) ?? []),
-  ).length;
-  const published = statsData.casts.filter((c) => c.is_published).length;
 
   const byStatus = (Object.keys(APP_STATUS) as ApplicationStatus[]).map((status) => ({
     status,
-    count: statsData.applications.filter((a) => a.status === status).length,
+    count: statsData.app_by_status[status] ?? 0,
   }));
 
   const stats = [
-    canAdmin(profile, "actors") ? { label: "Oyuncu", value: statsData.profiles.length, href: "/actors" } : null,
     canAdmin(profile, "actors")
-      ? { label: "Onay bekleyen", value: pending, href: "/actors?status=pending" }
+      ? { label: "Oyuncu", value: statsData.actors, href: "/actors" }
       : null,
     canAdmin(profile, "actors")
-      ? { label: "Onaylı", value: approved, href: "/actors?status=approved" }
+      ? { label: "Onay bekleyen", value: statsData.pending, href: "/actors?status=pending" }
       : null,
     canAdmin(profile, "actors")
-      ? { label: "Reddedilen", value: rejected, href: "/actors?status=rejected" }
+      ? { label: "Onaylı", value: statsData.approved, href: "/actors?status=approved" }
       : null,
     canAdmin(profile, "actors")
-      ? { label: "Formu eksik", value: noForm, href: "/actors?form=missing" }
+      ? { label: "Reddedilen", value: statsData.rejected, href: "/actors?status=rejected" }
       : null,
     canAdmin(profile, "actors")
-      ? { label: "Medyası eksik", value: noMedia, href: "/actors?media=missing" }
+      ? { label: "Formu eksik", value: statsData.no_form, href: "/actors?form=missing" }
+      : null,
+    canAdmin(profile, "actors")
+      ? { label: "Medyası eksik", value: statsData.no_media, href: "/actors?media=missing" }
       : null,
     canAdmin(profile, "casts")
-      ? { label: "Yayındaki ilan", value: published, href: "/casts?published=yes" }
+      ? { label: "Yayındaki ilan", value: statsData.published_casts, href: "/casts?published=yes" }
       : null,
     canAdmin(profile, "applications")
-      ? { label: "Toplam başvuru", value: statsData.applications.length, href: "/applications" }
+      ? { label: "Toplam başvuru", value: statsData.applications, href: "/applications" }
       : null,
   ].filter((s): s is { label: string; value: number; href: string } => Boolean(s));
 

@@ -1,5 +1,5 @@
 import { ageFromBirth } from "@/lib/labels";
-import { fetchActorRows } from "@/lib/queries";
+import { fetchActorRowsFresh } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
 import type { ActorRow, CastListing } from "@/lib/types";
 
@@ -115,7 +115,7 @@ async function sendExpoPush(
 export async function notifyMatchingActors(cast: NotifyCast) {
   if (!cast.is_published || !hasNotificationCriteria(cast)) return;
 
-  const rows = await fetchActorRows();
+  const rows = await fetchActorRowsFresh();
   const targets = rows.filter(
     (row) =>
       row.profile.role === "actor" &&
