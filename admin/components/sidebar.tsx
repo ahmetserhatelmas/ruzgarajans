@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
   Clapperboard,
@@ -50,6 +50,7 @@ export function Sidebar({
   profile: Pick<Profile, "role" | "is_super_admin" | "admin_permissions"> | null;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -89,6 +90,8 @@ export function Sidebar({
               key={link.href}
               href={link.href}
               prefetch={false}
+              onMouseEnter={() => router.prefetch(link.href)}
+              onFocus={() => router.prefetch(link.href)}
               className={cn(
                 "flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
                 active

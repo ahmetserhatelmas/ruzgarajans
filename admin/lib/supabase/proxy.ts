@@ -48,23 +48,21 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Local JWT verify (getClaims) — avoids a round-trip to Auth on every navigation.
+  const { data: claimsData, error } = await supabase.auth.getClaims();
+  const loggedIn = Boolean(claimsData?.claims?.sub) && !error;
 
-  if (!user && !isLogin) {
+  if (!loggedIn && !isLogin) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && !isPasswordUpdate) {
-    if (isLogin) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/";
-      url.search = "";
-      return NextResponse.redirect(url);
-    }
+  if (loggedIn && isLogin && !isPasswordUpdate) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    url.search = "";
+    return NextResponse.redirect(url);
   }
 
   return supabaseResponse;

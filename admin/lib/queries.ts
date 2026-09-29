@@ -46,12 +46,13 @@ export const fetchPendingActorCount = cache(async () => {
   return count ?? 0;
 });
 
-const ACTOR_ROW_SELECT =
-  "user_id, gender, national_id, city, birth_date, height_cm, weight_kg, body_size, tshirt_size, pants_size, suit_size, shoe_size, hair_color, eye_color, sports, dances, nationality, languages, address, whatsapp, instagram, facebook, experience, form_saved_at, media_saved_at, registration_completed_at, intro_video_playback_url, mimic_video_playback_url";
+/** Fields needed for list/filter/match — keep narrow for fast first paint. */
+const ACTOR_LIST_SELECT =
+  "user_id, gender, national_id, city, birth_date, height_cm, hair_color, eye_color, sports, dances, nationality, languages, instagram, facebook, experience, form_saved_at, media_saved_at, registration_completed_at, intro_video_playback_url, mimic_video_playback_url";
 
-const ACTOR_ROW_SELECT_NO_FACEBOOK = ACTOR_ROW_SELECT.replace(" instagram, facebook,", " instagram,");
+const ACTOR_LIST_SELECT_NO_FACEBOOK = ACTOR_LIST_SELECT.replace(", facebook,", ",");
 
-export const fetchActorRows = cache(async (): Promise<ActorRow[]> => {
+async function loadActorRows(select: string, selectFallback: string): Promise<ActorRow[]> {
   const supabase = await createClient();
   const [{ data: profiles }, actorsRes, { data: kinds }, { data: chests }] = await Promise.all([
     supabase
@@ -59,16 +60,16 @@ export const fetchActorRows = cache(async (): Promise<ActorRow[]> => {
       .select("id, email, full_name, phone, actor_status, avatar_url, cover_url, created_at")
       .eq("role", "actor")
       .order("created_at", { ascending: false }),
-    supabase.from("actor_profiles").select(ACTOR_ROW_SELECT),
+    supabase.from("actor_profiles").select(select),
     supabase.from("gallery_photos").select("user_id, kind"),
     supabase.from("gallery_photos").select("user_id, public_url").eq("kind", "chest"),
   ]);
   const actors = actorsRes.error
-    ? (await supabase.from("actor_profiles").select(ACTOR_ROW_SELECT_NO_FACEBOOK)).data
+    ? (await supabase.from("actor_profiles").select(selectFallback)).data
     : actorsRes.data;
 
   const actorMap = new Map(
-    ((actors ?? []) as ActorProfile[]).map((a) => [a.user_id, a])
+    ((actors ?? []) as unknown as ActorProfile[]).map((a) => [a.user_id, a])
   );
   const photoMap = new Map<string, string[]>();
   for (const p of (kinds ?? []) as { user_id: string; kind: string | null }[]) {
@@ -88,6 +89,10 @@ export const fetchActorRows = cache(async (): Promise<ActorRow[]> => {
     photoKinds: photoMap.get(profile.id) ?? [],
     chestPhotoUrl: chestMap.get(profile.id) ?? null,
   }));
+}
+
+export const fetchActorRows = cache(async (): Promise<ActorRow[]> => {
+  return loadActorRows(ACTOR_LIST_SELECT, ACTOR_LIST_SELECT_NO_FACEBOOK);
 });
 
 export async function fetchActorDetail(id: string) {
@@ -173,10 +178,12 @@ export const fetchDashboardStats = cache(async () => {
       supabase.from("profiles").select("id, actor_status").eq("role", "actor"),
       supabase
         .from("actor_profiles")
-        .select("user_id, form_saved_at, media_saved_at, registration_completed_at, intro_video_playback_url, mimic_video_playback_url"),
+        .select(
+          "user_id, form_saved_at, media_saved_at, registration_completed_at, intro_video_playback_url, mimic_video_playback_url",
+        ),
       supabase.from("gallery_photos").select("user_id, kind"),
       supabase.from("cast_listings").select("id, is_published"),
-      supabase.from("applications").select("id, status"),
+      supabase.from("applications").select("status"),
     ]);
   return {
     profiles: (profiles ?? []) as Pick<Profile, "id" | "actor_status">[],
@@ -191,7 +198,7 @@ export const fetchDashboardStats = cache(async () => {
     >[],
     kinds: (kinds ?? []) as { user_id: string; kind: string | null }[],
     casts: (casts ?? []) as Pick<CastListing, "id" | "is_published">[],
-    applications: (apps ?? []) as Pick<Application, "id" | "status">[],
+    applications: (apps ?? []) as Pick<Application, "status">[],
   };
 });
 
@@ -350,6 +357,20 @@ export const fetchUnreadAdminAlertCount = cache(async () => {
     .is("read_at", null);
   if (error) return 0;
   return count ?? 0;
+});
+
+export const fetchIntroducedApplicationIds = cache(async () => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("admin_alerts")
+    .select("application_id")
+    .not("application_id", "is", null);
+  if (error) return new Set<string>();
+  return new Set(
+    (data ?? [])
+      .map((row) => row.application_id as string | null)
+      .filter((id): id is string => Boolean(id)),
+  );
 });
 
 export const fetchAdminAlerts = cache(async (limit = 50): Promise<AdminAlert[]> => {

@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { TableSkeleton } from "@/components/page-skeleton";
-import { fetchAdminAlerts, fetchApplications, fetchCasts } from "@/lib/queries";
+import { fetchIntroducedApplicationIds, fetchApplications, fetchCasts } from "@/lib/queries";
 import { APP_STATUS } from "@/lib/labels";
 import type { ApplicationStatus } from "@/lib/types";
 import { canAdmin, requireAdminPerm } from "@/lib/permissions";
@@ -40,15 +40,12 @@ async function ApplicationsBody({
   const { profile } = await requireAdminPerm("applications");
   const canExport = canAdmin(profile, "export_applications");
   const { q = "", status = "all", cast = "all", share, shared } = params;
-  const [apps, casts, shares, alerts] = await Promise.all([
+  const [apps, casts, shares, introducedApplyIds] = await Promise.all([
     fetchApplications(),
     fetchCasts(),
     fetchActiveApplicationShares(),
-    fetchAdminAlerts(200),
+    fetchIntroducedApplicationIds(),
   ]);
-  const introducedApplyIds = new Set(
-    alerts.filter((alert) => alert.application_id).map((alert) => alert.application_id as string),
-  );
   const shareUrls = await shareUrlMap(shares);
   const filtered = apps.filter((a) => {
     const hay = `${a.profiles?.full_name ?? ""} ${a.profiles?.email ?? ""} ${a.cast_listings?.project_name ?? ""} ${a.cast_listings?.role_name ?? ""}`.toLowerCase();
