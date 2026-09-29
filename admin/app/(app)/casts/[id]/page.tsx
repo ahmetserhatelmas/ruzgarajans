@@ -5,7 +5,7 @@ import { CastForm } from "@/components/cast-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppStatusBadge, ActorStatusBadge } from "@/components/status-badge";
-import { fetchActorRows, fetchCastDetail, matchesCast } from "@/lib/queries";
+import { fetchApprovedActorRows, fetchCastDetail, matchesCast } from "@/lib/queries";
 import { hasCompletedForm, hasRequiredMedia } from "@/lib/access";
 import { ageFromBirth, GENDER, label } from "@/lib/labels";
 import { toggleCastPublishedAction } from "@/lib/actions";
@@ -30,21 +30,18 @@ export default async function CastDetailPage({
   const canExportApplications = canAdmin(admin, "export_applications");
   const [{ cast, applications, videos, introductions, options }, actors] = await Promise.all([
     fetchCastDetail(id),
-    fetchActorRows(),
+    fetchApprovedActorRows(),
   ]);
   if (!cast) notFound();
   const introducedIds = new Set(introductions.map((row) => row.actor_id));
   const optionByActor = new Map(options.map((row) => [row.actor_id, row]));
-  const pickerActors = actors
-    .filter((row) => row.profile.actor_status === "approved")
-    .map((row) => ({
-      id: row.profile.id,
-      name: row.profile.full_name || row.profile.email || row.profile.id,
-    }));
+  const pickerActors = actors.map((row) => ({
+    id: row.profile.id,
+    name: row.profile.full_name || row.profile.email || row.profile.id,
+  }));
 
   const matches = actors.filter(
     (row) =>
-      row.profile.actor_status === "approved" &&
       hasCompletedForm(row.actor) &&
       hasRequiredMedia(row.profile, row.actor, row.photoKinds) &&
       matchesCast(row, cast)

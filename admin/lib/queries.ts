@@ -398,17 +398,28 @@ export const fetchUnreadAdminAlertCount = cache(async () => {
 });
 
 export const fetchIntroducedApplicationIds = cache(async () => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("admin_alerts")
-    .select("application_id")
-    .not("application_id", "is", null);
-  if (error) return new Set<string>();
-  return new Set(
-    (data ?? [])
-      .map((row) => row.application_id as string | null)
-      .filter((id): id is string => Boolean(id)),
-  );
+  const load = async () => {
+    const { supabase } = await dataClient();
+    const { data, error } = await supabase
+      .from("admin_alerts")
+      .select("application_id")
+      .not("application_id", "is", null);
+    if (error) return [] as string[];
+    return [
+      ...new Set(
+        (data ?? [])
+          .map((row) => row.application_id as string | null)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+  };
+  const ids = !createServiceClient()
+    ? await load()
+    : await unstable_cache(load, ["admin-introduced-app-ids-v1"], {
+        revalidate: 60,
+        tags: [ADMIN_CACHE_TAGS.alerts, ADMIN_CACHE_TAGS.applications],
+      })();
+  return new Set(ids);
 });
 
 export const fetchAdminAlerts = cache(async (limit = 50): Promise<AdminAlert[]> => {
@@ -471,7 +482,7 @@ export async function fetchAppSettings(): Promise<AppSettings | null> {
   return (data as AppSettings | null) ?? null;
 }
 
-/** Push default cues + 1.00 speed if the live row is still the old slow default. */
+/** One-off repair of old slow mimic defaults — not for every page open. */
 export async function activateMimicDefaults(): Promise<AppSettings | null> {
   const current = await fetchAppSettings();
   const rate = Number(current?.mimic_speech_rate);
@@ -505,3 +516,79 @@ export async function activateMimicDefaults(): Promise<AppSettings | null> {
   if (inserted.error) return current;
   return (inserted.data as AppSettings | null) ?? current;
 }
+
+export const fetchConversation = cache(async (id: string) => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("*, profiles:actor_id(full_name, email, avatar_url)")
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data as Conversation & {
+    profiles: { full_name: string | null; email: string | null; avatar_url: string | null } | null;
+  };
+});
+
+/** Approved actors only — for cast match/picker (much smaller than full roster). */
+export const fetchApprovedActorRows = cache(async (): Promise<ActorRow[]> => {
+  const load = async () => {
+    const { supabase } = await dataClient();
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, email, full_name, phone, actor_status, avatar_url, cover_url, created_at")
+      .eq("role", "actor")
+      .eq("actor_status", "approved")
+      .order("full_name", { ascending: true });
+    const list = (profiles ?? []) as Profile[];
+    if (!list.length) return [];
+    const ids = list.map((p) => p.id);
+    const [actorsRes, { data: kinds }] = await Promise.all([
+      supabase.from("actor_profiles").select(ACTOR_LIST_SELECT).in("user_id", ids),
+      supabase.from("gallery_photos").select("user_id, kind").in("user_id", ids),
+    ]);
+    const actors = actorsRes.error
+      ? (await supabase.from("actor_profiles").select(ACTOR_LIST_SELECT_NO_FACEBOOK).in("user_id", ids))
+          .data
+      : actorsRes.data;
+    const actorMap = new Map(
+      ((actors ?? []) as unknown as ActorProfile[]).map((a) => [a.user_id, a]),
+    );
+    const photoMap = new Map<string, string[]>();
+    for (const p of (kinds ?? []) as { user_id: string; kind: string | null }[]) {
+      if (!p.kind) continue;
+      const kindsList = photoMap.get(p.user_id) ?? [];
+      kindsList.push(p.kind);
+      photoMap.set(p.user_id, kindsList);
+    }
+    return list.map((profile) => ({
+      profile,
+      actor: actorMap.get(profile.id) ?? null,
+      photoKinds: photoMap.get(profile.id) ?? [],
+      chestPhotoUrl: null as string | null,
+    }));
+  };
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, ["admin-approved-actor-rows-v2"], {
+    revalidate: 45,
+    tags: [ADMIN_CACHE_TAGS.actors],
+  })();
+});
+
+/** Lightweight cast labels for application filters. */
+export const fetchCastFilterOptions = cache(async () => {
+  const load = async () => {
+    const { supabase } = await dataClient();
+    const { data, error } = await supabase
+      .from("cast_listings")
+      .select("id, project_name, role_name")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as Pick<CastListing, "id" | "project_name" | "role_name">[];
+  };
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, ["admin-cast-filter-options-v1"], {
+    revalidate: 60,
+    tags: [ADMIN_CACHE_TAGS.casts],
+  })();
+});

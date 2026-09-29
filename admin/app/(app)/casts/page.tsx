@@ -101,6 +101,8 @@ async function CastsBody({ q, published }: { q: string; published: string }) {
                       <img
                         src={displayImageUrl(c.cover_image_url, 96) ?? c.cover_image_url}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                         className="size-12 shrink-0 rounded-full object-cover ring-1 ring-foreground/10"
                       />
                     ) : (

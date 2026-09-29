@@ -1,6 +1,9 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
+import { ADMIN_CACHE_TAGS } from "@/lib/admin-cache";
 import { isSharePin, shareUnlockCookieName } from "@/lib/share-pin";
 import type {
   ActorShare,
@@ -55,27 +58,41 @@ export const fetchActorShares = cache(async (actorId: string) => {
 });
 
 export const fetchActiveActorShares = cache(async () => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("actor_shares")
-    .select("*")
-    .is("revoked_at", null)
-    .order("created_at", { ascending: false });
-  if (error) return [];
-  return ((data ?? []) as ActorShare[]).filter(
-    (share) => !share.expires_at || new Date(share.expires_at).getTime() > Date.now()
-  );
+  const load = async () => {
+    const supabase = createServiceClient() ?? (await createClient());
+    const { data, error } = await supabase
+      .from("actor_shares")
+      .select("*")
+      .is("revoked_at", null)
+      .order("created_at", { ascending: false });
+    if (error) return [];
+    return ((data ?? []) as ActorShare[]).filter(
+      (share) => !share.expires_at || new Date(share.expires_at).getTime() > Date.now(),
+    );
+  };
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, ["admin-active-actor-shares-v1"], {
+    revalidate: 60,
+    tags: [ADMIN_CACHE_TAGS.actors],
+  })();
 });
 
 export const fetchDirectors = cache(async () => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, full_name, email, role")
-    .eq("role", "cast_director")
-    .order("full_name");
-  if (error) throw error;
-  return (data ?? []) as Pick<Profile, "id" | "full_name" | "email" | "role">[];
+  const load = async () => {
+    const supabase = createServiceClient() ?? (await createClient());
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, role")
+      .eq("role", "cast_director")
+      .order("full_name");
+    if (error) throw error;
+    return (data ?? []) as Pick<Profile, "id" | "full_name" | "email" | "role">[];
+  };
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, ["admin-directors-v1"], {
+    revalidate: 120,
+    tags: [ADMIN_CACHE_TAGS.actors],
+  })();
 });
 
 export async function readSharePinCookie(token: string) {
@@ -137,16 +154,23 @@ export const fetchApplicationShares = cache(async (applicationId: string) => {
 });
 
 export const fetchActiveApplicationShares = cache(async () => {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("application_shares")
-    .select("*")
-    .is("revoked_at", null)
-    .order("created_at", { ascending: false });
-  if (error) return [];
-  return ((data ?? []) as ApplicationShare[]).filter(
-    (share) => !share.expires_at || new Date(share.expires_at).getTime() > Date.now()
-  );
+  const load = async () => {
+    const supabase = createServiceClient() ?? (await createClient());
+    const { data, error } = await supabase
+      .from("application_shares")
+      .select("*")
+      .is("revoked_at", null)
+      .order("created_at", { ascending: false });
+    if (error) return [];
+    return ((data ?? []) as ApplicationShare[]).filter(
+      (share) => !share.expires_at || new Date(share.expires_at).getTime() > Date.now(),
+    );
+  };
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, ["admin-active-application-shares-v1"], {
+    revalidate: 60,
+    tags: [ADMIN_CACHE_TAGS.applications],
+  })();
 });
 
 export type SharedApplicationOpen =

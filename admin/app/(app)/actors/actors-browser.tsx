@@ -461,8 +461,10 @@ export function ActorsBrowser({
                     <div className="flex items-center gap-3">
                       {row.chestPhotoUrl ? (
                         <img
-                          src={displayImageUrl(row.chestPhotoUrl, 400) ?? row.chestPhotoUrl}
+                          src={displayImageUrl(row.chestPhotoUrl, 200) ?? row.chestPhotoUrl}
                           alt=""
+                          loading="lazy"
+                          decoding="async"
                           className="h-28 w-20 shrink-0 rounded-lg object-cover object-top ring-1 ring-foreground/10"
                         />
                       ) : (

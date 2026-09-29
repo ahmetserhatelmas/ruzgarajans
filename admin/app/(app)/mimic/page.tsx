@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/page-header";
 import { MimicSettingsForm } from "@/components/mimic-settings-form";
-import { activateMimicDefaults } from "@/lib/queries";
+import { fetchAppSettings } from "@/lib/queries";
 import { requireAdminPerm } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export default async function MimicSettingsPage({
   searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
   await requireAdminPerm("announcements");
-  const settings = await activateMimicDefaults();
+  const settings = await fetchAppSettings();
   const { error, ok } = await searchParams;
 
   return (

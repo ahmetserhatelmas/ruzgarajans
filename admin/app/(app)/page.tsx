@@ -42,11 +42,7 @@ export default async function DashboardPage({
 
 async function DashboardBody() {
   const { profile } = await requireAdminPerm();
-  const [statsData, alerts] = await Promise.all([
-    getCachedDashboardStats(),
-    canAdmin(profile, "applications") ? fetchAdminAlerts(8) : Promise.resolve([]),
-  ]);
-  const unreadAlerts = alerts.filter((alert) => !alert.read_at);
+  const statsData = await getCachedDashboardStats();
 
   const byStatus = (Object.keys(APP_STATUS) as ApplicationStatus[]).map((status) => ({
     status,
@@ -82,28 +78,10 @@ async function DashboardBody() {
 
   return (
     <>
-      {unreadAlerts.length ? (
-        <div className="mb-6 space-y-2 rounded-xl bg-primary/5 p-4 ring-1 ring-primary/20">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-medium">Yeni bildirimler</p>
-            <Link href="/alerts" className="text-sm text-primary hover:underline">
-              Tümünü gör
-            </Link>
-          </div>
-          <ul className="space-y-2">
-            {unreadAlerts.slice(0, 5).map((alert) => (
-              <li key={alert.id}>
-                <Link
-                  href={alert.application_id ? `/applications/${alert.application_id}` : "/alerts"}
-                  className="block text-sm hover:underline"
-                >
-                  <span className="font-medium">{alert.title}</span>
-                  <span className="text-muted-foreground"> · {alert.body}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
+      {canAdmin(profile, "applications") ? (
+        <Suspense fallback={null}>
+          <DashboardAlerts />
+        </Suspense>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -143,5 +121,34 @@ async function DashboardBody() {
         </>
       ) : null}
     </>
+  );
+}
+
+async function DashboardAlerts() {
+  const alerts = await fetchAdminAlerts(8);
+  const unreadAlerts = alerts.filter((alert) => !alert.read_at);
+  if (!unreadAlerts.length) return null;
+  return (
+    <div className="mb-6 space-y-2 rounded-xl bg-primary/5 p-4 ring-1 ring-primary/20">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-medium">Yeni bildirimler</p>
+        <Link href="/alerts" className="text-sm text-primary hover:underline">
+          Tümünü gör
+        </Link>
+      </div>
+      <ul className="space-y-2">
+        {unreadAlerts.slice(0, 5).map((alert) => (
+          <li key={alert.id}>
+            <Link
+              href={alert.application_id ? `/applications/${alert.application_id}` : "/alerts"}
+              className="block text-sm hover:underline"
+            >
+              <span className="font-medium">{alert.title}</span>
+              <span className="text-muted-foreground"> · {alert.body}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
