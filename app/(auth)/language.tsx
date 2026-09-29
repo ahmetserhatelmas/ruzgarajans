@@ -13,7 +13,7 @@ export default function LanguageScreen() {
 
   const choose = async (lng: 'tr' | 'en') => {
     await setAppLanguage(lng);
-    router.replace(session ? '/' : '/(auth)/login');
+    router.replace('/');
   };
 
   return (

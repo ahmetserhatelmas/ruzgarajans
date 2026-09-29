@@ -14,7 +14,7 @@ import { Colors, Fonts, Spacing } from '@/constants/theme';
 
 export default function LoginScreen() {
   const { t } = useTranslation();
-  const { signIn } = useAuth();
+  const { signIn, configured } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,6 +23,10 @@ export default function LoginScreen() {
   const onSubmit = async () => {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPassword = password.trim();
+    if (!configured) {
+      router.replace('/(auth)/setup');
+      return;
+    }
     if (!cleanEmail || !cleanPassword) {
       Alert.alert(t('common.error'), t('auth.login'));
       return;
@@ -55,6 +59,7 @@ export default function LoginScreen() {
           keyboardType="email-address"
           textContentType="username"
           autoComplete="email"
+          importantForAutofill="yes"
           value={email}
           onChangeText={setEmail}
         />
@@ -66,6 +71,7 @@ export default function LoginScreen() {
           spellCheck={false}
           textContentType="password"
           autoComplete="password"
+          importantForAutofill="yes"
           value={password}
           onChangeText={setPassword}
         />
