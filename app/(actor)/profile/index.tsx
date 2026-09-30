@@ -141,6 +141,7 @@ export default function ProfileScreen() {
         kind,
         title,
         replaceVideoId,
+        mimeType: asset.mimeType,
       });
       if (kind === LANG_INTRO_KIND) {
         const next = await fetchLangIntroVideos(user.id);

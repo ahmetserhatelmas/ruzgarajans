@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +27,8 @@ export default function AdminConversationScreen() {
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList<Message>>(null);
+  const insets = useSafeAreaInsets();
+  const ChatShell = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -67,7 +69,7 @@ export default function AdminConversationScreen() {
 
   useEffect(() => {
     if (!messages.length) return;
-    listRef.current?.scrollToEnd({ animated: true });
+    listRef.current?.scrollToEnd({ animated: Platform.OS !== 'android' });
   }, [messages.length]);
 
   const onSend = async () => {
@@ -101,15 +103,18 @@ export default function AdminConversationScreen() {
         <BackHeader fallbackHref="/(admin)/messages" />
       </View>
       <Text style={styles.title}>{t('admin.messages')}</Text>
-      <KeyboardAvoidingView
+      <ChatShell
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        {...(Platform.OS === 'ios' ? { behavior: 'padding' as const } : {})}
       >
         <FlatList
           ref={listRef}
           data={messages}
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          removeClippedSubviews={false}
           renderItem={({ item }) => {
             const mine = item.sender_id === user?.id;
             const when = new Date(item.created_at).toLocaleString(
@@ -128,7 +133,7 @@ export default function AdminConversationScreen() {
             );
           }}
         />
-        <View style={styles.composer}>
+        <View style={[styles.composer, { paddingBottom: Spacing.md + insets.bottom }]}>
           <TextInput
             style={styles.input}
             value={body}
@@ -136,10 +141,16 @@ export default function AdminConversationScreen() {
             placeholder={t('messages.placeholder')}
             placeholderTextColor={Colors.textMuted}
             editable={!sending}
+            underlineColorAndroid="transparent"
+            onFocus={() =>
+              requestAnimationFrame(() =>
+                listRef.current?.scrollToEnd({ animated: false })
+              )
+            }
           />
           <Button label={t('messages.send')} onPress={onSend} loading={sending} />
         </View>
-      </KeyboardAvoidingView>
+      </ChatShell>
     </SafeAreaView>
   );
 }

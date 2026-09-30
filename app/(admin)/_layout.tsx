@@ -84,6 +84,7 @@ export default function AdminLayout() {
         options={{
           href: canAdmin(profile, 'messages') ? undefined : null,
           title: t('admin.messages'),
+          tabBarHideOnKeyboard: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubbles-outline" size={size} color={color} />
           ),
@@ -93,7 +94,7 @@ export default function AdminLayout() {
       <Tabs.Screen name="casts/[id]" options={{ href: null }} />
       <Tabs.Screen name="casts/new" options={{ href: null }} />
       <Tabs.Screen name="actors/[id]" options={{ href: null }} />
-      <Tabs.Screen name="messages/[id]" options={{ href: null }} />
+      <Tabs.Screen name="messages/[id]" options={{ href: null, tabBarHideOnKeyboard: false }} />
       <Tabs.Screen name="applications/[id]" options={{ href: null }} />
     </Tabs>
   );

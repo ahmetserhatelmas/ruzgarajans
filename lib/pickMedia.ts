@@ -12,6 +12,7 @@ export async function pickFromLibrary(
   kind: 'images' | 'videos',
   videoMaxDuration?: number
 ): Promise<PickedAsset | null> {
+  await ImagePicker.requestMediaLibraryPermissionsAsync();
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: [kind],
     quality: kind === 'images' ? 0.85 : 0.8,

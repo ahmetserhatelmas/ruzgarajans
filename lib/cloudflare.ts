@@ -1,4 +1,6 @@
+import { Platform } from 'react-native';
 import { File, UploadType } from 'expo-file-system';
+import { cacheDirectory, copyAsync } from 'expo-file-system/legacy';
 import { supabase } from './supabase';
 
 export type DirectUploadResult = {
@@ -127,35 +129,136 @@ export type UploadProgressCallback = (progress: {
   percent: number;
 }) => void;
 
+const EXT_BY_MIME: Record<string, string> = {
+  'video/mp4': 'mp4',
+  'video/quicktime': 'mov',
+  'video/3gpp': '3gp',
+  'video/webm': 'webm',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+};
+
+const MIME_BY_EXT: Record<string, string> = {
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  '3gp': 'video/3gpp',
+  webm: 'video/webm',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  heic: 'image/heic',
+};
+
+function guessExt(uri: string, mimeType?: string | null, fallback = 'mp4') {
+  if (mimeType && EXT_BY_MIME[mimeType]) return EXT_BY_MIME[mimeType];
+  const clean = uri.split('?')[0] ?? uri;
+  const match = clean.match(/\.([a-z0-9]+)$/i);
+  return match ? match[1].toLowerCase() : fallback;
+}
+
+function guessMime(ext: string, mimeType: string | null | undefined, fallback: string) {
+  if (mimeType && mimeType !== 'application/octet-stream') return mimeType;
+  return MIME_BY_EXT[ext] ?? fallback;
+}
+
+async function fileForUpload(
+  localUri: string,
+  mimeType: string | null | undefined,
+  fallbackMime: string
+) {
+  const ext = guessExt(localUri, mimeType, fallbackMime.startsWith('image/') ? 'jpg' : 'mp4');
+  const mime = guessMime(ext, mimeType, fallbackMime);
+  const cacheRoot = cacheDirectory ?? '';
+  const shouldCopy =
+    Platform.OS === 'android' ||
+    localUri.startsWith('content://') ||
+    localUri.startsWith('ph://');
+
+  if (shouldCopy && cacheRoot) {
+    const dest = `${cacheRoot}cf-up-${Date.now()}.${ext}`;
+    try {
+      await copyAsync({ from: localUri, to: dest });
+      return { file: new File(dest), mimeType: mime };
+    } catch {
+      // Fall back to the original URI if the copy is refused.
+    }
+  }
+
+  return { file: new File(localUri), mimeType: mime };
+}
+
+function uploadSucceeded(result: { status?: number; body?: string }) {
+  const status = Number(result.status);
+  if (status >= 200 && status < 300) return true;
+  if (status !== 0 && !Number.isNaN(status)) return false;
+
+  const raw = (result.body ?? '').trim();
+  if (!raw) return true;
+  try {
+    const json = JSON.parse(raw) as {
+      success?: boolean;
+      errors?: unknown;
+      result?: unknown;
+      uid?: unknown;
+    };
+    if (json.success === false || json.errors) return false;
+    if (json.success === true || json.result || json.uid) return true;
+  } catch {
+    // not JSON
+  }
+  const lower = raw.toLowerCase();
+  if (lower.includes('error') && !lower.includes('success')) return false;
+  return true;
+}
+
+async function uploadLocalFile(input: {
+  localUri: string;
+  uploadURL: string;
+  mimeType: string;
+  failLabel: string;
+  onProgress?: UploadProgressCallback;
+}) {
+  const { file, mimeType } = await fileForUpload(input.localUri, input.mimeType, input.mimeType);
+  const result = await file.upload(input.uploadURL, {
+    httpMethod: 'POST',
+    uploadType: UploadType.MULTIPART,
+    fieldName: 'file',
+    mimeType,
+    ...(Platform.OS === 'ios' ? { sessionType: 'foreground' as const } : {}),
+    onProgress: ({ bytesSent, totalBytes }) => {
+      const total = totalBytes > 0 ? totalBytes : 0;
+      const percent =
+        total > 0 ? Math.min(100, Math.round((bytesSent / total) * 100)) : 0;
+      input.onProgress?.({ bytesSent, totalBytes: total, percent });
+    },
+  });
+
+  if (!uploadSucceeded(result)) {
+    throw new Error(`${input.failLabel}: ${result.status} ${result.body}`);
+  }
+
+  input.onProgress?.({ bytesSent: 1, totalBytes: 1, percent: 100 });
+}
+
 /**
  * Uploads a local video file to Cloudflare Stream via direct upload URL.
  */
 export async function uploadVideoToStream(
   localUri: string,
   uploadURL: string,
-  onProgress?: UploadProgressCallback
+  onProgress?: UploadProgressCallback,
+  mimeType?: string | null
 ): Promise<void> {
-  const file = new File(localUri);
-  const result = await file.upload(uploadURL, {
-    httpMethod: 'POST',
-    uploadType: UploadType.MULTIPART,
-    fieldName: 'file',
-    mimeType: 'video/mp4',
-    sessionType: 'foreground',
-    onProgress: ({ bytesSent, totalBytes }) => {
-      if (!onProgress) return;
-      const total = totalBytes > 0 ? totalBytes : 0;
-      const percent =
-        total > 0 ? Math.min(100, Math.round((bytesSent / total) * 100)) : 0;
-      onProgress({ bytesSent, totalBytes: total, percent });
-    },
+  await uploadLocalFile({
+    localUri,
+    uploadURL,
+    mimeType: mimeType ?? 'video/mp4',
+    failLabel: 'Video yükleme başarısız',
+    onProgress,
   });
-
-  if (result.status < 200 || result.status >= 300) {
-    throw new Error(`Video yükleme başarısız: ${result.status} ${result.body}`);
-  }
-
-  onProgress?.({ bytesSent: 1, totalBytes: 1, percent: 100 });
 }
 
 /**
@@ -167,27 +270,13 @@ export async function uploadImageToCf(
   mimeType: string = 'image/jpeg',
   onProgress?: UploadProgressCallback
 ): Promise<void> {
-  const file = new File(localUri);
-  const result = await file.upload(uploadURL, {
-    httpMethod: 'POST',
-    uploadType: UploadType.MULTIPART,
-    fieldName: 'file',
+  await uploadLocalFile({
+    localUri,
+    uploadURL,
     mimeType,
-    sessionType: 'foreground',
-    onProgress: ({ bytesSent, totalBytes }) => {
-      if (!onProgress) return;
-      const total = totalBytes > 0 ? totalBytes : 0;
-      const percent =
-        total > 0 ? Math.min(100, Math.round((bytesSent / total) * 100)) : 0;
-      onProgress({ bytesSent, totalBytes: total, percent });
-    },
+    failLabel: 'Görsel yükleme başarısız',
+    onProgress,
   });
-
-  if (result.status < 200 || result.status >= 300) {
-    throw new Error(`Görsel yükleme başarısız: ${result.status} ${result.body}`);
-  }
-
-  onProgress?.({ bytesSent: 1, totalBytes: 1, percent: 100 });
 }
 
 /**

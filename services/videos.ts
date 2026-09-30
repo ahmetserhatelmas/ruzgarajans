@@ -22,14 +22,15 @@ function isProfileVideoKind(kind: VideoKind): kind is ProfileVideoKind {
 }
 
 async function saveProfileVideoFields(userId: string, fields: Record<string, string>) {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const { data, error } = await supabase
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+    }
+    const { error } = await supabase
       .from('actor_profiles')
       .update(fields)
-      .eq('user_id', userId)
-      .select('user_id')
-      .maybeSingle();
-    if (!error && data) return;
+      .eq('user_id', userId);
+    if (!error) return;
   }
   throw new Error('profile_video_save_failed');
 }
@@ -54,6 +55,7 @@ export async function recordAndUploadVideo(input: {
   applicationId?: string | null;
   title?: string;
   replaceVideoId?: string;
+  mimeType?: string | null;
   onProgress?: (percent: number) => void;
 }): Promise<Video> {
   input.onProgress?.(0);
@@ -90,9 +92,14 @@ export async function recordAndUploadVideo(input: {
   if (insertError) throw insertError;
 
   try {
-    await uploadVideoToStream(input.localUri, uploadURL, ({ percent }) => {
-      input.onProgress?.(percent);
-    });
+    await uploadVideoToStream(
+      input.localUri,
+      uploadURL,
+      ({ percent }) => {
+        input.onProgress?.(percent);
+      },
+      input.mimeType
+    );
   } catch (e) {
     await supabase.from('videos').update({ status: 'failed' }).eq('id', row.id);
     throw e;
@@ -110,7 +117,7 @@ export async function recordAndUploadVideo(input: {
     })
     .eq('id', row.id)
     .select('*')
-    .single();
+    .maybeSingle();
 
   if (updateError) throw updateError;
 
@@ -131,7 +138,15 @@ export async function recordAndUploadVideo(input: {
       .eq('kind', LANG_INTRO_KIND);
   }
 
-  return updated as Video;
+  return (
+    (updated as Video | null) ??
+    ({
+      ...row,
+      status: 'ready',
+      playback_url: playback,
+      thumbnail_url: thumb,
+    } as Video)
+  );
 }
 
 export async function fetchVideosForCast(castId: string): Promise<Video[]> {

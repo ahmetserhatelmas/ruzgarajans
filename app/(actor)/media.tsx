@@ -162,6 +162,7 @@ export default function MediaScreen() {
         kind,
         title,
         replaceVideoId,
+        mimeType: asset.mimeType,
       });
       if (kind === 'lang_intro') {
         const next = await fetchLangIntroVideos(user.id);

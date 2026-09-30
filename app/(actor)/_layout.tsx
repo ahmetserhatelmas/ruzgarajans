@@ -70,6 +70,7 @@ export default function ActorLayout() {
         name="messages/index"
         options={{
           title: t('tabs.messages'),
+          tabBarHideOnKeyboard: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="chatbubble-outline" size={size} color={color} />
           ),

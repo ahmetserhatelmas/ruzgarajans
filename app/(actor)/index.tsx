@@ -132,6 +132,7 @@ export default function HomeScreen() {
                         userId: user.id,
                         kind: 'intro',
                         title: 'Tanıtım',
+                        mimeType: asset.mimeType,
                       });
                       await refreshProfile();
                       Alert.alert(t('common.success'));

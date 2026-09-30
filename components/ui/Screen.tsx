@@ -31,14 +31,11 @@ export const Screen = React.forwardRef<ScrollView, Props>(function Screen(
 
   useEffect(() => {
     if (!scroll) return;
-    const show = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => setKeyboardPad(e.endCoordinates.height)
+    if (Platform.OS !== 'ios') return;
+    const show = Keyboard.addListener('keyboardWillShow', (e) =>
+      setKeyboardPad(e.endCoordinates.height)
     );
-    const hide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardPad(0)
-    );
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardPad(0));
     return () => {
       show.remove();
       hide.remove();
@@ -59,7 +56,7 @@ export const Screen = React.forwardRef<ScrollView, Props>(function Screen(
             contentStyle,
           ]}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           automaticallyAdjustKeyboardInsets={false}
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
