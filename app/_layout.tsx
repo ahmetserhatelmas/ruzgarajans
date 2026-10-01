@@ -20,13 +20,17 @@ import {
 import { AuthProvider } from '@/contexts/AuthContext';
 import { NotificationObserver } from '@/components/NotificationObserver';
 import { initI18n } from '@/lib/i18n';
+import { lockInterfaceOrientation, useInterfaceOrientationLock } from '@/lib/appOrientation';
 import { Colors } from '@/constants/theme';
+
+void lockInterfaceOrientation();
 
 export { ErrorBoundary } from 'expo-router';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  useInterfaceOrientationLock();
   const [i18nReady, setI18nReady] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
     CormorantGaramond_600SemiBold,
@@ -47,6 +51,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded && i18nReady) {
       SplashScreen.hideAsync();
+      void lockInterfaceOrientation();
     }
   }, [fontsLoaded, i18nReady]);
 
@@ -66,7 +71,6 @@ export default function RootLayout() {
         <Stack
           screenOptions={{
             headerShown: false,
-            orientation: 'portrait',
             contentStyle: { backgroundColor: Colors.paper },
           }}
         >
@@ -74,18 +78,9 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(actor)" />
           <Stack.Screen name="(admin)" />
-          <Stack.Screen
-            name="record/intro"
-            options={{ presentation: 'fullScreenModal', orientation: 'all' }}
-          />
-          <Stack.Screen
-            name="record/[kind]"
-            options={{ presentation: 'fullScreenModal', orientation: 'all' }}
-          />
-          <Stack.Screen
-            name="record/audition"
-            options={{ presentation: 'fullScreenModal', orientation: 'all' }}
-          />
+          <Stack.Screen name="record/intro" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="record/[kind]" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="record/audition" options={{ presentation: 'fullScreenModal' }} />
         </Stack>
       </AuthProvider>
     </SafeAreaProvider>

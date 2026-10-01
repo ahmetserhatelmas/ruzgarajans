@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { BackHeader } from '@/components/ui/BackHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchMessages, mergeMessages, sendMessage } from '@/services/messages';
+import { useAndroidChatLift } from '@/lib/androidChatLift';
 import { supabase } from '@/lib/supabase';
 import type { Message } from '@/types/database';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
@@ -28,6 +29,7 @@ export default function AdminConversationScreen() {
   const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList<Message>>(null);
   const insets = useSafeAreaInsets();
+  const keyboardLift = useAndroidChatLift();
   const ChatShell = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
 
   const load = useCallback(async () => {
@@ -72,6 +74,11 @@ export default function AdminConversationScreen() {
     listRef.current?.scrollToEnd({ animated: Platform.OS !== 'android' });
   }, [messages.length]);
 
+  useEffect(() => {
+    if (!keyboardLift) return;
+    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false }));
+  }, [keyboardLift]);
+
   const onSend = async () => {
     if (!user || !id || !body.trim()) return;
     const text = body.trim();
@@ -104,7 +111,7 @@ export default function AdminConversationScreen() {
       </View>
       <Text style={styles.title}>{t('admin.messages')}</Text>
       <ChatShell
-        style={{ flex: 1 }}
+        style={{ flex: 1, marginBottom: keyboardLift }}
         {...(Platform.OS === 'ios' ? { behavior: 'padding' as const } : {})}
       >
         <FlatList
@@ -133,7 +140,12 @@ export default function AdminConversationScreen() {
             );
           }}
         />
-        <View style={[styles.composer, { paddingBottom: Spacing.md + insets.bottom }]}>
+        <View
+          style={[
+            styles.composer,
+            { paddingBottom: Spacing.md + (keyboardLift > 0 ? 0 : insets.bottom) },
+          ]}
+        >
           <TextInput
             style={styles.input}
             value={body}

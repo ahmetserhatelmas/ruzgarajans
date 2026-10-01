@@ -10,7 +10,7 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import * as ScreenOrientation from 'expo-screen-orientation';
+import { lockInterfaceOrientation, unlockRecordingOrientation } from '@/lib/appOrientation';
 import {
   CameraView,
   useCameraPermissions,
@@ -313,11 +313,11 @@ export function VideoRecorder({
 
   useEffect(() => {
     mountedRef.current = true;
-    void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.DEFAULT);
+    void unlockRecordingOrientation();
     return () => {
       mountedRef.current = false;
       hushAll();
-      void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      void lockInterfaceOrientation();
     };
   }, []);
 

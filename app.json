@@ -3,7 +3,7 @@
     "name": "Rüzgar Oyunculuk",
     "slug": "ajansapp",
     "version": "1.0.0",
-    "orientation": "default",
+    "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "ajansapp",
     "userInterfaceStyle": "light",
@@ -84,7 +84,8 @@
           "color": "#6B2C91",
           "defaultChannel": "casts"
         }
-      ]
+      ],
+      "./plugins/withIphonePortrait"
     ],
     "experiments": {
       "typedRoutes": true

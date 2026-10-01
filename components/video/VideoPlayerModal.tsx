@@ -6,6 +6,7 @@ import Slider from '@react-native-community/slider';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { isTabletDevice, lockInterfaceOrientation } from '@/lib/appOrientation';
 import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 
 function formatTime(sec: number) {
@@ -23,27 +24,30 @@ type Props = {
   onClose: () => void;
 };
 
+const releasedPlayers = new WeakSet<VideoPlayer>();
+
 function killPlayer(player: VideoPlayer | null) {
-  if (!player) return;
+  if (!player || releasedPlayers.has(player)) return;
+  releasedPlayers.add(player);
   try {
     player.loop = false;
     player.muted = true;
     player.volume = 0;
     player.pause();
-    player.currentTime = 0;
   } catch {
     // already released
-  }
-  try {
-    void player.replaceAsync(null);
-  } catch {
-    // ignore
   }
   try {
     player.release();
   } catch {
     // ignore
   }
+}
+
+function replaceSource(player: VideoPlayer, uri: string) {
+  return player.replaceAsync(uri).catch(() => {
+    // Android rejects this if the native player was already released.
+  });
 }
 
 async function hushAudioSession() {
@@ -74,39 +78,51 @@ export function VideoPlayerModal({ visible, uri, title, onClose }: Props) {
   const [duration, setDuration] = useState(0);
   const [preparing, setPreparing] = useState(false);
   const [stuck, setStuck] = useState(false);
+  const [ended, setEnded] = useState(false);
   const slidingRef = useRef(false);
   const retryRef = useRef(0);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
+    if (!visible || isTabletDevice()) return;
+    void lockInterfaceOrientation();
+  }, [visible]);
+
+  useEffect(() => {
     if (!visible || !uri) {
       retryRef.current = 0;
-      killPlayer(playerRef.current);
+      const old = playerRef.current;
       playerRef.current = null;
       setPlayer(null);
       setPosition(0);
       setDuration(0);
       setPreparing(false);
       setStuck(false);
+      setEnded(false);
       void hushAudioSession();
-      return;
+      const detach = setTimeout(() => killPlayer(old), 120);
+      return () => {
+        clearTimeout(detach);
+        killPlayer(old);
+      };
     }
 
     let cancelled = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let watchdog: ReturnType<typeof setTimeout> | null = null;
+    let detachTimer: ReturnType<typeof setTimeout> | null = null;
     const listeners: { remove: () => void }[] = [];
 
     const clearTimers = () => {
       if (retryTimer) clearTimeout(retryTimer);
       if (watchdog) clearTimeout(watchdog);
+      if (detachTimer) clearTimeout(detachTimer);
       retryTimer = null;
       watchdog = null;
+      detachTimer = null;
     };
 
-    const boot = (attempt: number) => {
-      if (cancelled) return;
-      clearTimers();
+    const bindPlayer = (next: VideoPlayer) => {
       for (const sub of listeners) {
         try {
           sub.remove();
@@ -116,10 +132,6 @@ export function VideoPlayerModal({ visible, uri, title, onClose }: Props) {
       }
       listeners.length = 0;
 
-      killPlayer(playerRef.current);
-      playerRef.current = null;
-
-      const next = createVideoPlayer(playUri(uri, attempt));
       next.loop = false;
       next.muted = false;
       next.volume = 1;
@@ -132,9 +144,10 @@ export function VideoPlayerModal({ visible, uri, title, onClose }: Props) {
       setDuration(0);
       setPreparing(true);
       setStuck(false);
+      setEnded(false);
 
       const markReady = () => {
-        if (cancelled) return;
+        if (cancelled || playerRef.current !== next) return;
         setPreparing(false);
         setStuck(false);
         try {
@@ -161,7 +174,7 @@ export function VideoPlayerModal({ visible, uri, title, onClose }: Props) {
 
       listeners.push(
         next.addListener('statusChange', ({ status }) => {
-          if (cancelled) return;
+          if (cancelled || playerRef.current !== next) return;
           if (status === 'readyToPlay') {
             const len = next.duration;
             if (Number.isFinite(len) && len > 0) {
@@ -175,7 +188,7 @@ export function VideoPlayerModal({ visible, uri, title, onClose }: Props) {
       );
       listeners.push(
         next.addListener('timeUpdate', (event) => {
-          if (slidingRef.current) return;
+          if (slidingRef.current || playerRef.current !== next) return;
           setPosition(event.currentTime);
           const len = next.duration;
           if (Number.isFinite(len) && len > 0) {
@@ -186,12 +199,16 @@ export function VideoPlayerModal({ visible, uri, title, onClose }: Props) {
       );
       listeners.push(
         next.addListener('playToEnd', () => {
+          if (playerRef.current !== next) return;
+          const len = next.duration;
+          if (Number.isFinite(len) && len > 0) setPosition(len);
+          setEnded(true);
           setPaused(true);
         })
       );
 
       watchdog = setTimeout(() => {
-        if (cancelled) return;
+        if (cancelled || playerRef.current !== next) return;
         const len = next.duration;
         if (next.status === 'readyToPlay' || (Number.isFinite(len) && len > 0)) {
           markReady();
@@ -199,6 +216,59 @@ export function VideoPlayerModal({ visible, uri, title, onClose }: Props) {
         }
         scheduleRetry();
       }, 3500);
+    };
+
+    const boot = (attempt: number) => {
+      if (cancelled) return;
+      clearTimers();
+      const source = playUri(uri, attempt);
+      const current = playerRef.current;
+      if (current && !releasedPlayers.has(current)) {
+        void replaceSource(current, source);
+        setPreparing(true);
+        setStuck(false);
+        watchdog = setTimeout(() => {
+          if (cancelled || playerRef.current !== current) return;
+          const len = current.duration;
+          if (current.status === 'readyToPlay' || (Number.isFinite(len) && len > 0)) {
+            try {
+              current.play();
+              setPaused(false);
+              setPreparing(false);
+            } catch {
+              // ignore
+            }
+            return;
+          }
+          if (retryRef.current >= 18) {
+            setPreparing(false);
+            setStuck(true);
+            return;
+          }
+          retryRef.current += 1;
+          retryTimer = setTimeout(() => boot(retryRef.current), 2500);
+        }, 3500);
+        return;
+      }
+
+      const old = current;
+      playerRef.current = null;
+      setPlayer(null);
+      detachTimer = setTimeout(() => {
+        killPlayer(old);
+        if (cancelled) return;
+        try {
+          bindPlayer(createVideoPlayer(source));
+        } catch {
+          if (retryRef.current >= 18) {
+            setPreparing(false);
+            setStuck(true);
+            return;
+          }
+          retryRef.current += 1;
+          retryTimer = setTimeout(() => boot(retryRef.current), 2500);
+        }
+      }, 80);
     };
 
     retryRef.current = 0;
@@ -214,15 +284,17 @@ export function VideoPlayerModal({ visible, uri, title, onClose }: Props) {
           // ignore
         }
       }
-      killPlayer(playerRef.current);
+      const old = playerRef.current;
       playerRef.current = null;
+      setTimeout(() => killPlayer(old), 120);
     };
   }, [visible, uri, reloadToken]);
 
   const close = () => {
-    killPlayer(playerRef.current);
+    const old = playerRef.current;
     playerRef.current = null;
     setPlayer(null);
+    setTimeout(() => killPlayer(old), 120);
     void hushAudioSession();
     onClose();
   };
@@ -232,8 +304,22 @@ export function VideoPlayerModal({ visible, uri, title, onClose }: Props) {
     if (!current) return;
     try {
       if (paused) {
+        const len = duration > 0 ? duration : current.duration;
+        const pos = position > 0 ? position : current.currentTime;
+        const atEnd =
+          ended ||
+          (Number.isFinite(len) && Number.isFinite(pos) && len > 0 && pos >= len - 0.4);
         current.muted = false;
         current.volume = 1;
+        if (atEnd) {
+          try {
+            current.replay();
+          } catch {
+            current.currentTime = 0;
+          }
+          setPosition(0);
+          setEnded(false);
+        }
         current.play();
         setPaused(false);
       } else {
@@ -253,6 +339,7 @@ export function VideoPlayerModal({ visible, uri, title, onClose }: Props) {
     try {
       current.currentTime = next;
       setPosition(next);
+      setEnded(false);
     } catch {
       // ignore
     }
@@ -284,7 +371,7 @@ export function VideoPlayerModal({ visible, uri, title, onClose }: Props) {
           </Pressable>
         </View>
         <View style={styles.video}>
-          {player ? (
+          {player && !releasedPlayers.has(player) ? (
             <VideoView
               style={StyleSheet.absoluteFill}
               player={player}

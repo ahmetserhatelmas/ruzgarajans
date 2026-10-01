@@ -190,28 +190,51 @@ async function fileForUpload(
   return { file: new File(localUri), mimeType: mime };
 }
 
-function uploadSucceeded(result: { status?: number; body?: string }) {
-  const status = Number(result.status);
-  if (status >= 200 && status < 300) return true;
-  if (status !== 0 && !Number.isNaN(status)) return false;
+type CfUploadJson = {
+  success?: boolean;
+  errors?: unknown;
+  result?: unknown;
+  uid?: unknown;
+};
 
-  const raw = (result.body ?? '').trim();
-  if (!raw) return true;
-  try {
-    const json = JSON.parse(raw) as {
-      success?: boolean;
-      errors?: unknown;
-      result?: unknown;
-      uid?: unknown;
-    };
-    if (json.success === false || json.errors) return false;
-    if (json.success === true || json.result || json.uid) return true;
-  } catch {
-    // not JSON
-  }
-  const lower = raw.toLowerCase();
-  if (lower.includes('error') && !lower.includes('success')) return false;
+function hasCloudflareErrors(errors: unknown) {
+  if (!errors) return false;
+  if (Array.isArray(errors)) return errors.length > 0;
+  if (typeof errors === 'object') return Object.keys(errors as object).length > 0;
   return true;
+}
+
+function parseUploadJson(body: unknown): CfUploadJson | null {
+  if (body && typeof body === 'object') return body as CfUploadJson;
+  if (typeof body !== 'string') return null;
+  const raw = body.trim();
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as CfUploadJson;
+  } catch {
+    return null;
+  }
+}
+
+function uploadSucceeded(result: { status?: number; body?: unknown }) {
+  const status = Number(result.status);
+  const json = parseUploadJson(result.body);
+
+  // Cloudflare's success payload always includes `"errors": []`. An empty array is
+  // truthy in JS, so checking `json.errors` used to mark finished Android uploads as failed.
+  if (json) {
+    if (json.success === true) return true;
+    if (json.success === false || hasCloudflareErrors(json.errors)) return false;
+    if (json.result || json.uid) return true;
+  }
+
+  if (status >= 200 && status < 300) return true;
+  // Android File.upload often reports status 0 after a completed multipart POST.
+  if ((status === 0 || Number.isNaN(status)) && !json) {
+    const raw = typeof result.body === 'string' ? result.body.trim() : '';
+    return !raw;
+  }
+  return false;
 }
 
 async function uploadLocalFile(input: {
@@ -222,22 +245,35 @@ async function uploadLocalFile(input: {
   onProgress?: UploadProgressCallback;
 }) {
   const { file, mimeType } = await fileForUpload(input.localUri, input.mimeType, input.mimeType);
-  const result = await file.upload(input.uploadURL, {
-    httpMethod: 'POST',
-    uploadType: UploadType.MULTIPART,
-    fieldName: 'file',
-    mimeType,
-    ...(Platform.OS === 'ios' ? { sessionType: 'foreground' as const } : {}),
-    onProgress: ({ bytesSent, totalBytes }) => {
-      const total = totalBytes > 0 ? totalBytes : 0;
-      const percent =
-        total > 0 ? Math.min(100, Math.round((bytesSent / total) * 100)) : 0;
-      input.onProgress?.({ bytesSent, totalBytes: total, percent });
-    },
-  });
+  let reachedEnd = false;
+  let result: { status?: number; body?: unknown };
+  try {
+    result = await file.upload(input.uploadURL, {
+      httpMethod: 'POST',
+      uploadType: UploadType.MULTIPART,
+      fieldName: 'file',
+      mimeType,
+      ...(Platform.OS === 'ios' ? { sessionType: 'foreground' as const } : {}),
+      onProgress: ({ bytesSent, totalBytes }) => {
+        const total = totalBytes > 0 ? totalBytes : 0;
+        const percent =
+          total > 0 ? Math.min(100, Math.round((bytesSent / total) * 100)) : 0;
+        if (percent >= 100 || (total > 0 && bytesSent >= total)) reachedEnd = true;
+        input.onProgress?.({ bytesSent, totalBytes: total, percent });
+      },
+    });
+  } catch (error) {
+    // Bytes left the device; Cloudflare already has the file. Android sometimes
+    // throws while reading the HTTP response after 100%.
+    if (reachedEnd && Platform.OS === 'android') {
+      input.onProgress?.({ bytesSent: 1, totalBytes: 1, percent: 100 });
+      return;
+    }
+    throw error;
+  }
 
   if (!uploadSucceeded(result)) {
-    throw new Error(`${input.failLabel}: ${result.status} ${result.body}`);
+    throw new Error(`${input.failLabel}: ${result.status} ${String(result.body ?? '')}`);
   }
 
   input.onProgress?.({ bytesSent: 1, totalBytes: 1, percent: 100 });
