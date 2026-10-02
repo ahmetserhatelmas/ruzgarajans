@@ -1,5 +1,6 @@
 import { ageFromBirth } from "@/lib/labels";
 import { fetchActorRowsFresh } from "@/lib/queries";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { ActorRow, CastListing } from "@/lib/types";
 
@@ -124,7 +125,7 @@ export async function notifyMatchingActors(cast: NotifyCast) {
   );
   if (!targets.length) return;
 
-  const supabase = await createClient();
+  const supabase = await notifyClient();
   const rowsToInsert = targets.map((row) => {
     const copy = copyFor(row.profile.locale, cast);
     return {
@@ -139,27 +140,57 @@ export async function notifyMatchingActors(cast: NotifyCast) {
   const { error } = await supabase.from("notifications").insert(rowsToInsert);
   if (error) console.error("cast notify insert failed", error.message);
 
-  const messages = targets
-    .filter((row) => row.profile.expo_push_token)
-    .map((row) => {
-      const copy = copyFor(row.profile.locale, cast);
-      return {
-        to: row.profile.expo_push_token as string,
-        sound: "default",
-        title: copy.title,
-        body: copy.body,
-        data: { castId: cast.id, url: `/(actor)/cast/${cast.id}` },
-        channelId: "casts",
-        priority: "high" as const,
-        subtitle: "Rüzgar Oyunculuk",
-        mutableContent: true,
-        richContent: { image: BRAND_LOGO_URL },
-      };
-    });
+  const byUser = await tokensByUser(targets.map((row) => row.profile.id));
+  const messages = targets.flatMap((row) => {
+    const copy = copyFor(row.profile.locale, cast);
+    return (byUser.get(row.profile.id) ?? []).map((token) => ({
+      to: token,
+      sound: "default",
+      title: copy.title,
+      body: copy.body,
+      data: { castId: cast.id, url: `/(actor)/cast/${cast.id}` },
+      channelId: "casts",
+      priority: "high" as const,
+      subtitle: "Rüzgar Oyunculuk",
+      mutableContent: true,
+      richContent: { image: BRAND_LOGO_URL },
+    }));
+  });
 
   if (messages.length) {
     await sendExpoPush(messages);
   }
+}
+
+async function notifyClient() {
+  return createServiceClient() ?? (await createClient());
+}
+
+async function tokensByUser(userIds: string[]) {
+  const map = new Map<string, string[]>();
+  if (!userIds.length) return map;
+  const supabase = await notifyClient();
+  const bags = new Map<string, Set<string>>();
+  const add = (userId: string, token?: string | null) => {
+    if (!token) return;
+    const bag = bags.get(userId) ?? new Set<string>();
+    bag.add(token);
+    bags.set(userId, bag);
+  };
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, expo_push_token")
+    .in("id", userIds);
+  for (const row of profiles ?? []) add(row.id, row.expo_push_token);
+  const extra = await supabase
+    .from("expo_push_tokens")
+    .select("user_id, token")
+    .in("user_id", userIds);
+  if (!extra.error) {
+    for (const row of extra.data ?? []) add(row.user_id, row.token);
+  }
+  for (const [userId, bag] of bags) map.set(userId, [...bag]);
+  return map;
 }
 
 export async function notifyOptionedActor(
@@ -192,10 +223,11 @@ export async function notifyOptionedActor(
   });
   if (error) console.error("option notify insert failed", error.message);
 
-  if (profile.expo_push_token) {
-    await sendExpoPush([
-      {
-        to: profile.expo_push_token,
+  const tokens = (await tokensByUser([profile.id])).get(profile.id) ?? [];
+  if (tokens.length) {
+    await sendExpoPush(
+      tokens.map((token) => ({
+        to: token,
         title,
         body,
         data,
@@ -205,8 +237,8 @@ export async function notifyOptionedActor(
         subtitle: "Rüzgar Oyunculuk",
         mutableContent: true,
         richContent: { image: BRAND_LOGO_URL },
-      },
-    ]);
+      }))
+    );
   }
 }
 
@@ -238,10 +270,11 @@ export async function notifyIntroducedActor(
   });
   if (error) console.error("intro notify insert failed", error.message);
 
-  if (profile.expo_push_token) {
-    await sendExpoPush([
-      {
-        to: profile.expo_push_token,
+  const tokens = (await tokensByUser([profile.id])).get(profile.id) ?? [];
+  if (tokens.length) {
+    await sendExpoPush(
+      tokens.map((token) => ({
+        to: token,
         title,
         body,
         data,
@@ -251,7 +284,7 @@ export async function notifyIntroducedActor(
         subtitle: "Rüzgar Oyunculuk",
         mutableContent: true,
         richContent: { image: BRAND_LOGO_URL },
-      },
-    ]);
+      }))
+    );
   }
 }

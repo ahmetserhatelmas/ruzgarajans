@@ -77,7 +77,7 @@ async function loadActorRows(
   const [{ data: profiles }, actorsRes, { data: kinds }, { data: chests }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, email, full_name, phone, actor_status, avatar_url, cover_url, created_at")
+      .select("id, email, full_name, phone, actor_status, avatar_url, cover_url, created_at, role, locale, expo_push_token")
       .eq("role", "actor")
       .order("created_at", { ascending: false }),
     supabase.from("actor_profiles").select(select),
@@ -536,7 +536,7 @@ export const fetchApprovedActorRows = cache(async (): Promise<ActorRow[]> => {
     const { supabase } = await dataClient();
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id, email, full_name, phone, actor_status, avatar_url, cover_url, created_at")
+      .select("id, email, full_name, phone, actor_status, avatar_url, cover_url, created_at, role, locale, expo_push_token")
       .eq("role", "actor")
       .eq("actor_status", "approved")
       .order("full_name", { ascending: true });

@@ -20,29 +20,38 @@ if (Notifications) {
     handleNotification: async () => ({
       shouldPlaySound: true,
       shouldSetBadge: false,
+      shouldShowAlert: true,
       shouldShowBanner: true,
       shouldShowList: true,
     }),
   });
 }
 
+async function ensureAndroidChannels() {
+  if (!Notifications || Platform.OS !== 'android') return;
+  const channels = [
+    ['default', 'Rüzgar Oyunculuk'],
+    ['casts', 'Cast ilanları'],
+    ['options', 'Opsiyon'],
+    ['introductions', 'Tanıtım'],
+  ] as const;
+  for (const [id, name] of channels) {
+    await Notifications.setNotificationChannelAsync(id, {
+      name,
+      importance: Notifications.AndroidImportance.MAX,
+      sound: 'default',
+      vibrationPattern: [0, 250, 250, 250],
+      enableVibrate: true,
+      showBadge: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    });
+  }
+}
+
 export async function registerAndSavePushToken(userId: string) {
   if (!Notifications || Platform.OS === 'web' || !Device.isDevice) return;
 
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('casts', {
-      name: 'Cast ilanları',
-      importance: Notifications.AndroidImportance.HIGH,
-    });
-    await Notifications.setNotificationChannelAsync('options', {
-      name: 'Opsiyon',
-      importance: Notifications.AndroidImportance.HIGH,
-    });
-    await Notifications.setNotificationChannelAsync('introductions', {
-      name: 'Tanıtım',
-      importance: Notifications.AndroidImportance.HIGH,
-    });
-  }
+  await ensureAndroidChannels();
 
   const existing = await Notifications.getPermissionsAsync();
   let status = existing.status;
@@ -56,14 +65,58 @@ export async function registerAndSavePushToken(userId: string) {
     Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
   if (!projectId) return;
 
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  let token: string | null = null;
+  try {
+    token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+  } catch {
+    return;
+  }
   if (!token) return;
 
   const locale = i18n.language?.toLowerCase().startsWith('en') ? 'en' : 'tr';
-  await supabase
+  const { data: current } = await supabase
     .from('profiles')
-    .update({ expo_push_token: token, locale })
-    .eq('id', userId);
+    .select('expo_push_token')
+    .eq('id', userId)
+    .maybeSingle();
+  const previous = current?.expo_push_token ?? null;
+
+  const { error: rpcError } = await supabase.rpc('save_push_token', {
+    p_token: token,
+    p_platform: Platform.OS,
+  });
+
+  if (rpcError) {
+    if (previous && previous !== token) {
+      await supabase.from('expo_push_tokens').upsert(
+        {
+          token: previous,
+          user_id: userId,
+          platform: 'unknown',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'token' }
+      );
+    }
+    await supabase
+      .from('profiles')
+      .update({ expo_push_token: token, locale })
+      .eq('id', userId);
+    await supabase.from('expo_push_tokens').upsert(
+      {
+        token,
+        user_id: userId,
+        platform: Platform.OS,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'token' }
+    );
+    return;
+  }
+
+  if (locale) {
+    await supabase.from('profiles').update({ locale }).eq('id', userId);
+  }
 }
 
 export async function enablePushFromSettings(userId: string): Promise<PushPermissionState> {

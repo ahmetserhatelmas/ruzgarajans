@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Alert, StyleSheet, Text, View, Pressable } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Screen } from '@/components/ui/Screen';
@@ -19,6 +19,12 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const revealFields = () => {
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 280);
+  };
 
   const onSubmit = async () => {
     const cleanEmail = email.trim().toLowerCase();
@@ -43,7 +49,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <Screen scroll>
+    <Screen ref={scrollRef} scroll>
       <LinearGradient />
       <View style={styles.hero}>
         <BrandMark />
@@ -62,6 +68,7 @@ export default function LoginScreen() {
           importantForAutofill="yes"
           value={email}
           onChangeText={setEmail}
+          onFocus={revealFields}
         />
         <TextField
           label={t('auth.password')}
@@ -74,6 +81,7 @@ export default function LoginScreen() {
           importantForAutofill="yes"
           value={password}
           onChangeText={setPassword}
+          onFocus={revealFields}
         />
         <Button label={t('auth.login')} onPress={() => void onSubmit()} loading={loading} />
         <Link href="/(auth)/forgot-password" asChild>

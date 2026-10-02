@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
-  Keyboard,
   Platform,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '@/constants/theme';
+import { useKeyboardOverlapPad } from '@/lib/keyboardOverlap';
 
 type Props = {
   children: React.ReactNode;
@@ -27,20 +27,7 @@ export const Screen = React.forwardRef<ScrollView, Props>(function Screen(
   { children, scroll, header, style, contentStyle, onScroll },
   ref
 ) {
-  const [keyboardPad, setKeyboardPad] = useState(0);
-
-  useEffect(() => {
-    if (!scroll) return;
-    if (Platform.OS !== 'ios') return;
-    const show = Keyboard.addListener('keyboardWillShow', (e) =>
-      setKeyboardPad(e.endCoordinates.height)
-    );
-    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardPad(0));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, [scroll]);
+  const keyboardPad = useKeyboardOverlapPad();
 
   const pinned = header ? <View style={styles.header}>{header}</View> : null;
 
