@@ -48,6 +48,23 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => ({}));
+    if (body?.storageUsage === true) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userData.user.id)
+        .maybeSingle();
+      if (profile?.role !== 'admin') {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403,
+          headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify(await streamStorageUsage(accountId, token)), {
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+
     const meta = body?.meta ?? {};
     const watermarkUid = await getOrCreateLogoWatermark(accountId, token);
 
@@ -93,6 +110,45 @@ Deno.serve(async (req: Request) => {
     });
   }
 });
+
+async function streamStorageUsage(accountId: string, token: string) {
+  const headers = { Authorization: `Bearer ${token}` };
+  const usageRes = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/storage-usage`,
+    { headers }
+  );
+  const usageJson = await usageRes.json().catch(() => null);
+  const usage = usageJson?.result ?? {};
+
+  let bytes = 0;
+  let count = 0;
+  let page = 1;
+  const perPage = 1000;
+  while (page <= 20) {
+    const listRes = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream?per_page=${perPage}&page=${page}`,
+      { headers }
+    );
+    const listJson = await listRes.json().catch(() => null);
+    if (!listRes.ok || listJson?.success === false) break;
+    const videos = Array.isArray(listJson?.result) ? listJson.result : [];
+    for (const video of videos) {
+      const size = Number(video?.size);
+      if (Number.isFinite(size) && size > 0) bytes += size;
+      count += 1;
+    }
+    const total = Number(listJson?.result_info?.total_count ?? videos.length);
+    if (videos.length === 0 || page * perPage >= total) break;
+    page += 1;
+  }
+
+  return {
+    bytes,
+    count: Number(usage.videoCount ?? count),
+    minutes: usage.totalStorageMinutes ?? null,
+    minutesLimit: usage.totalStorageMinutesLimit ?? null,
+  };
+}
 
 const WATERMARK_NAME = 'ruzgar-logo-lower-right';
 

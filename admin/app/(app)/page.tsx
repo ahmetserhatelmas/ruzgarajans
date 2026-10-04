@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { TableSkeleton } from "@/components/page-skeleton";
 import { fetchAdminAlerts } from "@/lib/queries";
 import { getCachedDashboardStats } from "@/lib/admin-cache";
+import { formatBytes, formatMinutes, getMediaUsage, type MediaUsage } from "@/lib/media-usage";
 import { APP_STATUS } from "@/lib/labels";
 import type { ApplicationStatus } from "@/lib/types";
 import { canAdmin, requireAdminPerm } from "@/lib/permissions";
@@ -42,7 +43,10 @@ export default async function DashboardPage({
 
 async function DashboardBody() {
   const { profile } = await requireAdminPerm();
-  const statsData = await getCachedDashboardStats();
+  const [statsData, usage] = await Promise.all([
+    getCachedDashboardStats(),
+    getMediaUsage(),
+  ]);
 
   const byStatus = (Object.keys(APP_STATUS) as ApplicationStatus[]).map((status) => ({
     status,
@@ -92,12 +96,14 @@ async function DashboardBody() {
                 <CardTitle className="text-sm text-muted-foreground">{s.label}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="font-heading text-4xl">{s.value}</p>
+                <p className="text-4xl font-semibold tabular-nums tracking-tight">{s.value}</p>
               </CardContent>
             </Card>
           </Link>
         ))}
       </div>
+
+      <StorageUsage usage={usage} />
 
       {canAdmin(profile, "applications") ? (
         <>
@@ -112,7 +118,7 @@ async function DashboardBody() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-2xl font-medium">{s.count}</p>
+                    <p className="text-2xl font-semibold tabular-nums tracking-tight">{s.count}</p>
                   </CardContent>
                 </Card>
               </Link>
@@ -121,6 +127,92 @@ async function DashboardBody() {
         </>
       ) : null}
     </>
+  );
+}
+
+function StorageUsage({ usage }: { usage: MediaUsage }) {
+  const photoBytes = usage.photos?.bytes ?? 0;
+  const videoBytes = usage.videos?.bytes ?? 0;
+  const total = photoBytes + videoBytes;
+  const photoShare = total > 0 ? Math.round((photoBytes / total) * 100) : 0;
+  const videoShare = total > 0 ? 100 - photoShare : 0;
+  const videoDetail = usage.videos
+    ? [
+        `${usage.videos.count.toLocaleString("tr-TR")} video`,
+        usage.videos.minutes != null ? formatMinutes(usage.videos.minutes) : null,
+        usage.videos.minutesLimit
+          ? `${formatMinutes(usage.videos.minutesLimit)} limit`
+          : null,
+        usage.videos.bytes == null ? "boyut henüz okunamadı" : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "Kayıtlı video bulunamadı";
+
+  return (
+    <section className="mt-10">
+      <h2 className="mb-3 font-heading text-2xl">Depolama</h2>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">Fotoğraflar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-4xl font-semibold tabular-nums tracking-tight">
+              {usage.photos ? formatBytes(usage.photos.bytes) : "—"}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {usage.photos
+                ? `${usage.photos.count.toLocaleString("tr-TR")} dosya`
+                : "Fotoğraf boyutu şu an alınamadı"}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">Videolar</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-4xl font-semibold tabular-nums tracking-tight">
+              {usage.videos?.bytes != null
+                ? formatBytes(usage.videos.bytes)
+                : usage.videos
+                  ? usage.videos.count.toLocaleString("tr-TR")
+                  : "—"}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{videoDetail}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">Toplam</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-4xl font-semibold tabular-nums tracking-tight">
+              {usage.photos || usage.videos ? formatBytes(total) : "—"}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {usage.videos?.bytes == null
+                ? "Video boyutu henüz eklenemedi"
+                : !usage.photos
+                  ? "Fotoğraf boyutu eklenemedi"
+                  : "Fotoğraf ve video birlikte"}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+      {total > 0 ? (
+        <div className="mt-4">
+          <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+            <div className="bg-primary" style={{ width: `${photoShare}%` }} />
+            <div className="bg-foreground/30" style={{ width: `${videoShare}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Fotoğraf %{photoShare} · Video %{videoShare}
+          </p>
+        </div>
+      ) : null}
+    </section>
   );
 }
 

@@ -523,13 +523,29 @@ export async function startConversationAction(actorId: string) {
     .select("id")
     .eq("actor_id", actorId)
     .maybeSingle();
-  if (existing?.id) redirect(`/messages/${existing.id}`);
+  if (existing?.id) {
+    bustAdminCache("messages");
+    redirect(`/messages/${existing.id}`);
+  }
   const { data, error } = await supabase
     .from("conversations")
     .insert({ actor_id: actorId })
     .select("id")
     .single();
-  if (error) throw error;
+  if (error) {
+    const { data: again } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("actor_id", actorId)
+      .maybeSingle();
+    if (again?.id) {
+      bustAdminCache("messages");
+      redirect(`/messages/${again.id}`);
+    }
+    throw error;
+  }
+  bustAdminCache("messages");
+  revalidatePath("/messages");
   redirect(`/messages/${data.id}`);
 }
 

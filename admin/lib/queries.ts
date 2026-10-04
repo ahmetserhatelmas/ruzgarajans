@@ -332,6 +332,30 @@ export const fetchConversations = cache(async () => {
   })();
 });
 
+export type MessageContact = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+};
+
+export const fetchMessageContacts = cache(async () => {
+  const load = async () => {
+    const { supabase } = await dataClient();
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .eq("role", "actor")
+      .order("full_name", { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as MessageContact[];
+  };
+  if (!createServiceClient()) return load();
+  return unstable_cache(load, ["admin-message-contacts-v1"], {
+    revalidate: 60,
+    tags: [ADMIN_CACHE_TAGS.messages, ADMIN_CACHE_TAGS.actors],
+  })();
+});
+
 export async function fetchMessages(conversationId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
